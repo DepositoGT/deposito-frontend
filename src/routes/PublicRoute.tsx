@@ -1,0 +1,10 @@
+import { Navigate, Outlet } from "react-router-dom";
+import { useAuth } from "@/context/useAuth";
+
+// Public pages accessible only when NOT authenticated (e.g., login)
+const PublicRoute = () => {
+  const { isAuthenticated } = useAuth();
+  return isAuthenticated ? <Navigate to="/" replace /> : <Outlet />;
+};
+
+export default PublicRoute;
