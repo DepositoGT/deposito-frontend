@@ -18,3 +18,13 @@ export const fetchSales = async (params: SalesQueryParams = {}) => {
   const data = await apiFetch(url, { method: "GET" });
   return data;
 };
+
+export const updateSaleStatus = async (saleId: string, payload: { status_id?: number; status_name?: string }) => {
+  if (!saleId) throw new Error('saleId requerido');
+  if (!payload.status_id && !payload.status_name) throw new Error('Debe enviar status_id o status_name');
+  return apiFetch(`/api/sales/${saleId}/status`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+};
