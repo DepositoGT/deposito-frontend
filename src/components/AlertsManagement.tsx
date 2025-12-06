@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -23,106 +23,87 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Alert, AlertStats, AlertType, AlertPriority } from "@/types";
+import { Alert, AlertStats, AlertType, AlertPriority, Status } from "@/types";
+import { apiFetch, reassignAlert, resolveAlert } from "@/services/api";
+import { useToast } from "@/hooks/use-toast";
 
 const AlertsManagement = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [priorityFilter, setPriorityFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
 
-  const alerts: Alert[] = [
-    {
-      id: "A001",
-      type: "stock_low",
-      priority: "high",
-      title: "Stock Crítico - Ron Zacapa 23",
-      message: "Solo quedan 2 unidades en inventario (mínimo: 3)",
-      product: "Ron Zacapa 23 Años",
-      category: "Rones",
-      currentStock: 2,
-      minStock: 3,
-      timestamp: "2024-01-10 14:30",
-      status: "active",
-      assignedTo: "Gerente de Inventario"
-    },
-    {
-      id: "A002",
-      type: "stock_out",
-      priority: "critical",
-      title: "Producto Agotado - Whisky Premium",
-      message: "El producto está completamente agotado",
-      product: "Whisky Macallan 18",
-      category: "Whisky",
-      currentStock: 0,
-      minStock: 2,
-      timestamp: "2024-01-10 12:15",
-      status: "active",
-      assignedTo: "Supervisor de Compras"
-    },
-    {
-      id: "A003",
-      type: "expiry_soon",
-      priority: "medium",
-      title: "Producto Próximo a Vencer",
-      message: "Vence en 30 días - considerar promoción",
-      product: "Vino Blanco Sauvignon 2022",
-      category: "Vinos",
-      currentStock: 15,
-      minStock: 5,
-      timestamp: "2024-01-10 10:45",
-      status: "pending",
-      assignedTo: "Gerente de Ventas"
-    },
-    {
-      id: "A004",
-      type: "stock_low",
-      priority: "medium",
-      title: "Stock Bajo - Cerveza Premium",
-      message: "Stock por debajo del mínimo recomendado",
-      product: "Cerveza Stella Artois 330ml",
-      category: "Cervezas",
-      currentStock: 8,
-      minStock: 12,
-      timestamp: "2024-01-10 09:20",
-      status: "resolved",
-      assignedTo: "Asistente de Inventario"
-    },
-    {
-      id: "A005",
-      type: "price_change",
-      priority: "low",
-      title: "Cambio de Precio de Proveedor",
-      message: "El proveedor ha actualizado precios - revisar márgenes",
-      product: "Vodka Absolut 750ml",
-      category: "Vodkas",
-      currentStock: 25,
-      minStock: 8,
-      timestamp: "2024-01-09 16:30",
-      status: "active",
-      assignedTo: "Gerente de Compras"
-    },
-    {
-      id: "A006",
-      type: "system",
-      priority: "high",
-      title: "Backup del Sistema Completado",
-      message: "Respaldo automático realizado exitosamente",
-      product: "Sistema",
-      category: "Tecnología",
-      currentStock: 0,
-      minStock: 0,
-      timestamp: "2024-01-10 02:00",
-      status: "resolved",
-      assignedTo: "Administrador de Sistema"
-    }
-  ];
+  const [alerts, setAlerts] = useState<Alert[]>([]);
+  const [users, setUsers] = useState<{ id: string; name: string }[]>([]);
+  const [resolvingAlertId, setResolvingAlertId] = useState<string | null>(null);
+  const { toast } = useToast();
 
-  const alertStats: AlertStats = {
+  useEffect(() => {
+    (async () => {
+      try {
+        const data = await apiFetch("/api/alerts", { method: "GET" }) as Array<Record<string, unknown>>;
+        // adapt API response (prisma model) to UI Alert type
+        // helpers to map DB names (es) to UI enums (en)
+        const mapPriority = (name?: string): AlertPriority => {
+          const n = (name || '').toLowerCase();
+          if (n === 'baja') return 'low';
+          if (n === 'media') return 'medium';
+          if (n === 'alta') return 'high';
+          if (n === 'crítica' || n === 'critica') return 'critical';
+          return 'medium';
+        };
+        const mapStatus = (name?: string): Status => {
+          const n = (name || '').toLowerCase();
+          if (n === 'activa') return 'active';
+          if (n === 'pendiente') return 'pending';
+          if (n === 'resuelta') return 'resolved';
+          return 'active';
+        };
+
+        const adapted: Alert[] = (data || []).map((raw) => {
+          const a = raw as {
+            id?: string | number
+            type?: { name?: string } | null
+            priority?: { name?: string } | null
+            title?: string
+            message?: string
+            product?: { name?: string; category?: { name?: string } | null } | null
+            current_stock?: number
+            min_stock?: number
+            timestamp?: string
+            status?: { name?: string } | null
+            assignedTo?: { name?: string } | null
+          }
+          return {
+            id: String(a.id ?? ''),
+            type: (a.type?.name === 'Sin Stock') ? 'stock_out' : 'stock_low',
+            priority: mapPriority(a.priority?.name),
+            title: a.title || 'Alerta',
+            message: a.message || '',
+            product: a.product?.name || '',
+            category: a.product?.category?.name || '',
+            currentStock: a.current_stock ?? 0,
+            minStock: a.min_stock ?? 0,
+            timestamp: a.timestamp || '',
+            status: mapStatus(a.status?.name),
+            assignedTo: a.assignedTo?.name || '',
+          }
+  });
+        setAlerts(adapted);
+      } catch (e) { /* noop */ }
+      try {
+        const list = await apiFetch("/api/auth/users", { method: "GET" }) as Array<Record<string, unknown>>;
+        const adaptedUsers = (list || []).map((u) => ({ id: String((u as { id?: string | number }).id ?? ''), name: String((u as { name?: string }).name ?? '') }));
+        setUsers(adaptedUsers);
+      } catch (e) { /* noop */ }
+    })();
+  }, []);
+
+  const alertStats: AlertStats = useMemo(() => ({
     total: alerts.length,
     active: alerts.filter(a => a.status === "active").length,
     critical: alerts.filter(a => a.priority === "critical").length,
     resolved: alerts.filter(a => a.status === "resolved").length
-  };
+  }), [alerts]);
 
   const getPriorityBadge = (priority: AlertPriority) => {
     switch (priority) {
@@ -163,6 +144,27 @@ const AlertsManagement = () => {
         return <Zap className="w-5 h-5" />;
       default:
         return <AlertTriangle className="w-5 h-5" />;
+    }
+  };
+
+  const handleResolveAlert = async (alertId: string) => {
+    setResolvingAlertId(alertId);
+    try {
+      await resolveAlert(alertId);
+      // Remove the alert from the list (since we're only showing unresolved by default)
+      setAlerts(prev => prev.filter(a => a.id !== alertId));
+      toast({
+        title: "Alerta resuelta",
+        description: "La alerta ha sido marcada como resuelta exitosamente.",
+      });
+    } catch (e) {
+      toast({
+        title: "Error",
+        description: "No se pudo resolver la alerta. Intenta nuevamente.",
+        variant: "destructive",
+      });
+    } finally {
+      setResolvingAlertId(null);
     }
   };
 
@@ -342,7 +344,23 @@ const AlertsManagement = () => {
                       </div>
                       <div>
                         <span className="text-muted-foreground">Asignado a:</span>
-                        <p className="font-medium text-foreground">{alert.assignedTo}</p>
+                        <div className="font-medium text-foreground">
+                          <Select onValueChange={async (val) => {
+                            try {
+                              await reassignAlert(alert.id, val);
+                              setAlerts(prev => prev.map(a => a.id === alert.id ? { ...a, assignedTo: users.find(u => u.id === val)?.name || a.assignedTo } : a));
+                            } catch (e) { /* noop */ }
+                          }}>
+                            <SelectTrigger className="w-56">
+                              <SelectValue placeholder={alert.assignedTo || 'Seleccionar'} />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {users.map(u => (
+                                <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
                       </div>
                     </div>
                     
@@ -356,9 +374,26 @@ const AlertsManagement = () => {
                           Ver Detalles
                         </Button>
                         {alert.status === "active" && (
-                          <Button size="sm" className="bg-gradient-primary hover:opacity-90">
-                            <CheckCircle className="w-3 h-3 mr-1" />
-                            Marcar Resuelta
+                          <Button 
+                            size="sm" 
+                            className="bg-liquor-amber hover:bg-liquor-amber/90 text-white"
+                            onClick={() => handleResolveAlert(alert.id)}
+                            disabled={resolvingAlertId === alert.id}
+                          >
+                            {resolvingAlertId === alert.id ? (
+                              <>
+                                <svg className="animate-spin w-3 h-3 mr-1" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+                                </svg>
+                                Procesando...
+                              </>
+                            ) : (
+                              <>
+                                <CheckCircle className="w-3 h-3 mr-1" />
+                                Marcar Resuelta
+                              </>
+                            )}
                           </Button>
                         )}
                       </div>

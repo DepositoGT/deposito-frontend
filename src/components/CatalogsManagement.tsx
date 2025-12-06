@@ -1,0 +1,800 @@
+import { useState } from 'react'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs'
+import { Button } from './ui/button'
+import { Input } from './ui/input'
+import { Label } from './ui/label'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from './ui/table'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from './ui/dialog'
+import { Badge } from './ui/badge'
+import { useToast } from '../hooks/use-toast'
+import {
+  usePaymentTerms,
+  useCreatePaymentTerm,
+  useUpdatePaymentTerm,
+  useDeletePaymentTerm,
+  useRestorePaymentTerm,
+  PaymentTerm,
+} from '../hooks/usePaymentTerms'
+import {
+  useProductCategories,
+  useCreateProductCategory,
+  useUpdateProductCategory,
+  useDeleteProductCategory,
+  useRestoreProductCategory,
+  ProductCategory,
+} from '../hooks/useProductCategories'
+import { useDeletedProducts, useRestoreProduct } from '../hooks/useProducts'
+import type { Product } from '../types'
+import { Pencil, Trash2, Plus, RotateCcw, Loader2 } from 'lucide-react'
+
+// Tipos para los diálogos
+type PaymentTermDialogState = {
+  open: boolean
+  mode: 'create' | 'edit'
+  item?: PaymentTerm
+}
+
+type ProductCategoryDialogState = {
+  open: boolean
+  mode: 'create' | 'edit'
+  item?: ProductCategory
+}
+
+export function CatalogsManagement() {
+  const [activeTab, setActiveTab] = useState('payment-terms')
+  const [showDeleted, setShowDeleted] = useState(false)
+  
+  // Payment Terms Dialog State
+  const [paymentTermDialog, setPaymentTermDialog] = useState<{
+    open: boolean
+    mode: 'create' | 'edit'
+    item?: PaymentTerm
+  }>({ open: false, mode: 'create' })
+  
+  // Product Categories Dialog State
+  const [categoryDialog, setCategoryDialog] = useState<{
+    open: boolean
+    mode: 'create' | 'edit'
+    item?: ProductCategory
+  }>({ open: false, mode: 'create' })
+
+  return (
+    <div className="p-6 space-y-6">
+      <div>
+        <h1 className="text-3xl font-bold tracking-tight">Administración de Catálogos</h1>
+        <p className="text-muted-foreground">Gestiona términos de pago y categorías de productos</p>
+      </div>
+
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList className="grid w-full grid-cols-3">
+          <TabsTrigger value="payment-terms">Términos de Pago</TabsTrigger>
+          <TabsTrigger value="categories">Categorías de Productos</TabsTrigger>
+          <TabsTrigger value="deleted-products">Productos Eliminados</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="payment-terms" className="space-y-4">
+          <PaymentTermsTab
+            showDeleted={showDeleted}
+            setShowDeleted={setShowDeleted}
+            dialog={paymentTermDialog}
+            setDialog={setPaymentTermDialog}
+          />
+        </TabsContent>
+
+        <TabsContent value="categories" className="space-y-4">
+          <ProductCategoriesTab
+            showDeleted={showDeleted}
+            setShowDeleted={setShowDeleted}
+            dialog={categoryDialog}
+            setDialog={setCategoryDialog}
+          />
+        </TabsContent>
+
+        <TabsContent value="deleted-products" className="space-y-4">
+          <DeletedProductsTab />
+        </TabsContent>
+      </Tabs>
+
+      {/* Payment Terms Dialog */}
+      <PaymentTermDialog
+        dialog={paymentTermDialog}
+        setDialog={setPaymentTermDialog}
+      />
+
+      {/* Product Categories Dialog */}
+      <ProductCategoryDialog
+        dialog={categoryDialog}
+        setDialog={setCategoryDialog}
+      />
+    </div>
+  )
+}
+
+// Payment Terms Tab Component
+function PaymentTermsTab({
+  showDeleted,
+  setShowDeleted,
+  dialog,
+  setDialog,
+}: {
+  showDeleted: boolean
+  setShowDeleted: (value: boolean) => void
+  dialog: PaymentTermDialogState
+  setDialog: (value: PaymentTermDialogState) => void
+}) {
+  const { toast } = useToast()
+  const { data: paymentTerms, isLoading } = usePaymentTerms(showDeleted)
+  const deleteMutation = useDeletePaymentTerm()
+  const restoreMutation = useRestorePaymentTerm()
+
+  const handleDelete = async (id: number) => {
+    if (!confirm('¿Estás seguro de eliminar este término de pago?')) return
+    
+    try {
+      await deleteMutation.mutateAsync(id)
+      toast({
+        title: 'Término eliminado',
+        description: 'El término de pago ha sido eliminado correctamente',
+      })
+    } catch (error: unknown) {
+      const apiError = error as { response?: { data?: { message?: string } } }
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: apiError.response?.data?.message || 'No se pudo eliminar el término de pago',
+      })
+    }
+  }
+
+  const handleRestore = async (id: number) => {
+    try {
+      await restoreMutation.mutateAsync(id)
+      toast({
+        title: 'Término restaurado',
+        description: 'El término de pago ha sido restaurado correctamente',
+      })
+    } catch (error: unknown) {
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: 'No se pudo restaurar el término de pago',
+      })
+    }
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <div>
+            <CardTitle>Términos de Pago</CardTitle>
+            <CardDescription>Administra los términos de pago disponibles</CardDescription>
+          </div>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowDeleted(!showDeleted)}
+            >
+              {showDeleted ? 'Ocultar eliminados' : 'Mostrar eliminados'}
+            </Button>
+            <Button
+              size="sm"
+              onClick={() => setDialog({ open: true, mode: 'create' })}
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Nuevo Término
+            </Button>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent>
+        {isLoading ? (
+          <div className="flex items-center justify-center py-8">
+            <Loader2 className="w-6 h-6 animate-spin" />
+          </div>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>ID</TableHead>
+                <TableHead>Nombre</TableHead>
+                <TableHead>Proveedores</TableHead>
+                <TableHead>Estado</TableHead>
+                <TableHead className="text-right">Acciones</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {paymentTerms?.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={5} className="text-center text-muted-foreground">
+                    No hay términos de pago registrados
+                  </TableCell>
+                </TableRow>
+              ) : (
+                paymentTerms?.map((term) => (
+                  <TableRow key={term.id}>
+                    <TableCell className="font-medium">{term.id}</TableCell>
+                    <TableCell>{term.name}</TableCell>
+                    <TableCell>{term._count?.suppliers || 0}</TableCell>
+                    <TableCell>
+                      {term.deleted ? (
+                        <Badge variant="destructive">Eliminado</Badge>
+                      ) : (
+                        <Badge variant="default">Activo</Badge>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end gap-2">
+                        {term.deleted ? (
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            onClick={() => handleRestore(term.id)}
+                            disabled={restoreMutation.isPending}
+                          >
+                            {restoreMutation.isPending ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                              <RotateCcw className="w-4 h-4" />
+                            )}
+                          </Button>
+                        ) : (
+                          <>
+                            <Button
+                              variant="outline"
+                              size="icon"
+                              onClick={() => setDialog({ open: true, mode: 'edit', item: term })}
+                            >
+                              <Pencil className="w-4 h-4" />
+                            </Button>
+                            <Button
+                              variant="destructive"
+                              size="icon"
+                              onClick={() => handleDelete(term.id)}
+                              disabled={deleteMutation.isPending}
+                            >
+                              {deleteMutation.isPending ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                              ) : (
+                                <Trash2 className="w-4 h-4" />
+                              )}
+                            </Button>
+                          </>
+                        )}
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        )}
+      </CardContent>
+    </Card>
+  )
+}
+
+// Product Categories Tab Component
+function ProductCategoriesTab({
+  showDeleted,
+  setShowDeleted,
+  dialog,
+  setDialog,
+}: {
+  showDeleted: boolean
+  setShowDeleted: (value: boolean) => void
+  dialog: ProductCategoryDialogState
+  setDialog: (value: ProductCategoryDialogState) => void
+}) {
+  const { toast } = useToast()
+  const { data: categories, isLoading } = useProductCategories(showDeleted)
+  const deleteMutation = useDeleteProductCategory()
+  const restoreMutation = useRestoreProductCategory()
+
+  const handleDelete = async (id: number) => {
+    if (!confirm('¿Estás seguro de eliminar esta categoría?')) return
+    
+    try {
+      await deleteMutation.mutateAsync(id)
+      toast({
+        title: 'Categoría eliminada',
+        description: 'La categoría ha sido eliminada correctamente',
+      })
+    } catch (error: unknown) {
+      const apiError = error as { response?: { data?: { message?: string } } }
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: apiError.response?.data?.message || 'No se pudo eliminar la categoría',
+      })
+    }
+  }
+
+  const handleRestore = async (id: number) => {
+    try {
+      await restoreMutation.mutateAsync(id)
+      toast({
+        title: 'Categoría restaurada',
+        description: 'La categoría ha sido restaurada correctamente',
+      })
+    } catch (error: unknown) {
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: 'No se pudo restaurar la categoría',
+      })
+    }
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <div>
+            <CardTitle>Categorías de Productos</CardTitle>
+            <CardDescription>Administra las categorías de productos disponibles</CardDescription>
+          </div>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowDeleted(!showDeleted)}
+            >
+              {showDeleted ? 'Ocultar eliminados' : 'Mostrar eliminados'}
+            </Button>
+            <Button
+              size="sm"
+              onClick={() => setDialog({ open: true, mode: 'create' })}
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Nueva Categoría
+            </Button>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent>
+        {isLoading ? (
+          <div className="flex items-center justify-center py-8">
+            <Loader2 className="w-6 h-6 animate-spin" />
+          </div>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>ID</TableHead>
+                <TableHead>Nombre</TableHead>
+                <TableHead>Productos</TableHead>
+                <TableHead>Proveedores</TableHead>
+                <TableHead>Estado</TableHead>
+                <TableHead className="text-right">Acciones</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {categories?.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={6} className="text-center text-muted-foreground">
+                    No hay categorías registradas
+                  </TableCell>
+                </TableRow>
+              ) : (
+                categories?.map((category) => (
+                  <TableRow key={category.id}>
+                    <TableCell className="font-medium">{category.id}</TableCell>
+                    <TableCell>{category.name}</TableCell>
+                    <TableCell>{category._count?.products || 0}</TableCell>
+                    <TableCell>{category._count?.suppliers || 0}</TableCell>
+                    <TableCell>
+                      {category.deleted ? (
+                        <Badge variant="destructive">Eliminado</Badge>
+                      ) : (
+                        <Badge variant="default">Activo</Badge>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end gap-2">
+                        {category.deleted ? (
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            onClick={() => handleRestore(category.id)}
+                            disabled={restoreMutation.isPending}
+                          >
+                            {restoreMutation.isPending ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                              <RotateCcw className="w-4 h-4" />
+                            )}
+                          </Button>
+                        ) : (
+                          <>
+                            <Button
+                              variant="outline"
+                              size="icon"
+                              onClick={() => setDialog({ open: true, mode: 'edit', item: category })}
+                            >
+                              <Pencil className="w-4 h-4" />
+                            </Button>
+                            <Button
+                              variant="destructive"
+                              size="icon"
+                              onClick={() => handleDelete(category.id)}
+                              disabled={deleteMutation.isPending}
+                            >
+                              {deleteMutation.isPending ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                              ) : (
+                                <Trash2 className="w-4 h-4" />
+                              )}
+                            </Button>
+                          </>
+                        )}
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        )}
+      </CardContent>
+    </Card>
+  )
+}
+
+// Payment Term Dialog Component
+function PaymentTermDialog({
+  dialog,
+  setDialog,
+}: {
+  dialog: PaymentTermDialogState
+  setDialog: (value: PaymentTermDialogState) => void
+}) {
+  const { toast } = useToast()
+  const [name, setName] = useState('')
+  const createMutation = useCreatePaymentTerm()
+  const updateMutation = useUpdatePaymentTerm()
+
+  const handleOpenChange = (open: boolean) => {
+    if (!open) {
+      setName('')
+      setDialog({ open: false, mode: 'create' })
+    } else {
+      if (dialog.item) {
+        setName(dialog.item.name)
+      }
+    }
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    
+    if (!name.trim()) {
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: 'El nombre es requerido',
+      })
+      return
+    }
+
+    try {
+      if (dialog.mode === 'create') {
+        await createMutation.mutateAsync({ name: name.trim() })
+        toast({
+          title: 'Término creado',
+          description: 'El término de pago ha sido creado correctamente',
+        })
+      } else if (dialog.item) {
+        await updateMutation.mutateAsync({ id: dialog.item.id, data: { name: name.trim() } })
+        toast({
+          title: 'Término actualizado',
+          description: 'El término de pago ha sido actualizado correctamente',
+        })
+      }
+      
+      handleOpenChange(false)
+    } catch (error: unknown) {
+      const apiError = error as { response?: { data?: { message?: string } } }
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: apiError.response?.data?.message || 'Ocurrió un error',
+      })
+    }
+  }
+
+  return (
+    <Dialog open={dialog.open} onOpenChange={handleOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>
+            {dialog.mode === 'create' ? 'Nuevo Término de Pago' : 'Editar Término de Pago'}
+          </DialogTitle>
+          <DialogDescription>
+            {dialog.mode === 'create'
+              ? 'Crea un nuevo término de pago para asignar a proveedores'
+              : 'Modifica los datos del término de pago'}
+          </DialogDescription>
+        </DialogHeader>
+        <form onSubmit={handleSubmit}>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="name">Nombre del término</Label>
+              <Input
+                id="name"
+                placeholder="Ej: 30 días, 60 días, Contado"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                autoFocus
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => handleOpenChange(false)}
+              disabled={createMutation.isPending || updateMutation.isPending}
+            >
+              Cancelar
+            </Button>
+            <Button
+              type="submit"
+              disabled={createMutation.isPending || updateMutation.isPending}
+            >
+              {(createMutation.isPending || updateMutation.isPending) && (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              )}
+              {dialog.mode === 'create' ? 'Crear' : 'Guardar'}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+// Product Category Dialog Component
+function ProductCategoryDialog({
+  dialog,
+  setDialog,
+}: {
+  dialog: ProductCategoryDialogState
+  setDialog: (value: ProductCategoryDialogState) => void
+}) {
+  const { toast } = useToast()
+  const [name, setName] = useState('')
+  const createMutation = useCreateProductCategory()
+  const updateMutation = useUpdateProductCategory()
+
+  const handleOpenChange = (open: boolean) => {
+    if (!open) {
+      setName('')
+      setDialog({ open: false, mode: 'create' })
+    } else {
+      if (dialog.item) {
+        setName(dialog.item.name)
+      }
+    }
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    
+    if (!name.trim()) {
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: 'El nombre es requerido',
+      })
+      return
+    }
+
+    try {
+      if (dialog.mode === 'create') {
+        await createMutation.mutateAsync({ name: name.trim() })
+        toast({
+          title: 'Categoría creada',
+          description: 'La categoría ha sido creada correctamente',
+        })
+      } else if (dialog.item) {
+        await updateMutation.mutateAsync({ id: dialog.item.id, data: { name: name.trim() } })
+        toast({
+          title: 'Categoría actualizada',
+          description: 'La categoría ha sido actualizada correctamente',
+        })
+      }
+      
+      handleOpenChange(false)
+    } catch (error: unknown) {
+      const apiError = error as { response?: { data?: { message?: string } } }
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: apiError.response?.data?.message || 'Ocurrió un error',
+      })
+    }
+  }
+
+  return (
+    <Dialog open={dialog.open} onOpenChange={handleOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>
+            {dialog.mode === 'create' ? 'Nueva Categoría' : 'Editar Categoría'}
+          </DialogTitle>
+          <DialogDescription>
+            {dialog.mode === 'create'
+              ? 'Crea una nueva categoría para clasificar productos'
+              : 'Modifica los datos de la categoría'}
+          </DialogDescription>
+        </DialogHeader>
+        <form onSubmit={handleSubmit}>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="categoryName">Nombre de la categoría</Label>
+              <Input
+                id="categoryName"
+                placeholder="Ej: Licores, Cervezas, Vinos"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                autoFocus
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => handleOpenChange(false)}
+              disabled={createMutation.isPending || updateMutation.isPending}
+            >
+              Cancelar
+            </Button>
+            <Button
+              type="submit"
+              disabled={createMutation.isPending || updateMutation.isPending}
+            >
+              {(createMutation.isPending || updateMutation.isPending) && (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              )}
+              {dialog.mode === 'create' ? 'Crear' : 'Guardar'}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+// ========================================
+// Deleted Products Tab Component
+// ========================================
+
+function DeletedProductsTab() {
+  const { toast } = useToast()
+  const { data: products = [], isLoading, error } = useDeletedProducts()
+  const restoreMutation = useRestoreProduct()
+
+  const handleRestore = async (product: Product) => {
+    if (!confirm(`¿Restaurar el producto "${product.name}"?`)) return
+
+    try {
+      await restoreMutation.mutateAsync(product.id)
+      toast({
+        title: 'Producto restaurado',
+        description: `El producto "${product.name}" ha sido restaurado exitosamente`,
+      })
+    } catch (error) {
+      const apiError = error as { response?: { data?: { message?: string } } }
+      toast({
+        title: 'Error',
+        description: apiError.response?.data?.message || 'No se pudo restaurar el producto',
+        variant: 'destructive',
+      })
+    }
+  }
+
+  if (error) {
+    return (
+      <Card>
+        <CardContent className="pt-6">
+          <p className="text-center text-red-600">Error al cargar productos eliminados</p>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Productos Eliminados</CardTitle>
+        <CardDescription>
+          Restaura productos que fueron eliminados anteriormente
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        {isLoading ? (
+          <div className="flex justify-center py-8">
+            <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+          </div>
+        ) : products.length === 0 ? (
+          <p className="text-center text-muted-foreground py-8">
+            No hay productos eliminados
+          </p>
+        ) : (
+          <div className="rounded-md border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Nombre</TableHead>
+                  <TableHead>Categoría</TableHead>
+                  <TableHead>Marca</TableHead>
+                  <TableHead>Stock</TableHead>
+                  <TableHead>Proveedor</TableHead>
+                  <TableHead className="text-right">Acciones</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {products.map((product) => (
+                  <TableRow key={product.id}>
+                    <TableCell className="font-medium">{product.name}</TableCell>
+                    <TableCell>
+                      {typeof product.category === 'string'
+                        ? product.category
+                        : (product.category as { name: string }).name || '-'}
+                    </TableCell>
+                    <TableCell>{product.brand || '-'}</TableCell>
+                    <TableCell>
+                      <Badge variant={product.stock > 0 ? 'default' : 'secondary'}>
+                        {product.stock}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      {typeof product.supplier === 'string'
+                        ? product.supplier
+                        : (product.supplier as { name: string })?.name || '-'}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleRestore(product)}
+                        disabled={restoreMutation.isPending}
+                      >
+                        {restoreMutation.isPending ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <>
+                            <RotateCcw className="w-4 h-4 mr-2" />
+                            Restaurar
+                          </>
+                        )}
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  )
+}

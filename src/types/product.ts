@@ -14,6 +14,8 @@ export interface Product extends BaseEntity {
   barcode: string;
   description: string;
   status: StockStatus | string; // Permitir string para flexibilidad
+  deleted?: boolean; // Campo para soft delete
+  deleted_at?: string | null; // Fecha de eliminación
 }
 
 // Interfaz para nuevo producto (form)

@@ -185,24 +185,86 @@ const ProductManagement = () => {
 
   // The following actions (save/edit/delete/adjust) remain client-side placeholders until backend endpoints exist
   const saveProduct = () => {
-    if (!newProduct.name || !newProduct.category || !newProduct.price) {
-      toast({ title: "Error", description: "Complete los campos requeridos", variant: "destructive" });
+    // Validaciones de campos requeridos
+    if (!newProduct.name || newProduct.name.trim() === "") {
+      toast({ 
+        title: "Campo requerido", 
+        description: "El nombre del producto es obligatorio", 
+        variant: "destructive" 
+      });
+      return;
+    }
+
+    if (!newProduct.category) {
+      toast({ 
+        title: "Campo requerido", 
+        description: "La categoría del producto es obligatoria", 
+        variant: "destructive" 
+      });
+      return;
+    }
+
+    if (!newProduct.price || Number(newProduct.price) <= 0) {
+      toast({ 
+        title: "Campo requerido", 
+        description: "El precio debe ser mayor a 0", 
+        variant: "destructive" 
+      });
+      return;
+    }
+
+    if (!newProduct.supplier) {
+      toast({ 
+        title: "Campo requerido", 
+        description: "El proveedor es obligatorio", 
+        variant: "destructive" 
+      });
+      return;
+    }
+
+    // Validación de stock mínimo
+    if (newProduct.minStock && Number(newProduct.minStock) < 0) {
+      toast({ 
+        title: "Valor inválido", 
+        description: "El stock mínimo no puede ser negativo", 
+        variant: "destructive" 
+      });
+      return;
+    }
+
+    // Validación de stock actual
+    if (newProduct.stock && Number(newProduct.stock) < 0) {
+      toast({ 
+        title: "Valor inválido", 
+        description: "El stock no puede ser negativo", 
+        variant: "destructive" 
+      });
+      return;
+    }
+
+    // Validación de costo
+    if (newProduct.cost && Number(newProduct.cost) < 0) {
+      toast({ 
+        title: "Valor inválido", 
+        description: "El costo no puede ser negativo", 
+        variant: "destructive" 
+      });
       return;
     }
 
     // prepare payload mapping form values to API shape
     const payload = {
-      name: newProduct.name,
-      category_id: Number(newProduct.category) || newProduct.category,
-      brand: newProduct.brand || undefined,
-      size: newProduct.size || undefined,
+      name: newProduct.name.trim(),
+      category_id: Number(newProduct.category),
+      brand: newProduct.brand?.trim() || undefined,
+      size: newProduct.size?.trim() || undefined,
       stock: newProduct.stock ? Number(newProduct.stock) : 0,
       min_stock: newProduct.minStock ? Number(newProduct.minStock) : 0,
-      price: newProduct.price ? Number(newProduct.price) : 0,
+      price: Number(newProduct.price),
       cost: newProduct.cost ? Number(newProduct.cost) : 0,
-      supplier_id: newProduct.supplier || undefined,
-      barcode: newProduct.barcode || undefined,
-      description: newProduct.description || undefined,
+      supplier_id: newProduct.supplier,
+      barcode: newProduct.barcode?.trim() || undefined,
+      description: newProduct.description?.trim() || undefined,
       status_id: 1,
     };
 
@@ -262,20 +324,88 @@ const ProductManagement = () => {
 
   const updateProduct = async () => {
     if (!selectedProduct) return;
+
+    // Validaciones de campos requeridos
+    if (!newProduct.name || newProduct.name.trim() === "") {
+      toast({ 
+        title: "Campo requerido", 
+        description: "El nombre del producto es obligatorio", 
+        variant: "destructive" 
+      });
+      return;
+    }
+
+    if (!newProduct.category) {
+      toast({ 
+        title: "Campo requerido", 
+        description: "La categoría del producto es obligatoria", 
+        variant: "destructive" 
+      });
+      return;
+    }
+
+    if (!newProduct.price || Number(newProduct.price) <= 0) {
+      toast({ 
+        title: "Campo requerido", 
+        description: "El precio debe ser mayor a 0", 
+        variant: "destructive" 
+      });
+      return;
+    }
+
+    if (!newProduct.supplier) {
+      toast({ 
+        title: "Campo requerido", 
+        description: "El proveedor es obligatorio", 
+        variant: "destructive" 
+      });
+      return;
+    }
+
+    // Validación de stock mínimo
+    if (newProduct.minStock && Number(newProduct.minStock) < 0) {
+      toast({ 
+        title: "Valor inválido", 
+        description: "El stock mínimo no puede ser negativo", 
+        variant: "destructive" 
+      });
+      return;
+    }
+
+    // Validación de stock actual
+    if (newProduct.stock && Number(newProduct.stock) < 0) {
+      toast({ 
+        title: "Valor inválido", 
+        description: "El stock no puede ser negativo", 
+        variant: "destructive" 
+      });
+      return;
+    }
+
+    // Validación de costo
+    if (newProduct.cost && Number(newProduct.cost) < 0) {
+      toast({ 
+        title: "Valor inválido", 
+        description: "El costo no puede ser negativo", 
+        variant: "destructive" 
+      });
+      return;
+    }
+
     try {
       const payload = {
         id: selectedProduct.id,
-        name: newProduct.name,
-        category_id: Number(newProduct.category) || newProduct.category,
-        brand: newProduct.brand || undefined,
-        size: newProduct.size || undefined,
+        name: newProduct.name.trim(),
+        category_id: Number(newProduct.category),
+        brand: newProduct.brand?.trim() || undefined,
+        size: newProduct.size?.trim() || undefined,
         stock: newProduct.stock ? Number(newProduct.stock) : 0,
         min_stock: newProduct.minStock ? Number(newProduct.minStock) : 0,
-        price: newProduct.price ? Number(newProduct.price) : 0,
+        price: Number(newProduct.price),
         cost: newProduct.cost ? Number(newProduct.cost) : 0,
-        supplier_id: newProduct.supplier || undefined,
-        barcode: newProduct.barcode || undefined,
-        description: newProduct.description || undefined,
+        supplier_id: newProduct.supplier,
+        barcode: newProduct.barcode?.trim() || undefined,
+        description: newProduct.description?.trim() || undefined,
         status_id: 1,
       };
 
@@ -667,9 +797,10 @@ const ProductManagement = () => {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => { setDeleteTargetId(null); setIsDeleteDialogOpen(false); }}>Cancelar</AlertDialogCancel>
+            <AlertDialogCancel onClick={() => { setDeleteTargetId(null); setIsDeleteDialogOpen(false); }} disabled={deleteIsLoading}>Cancelar</AlertDialogCancel>
             <AlertDialogAction
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={deleteIsLoading}
               onClick={async () => {
                 if (!deleteTargetId) return;
                 try {
@@ -686,7 +817,17 @@ const ProductManagement = () => {
                 }
               }}
             >
-              Eliminar
+              {deleteIsLoading ? (
+                <>
+                  <svg className="animate-spin w-4 h-4 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+                  </svg>
+                  Eliminando...
+                </>
+              ) : (
+                "Eliminar"
+              )}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -753,7 +894,7 @@ const ProductManagement = () => {
               <div>
                 <Label htmlFor="price">Precio de Venta *</Label>
                 <div className="relative">
-                  <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">Q</span>
                   <Input
                     id="price"
                     type="number"
@@ -768,7 +909,7 @@ const ProductManagement = () => {
               <div>
                 <Label htmlFor="cost">Costo</Label>
                 <div className="relative">
-                  <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">Q</span>
                   <Input
                     id="cost"
                     type="number"
@@ -858,11 +999,21 @@ const ProductManagement = () => {
               />
             </div>
             <div className="flex space-x-2">
-              <Button variant="outline" className="flex-1" onClick={() => setIsNewProductOpen(false)}>
+              <Button variant="outline" className="flex-1" onClick={() => setIsNewProductOpen(false)} disabled={createProductMutation.isPending}>
                 Cancelar
               </Button>
-              <Button className="flex-1" onClick={saveProduct}>
-                Guardar Producto
+              <Button className="flex-1 bg-liquor-amber hover:bg-liquor-amber/90 text-white" onClick={saveProduct} disabled={createProductMutation.isPending}>
+                {createProductMutation.isPending ? (
+                  <>
+                    <svg className="animate-spin w-4 h-4 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+                    </svg>
+                    Guardando...
+                  </>
+                ) : (
+                  "Guardar Producto"
+                )}
               </Button>
             </div>
           </div>
@@ -969,11 +1120,21 @@ const ProductManagement = () => {
               <Textarea id="editDescription" value={newProduct.description} onChange={(e) => setNewProduct((prev) => ({ ...prev, description: e.target.value }))} />
             </div>
             <div className="flex space-x-2">
-              <Button variant="outline" className="flex-1" onClick={() => setIsEditProductOpen(false)}>
+              <Button variant="outline" className="flex-1" onClick={() => setIsEditProductOpen(false)} disabled={updateMutation.isPending}>
                 Cancelar
               </Button>
-              <Button className="flex-1" onClick={updateProduct}>
-                Actualizar Producto
+              <Button className="flex-1 bg-liquor-amber hover:bg-liquor-amber/90 text-white" onClick={updateProduct} disabled={updateMutation.isPending}>
+                {updateMutation.isPending ? (
+                  <>
+                    <svg className="animate-spin w-4 h-4 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+                    </svg>
+                    Actualizando...
+                  </>
+                ) : (
+                  "Actualizar Producto"
+                )}
               </Button>
             </div>
           </div>
@@ -1118,11 +1279,21 @@ const ProductManagement = () => {
               </div>
 
               <div className="flex space-x-2">
-                <Button variant="outline" className="flex-1" onClick={() => setIsStockAdjustOpen(false)}>
+                <Button variant="outline" className="flex-1" onClick={() => setIsStockAdjustOpen(false)} disabled={adjustStockMutation.isPending}>
                   Cancelar
                 </Button>
-                <Button className="flex-1" onClick={adjustStock}>
-                  Confirmar Ajuste
+                <Button className="flex-1 bg-liquor-amber hover:bg-liquor-amber/90 text-white" onClick={adjustStock} disabled={adjustStockMutation.isPending}>
+                  {adjustStockMutation.isPending ? (
+                    <>
+                      <svg className="animate-spin w-4 h-4 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+                      </svg>
+                      Ajustando...
+                    </>
+                  ) : (
+                    "Confirmar Ajuste"
+                  )}
                 </Button>
               </div>
             </div>

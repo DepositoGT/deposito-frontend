@@ -57,6 +57,23 @@ const mapStatus = (status?: string | number | null): Status | string => {
   return "active";
 };
 
+// Format date/time removing timezone info (DB stores Guatemala time as-is)
+const formatDateTime = (dateStr: string | null | undefined): string => {
+  if (!dateStr) return "N/A";
+  // Remove timezone info if present - DB stores Guatemala time as-is
+  const cleanDate = dateStr.replace('Z', '').replace(/[+-]\d{2}:\d{2}$/, '');
+  const d = new Date(cleanDate);
+  if (isNaN(d.getTime())) return dateStr;
+  return new Intl.DateTimeFormat('es-GT', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false
+  }).format(d);
+};
+
 export const adaptApiSupplier = (s: ApiSupplier): Supplier => {
   const categoryName = s.category?.name ?? (s.category_id != null ? String(s.category_id) : "");
   const statusRaw: string | number | undefined = s.status?.name ?? (s.status_id != null ? Number(s.status_id) : undefined);
@@ -75,7 +92,8 @@ export const adaptApiSupplier = (s: ApiSupplier): Supplier => {
     address: s.address ?? "",
     category: categoryName || "",
     products: toNumber(s.products, 0),
-    lastOrder: s.last_order ?? "",
+    // Format last_order date properly
+    lastOrder: formatDateTime(s.last_order),
     totalPurchases: toNumber(s.total_purchases, 0),
     rating: toNumber(s.rating, 0),
     status: mapStatus(statusRaw),

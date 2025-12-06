@@ -8,6 +8,7 @@ import NotFound from "./pages/NotFound";
 import PublicRoute from "@/routes/PublicRoute";
 import PrivateRoute from "@/routes/PrivateRoute";
 import Login from "@/pages/Login";
+import NewReturn from "./pages/NewReturn";
 import AuthProvider from "@/context/AuthProvider";
 
 const queryClient = new QueryClient();
@@ -28,6 +29,7 @@ const App = () => (
             {/* Private routes (require authentication) */}
             <Route element={<PrivateRoute />}>
               <Route path="/" element={<Index />} />
+              <Route path="/returns/new" element={<NewReturn />} />
             </Route>
 
             {/* Catch-all */}
