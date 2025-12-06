@@ -1,12 +1,14 @@
 import { useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
-import { Plus, Search, ShoppingCart, Calendar, DollarSign, User, Receipt, Eye, Trash2, X, Calculator, Minus, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Plus, Search, ShoppingCart, Calendar, DollarSign, User, Receipt, Eye, Trash2, X, Calculator, Minus, ChevronLeft, ChevronRight, RotateCcw, AlertTriangle, PackageX } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
 import { Sale, CartProduct, PaymentMethod, SaleStatus } from '@/types';
 import type { Product } from '@/types/product';
@@ -16,10 +18,32 @@ import { createSale } from '@/services/saleService';
 import { updateSaleStatus as apiUpdateSaleStatus } from '@/services/salesService';
 import { useRealtimeSales } from '@/hooks/useRealtimeSales';
 import { useAuth } from '@/context/useAuth';
+import { usePaymentMethods } from '@/hooks/usePaymentMethods';
 
-const SalesManagement = () => {
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000/api';
+
+interface NegativeStockProduct {
+  id: string;
+  name: string;
+  category: string;
+  supplier: string;
+  current_stock: number;
+  barcode: string | null;
+  status: string;
+}
+
+interface SalesManagementProps {
+  onSectionChange?: (section: string) => void;
+}
+
+const SalesManagement = ({ onSectionChange }: SalesManagementProps = {}) => {
   const { isAuthenticated } = useAuth();
   const { toast } = useToast();
+  const navigate = useNavigate();
+
+  // Payment methods from backend
+  const paymentMethodsQuery = usePaymentMethods();
+  const paymentMethods = paymentMethodsQuery.data ?? [];
 
   // UI state
   const [searchTerm, setSearchTerm] = useState('');
@@ -34,10 +58,41 @@ const SalesManagement = () => {
   const [customer, setCustomer] = useState('');
   const [customerNit, setCustomerNit] = useState('');
   const [isFinalConsumer, setIsFinalConsumer] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod | ''>('');
+  const [paymentMethod, setPaymentMethod] = useState<import('@/hooks/usePaymentMethods').PaymentMethod | null>(null);
   const [cartItems, setCartItems] = useState<CartProduct[]>([]);
   const [productSearch, setProductSearch] = useState('');
   const [amountReceived, setAmountReceived] = useState('');
+  const [isProcessingSale, setIsProcessingSale] = useState(false);
+
+  // Stock override dialogs
+  const [availabilityDialog, setAvailabilityDialog] = useState<{
+    open: boolean;
+    product: Product | null;
+    requestedQty: number;
+    availableStock: number;
+  }>({ open: false, product: null, requestedQty: 0, availableStock: 0 });
+  
+  const [additionalQty, setAdditionalQty] = useState('');
+  
+  const [adminAuthDialog, setAdminAuthDialog] = useState<{
+    open: boolean;
+    product: Product | null;
+    requestedQty: number;
+  }>({ open: false, product: null, requestedQty: 0 });
+  
+  const [adminUsername, setAdminUsername] = useState('');
+  const [adminPassword, setAdminPassword] = useState('');
+  const [isAuthenticating, setIsAuthenticating] = useState(false);
+  
+  // Track admin-authorized products (products that can exceed stock)
+  const [adminAuthorizedProducts, setAdminAuthorizedProducts] = useState<Set<string>>(new Set());
+
+  // Cash closure validation
+  const [isValidatingClosure, setIsValidatingClosure] = useState(false);
+  const [negativeStockDialog, setNegativeStockDialog] = useState<{
+    open: boolean;
+    products: NegativeStockProduct[];
+  }>({ open: false, products: [] });
 
   // Data
   const productsQuery = useProducts();
@@ -58,10 +113,10 @@ const SalesManagement = () => {
   ]), []);
 
   // Queries per status
-  const completedQuery = useSalesByStatus('Completada', { period: selectedPeriod, page: pages.completed, pageSize: 10 });
-  const pendingQuery = useSalesByStatus('Pendiente', { period: selectedPeriod, page: pages.pending, pageSize: 10 });
-  const cancelledQuery = useSalesByStatus('Cancelada', { period: selectedPeriod, page: pages.cancelled, pageSize: 10 });
-  const paidQuery = useSalesByStatus('Pagado', { period: selectedPeriod, page: pages.paid, pageSize: 10 });
+  const completedQuery = useSalesByStatus('Completada', { period: selectedPeriod, page: pages.completed, pageSize: 5 });
+  const pendingQuery = useSalesByStatus('Pendiente', { period: selectedPeriod, page: pages.pending, pageSize: 5 });
+  const cancelledQuery = useSalesByStatus('Cancelada', { period: selectedPeriod, page: pages.cancelled, pageSize: 5 });
+  const paidQuery = useSalesByStatus('Pagado', { period: selectedPeriod, page: pages.paid, pageSize: 5 });
 
   const refreshSales = () => {
     completedQuery.refetch?.();
@@ -93,10 +148,14 @@ const SalesManagement = () => {
   });
 
   type PaginatedSales = { items: Sale[]; page: number; pageSize: number; totalPages: number; totalItems: number; nextPage?: number; prevPage?: number };
+
   const completedData = completedQuery.data as PaginatedSales | undefined;
   const pendingData = pendingQuery.data as PaginatedSales | undefined;
   const cancelledData = cancelledQuery.data as PaginatedSales | undefined;
   const paidData = paidQuery.data as PaginatedSales | undefined;
+
+
+
 
   const mapStatusNameToKey = (name?: string) => {
     if (!name) return 'pending';
@@ -107,6 +166,8 @@ const SalesManagement = () => {
     if (n.includes('pag')) return 'paid';
     return 'pending';
   };
+
+
 
   const normalizeRawSale = (raw: unknown): Sale => {
     const r = raw as Record<string, unknown>;
@@ -144,6 +205,41 @@ const SalesManagement = () => {
     })();
     const amountReceived = parseFloat(String(r.amount_received ?? (r as Record<string, unknown>).amountReceived ?? '0')) || 0;
     const change = parseFloat(String(r.change ?? '0')) || 0;
+    
+    // Process returns data
+    const returnsRaw = Array.isArray(r.returns) ? r.returns : [];
+    const totalReturned = parseFloat(String(r.total_returned ?? '0')) || 0;
+    const adjustedTotal = parseFloat(String(r.adjusted_total ?? totalNum)) || totalNum;
+    const hasReturns = returnsRaw.length > 0 || totalReturned > 0;
+    
+    const returnDetails = returnsRaw
+      .filter((ret: unknown) => {
+        const retObj = ret as Record<string, unknown>;
+        const retStatus = (retObj.status as Record<string, unknown>)?.name;
+        return retStatus === 'Completada'; // Only show completed returns
+      })
+      .map((ret: unknown) => {
+        const retObj = ret as Record<string, unknown>;
+        const retItems = Array.isArray(retObj.return_items) ? retObj.return_items : [];
+        const items = retItems.map((item: unknown) => {
+          const itemObj = item as Record<string, unknown>;
+          const product = (itemObj.product as Record<string, unknown>) ?? {};
+          return {
+            productName: String(product.name ?? 'Producto'),
+            qty: Number(itemObj.qty_returned ?? 0),
+            refund: parseFloat(String(itemObj.refund_amount ?? '0')) || 0
+          };
+        });
+        const retStatus = (retObj.status as Record<string, unknown>)?.name;
+        return {
+          date: String(retObj.return_date ?? ''),
+          status: String(retStatus ?? 'Desconocido'),
+          reason: retObj.reason ? String(retObj.reason) : undefined,
+          totalRefund: parseFloat(String(retObj.total_refund ?? '0')) || 0,
+          items
+        };
+      });
+    
     return {
       id: String(r.id ?? ''),
       date: String(r.sold_at ?? r.date ?? ''),
@@ -151,6 +247,10 @@ const SalesManagement = () => {
       customerNit,
       isFinalConsumer,
       total: totalNum,
+      totalReturned,
+      adjustedTotal,
+      hasReturns,
+      returnDetails,
       items: (r.items as number) ?? products.length,
       payment,
       status,
@@ -159,6 +259,25 @@ const SalesManagement = () => {
       products,
     } as Sale;
   };
+
+  // --- KPIs for today ---
+  // Only use sales with status 'completed' (Completada)
+  const completedTodaySales: Sale[] = (completedData?.items ?? []).map(normalizeRawSale);
+
+  // Total sales amount today (completed only) - usando adjusted_total para considerar devoluciones
+  const totalSalesToday = completedTodaySales.reduce((sum, sale) => sum + (sale.adjustedTotal || sale.total || 0), 0);
+  // Transaction count (completed only)
+  const transactionCountToday = completedTodaySales.length;
+  // Average ticket (completed only) - calculado con totales ajustados
+  const averageTicketToday = transactionCountToday > 0 ? totalSalesToday / transactionCountToday : 0;
+  // Preferred payment method (completed only)
+  const paymentMethodCount: Record<string, number> = {};
+  completedTodaySales.forEach(sale => {
+    const method = sale.payment || 'Desconocido';
+    paymentMethodCount[method] = (paymentMethodCount[method] || 0) + 1;
+  });
+  const preferredPaymentMethod = Object.entries(paymentMethodCount)
+    .sort((a, b) => b[1] - a[1])[0]?.[0] || 'Desconocido';
 
   const filteredProducts = availableProducts.filter(p =>
     p.name.toLowerCase().includes(productSearch.toLowerCase()) || (p.barcode ?? '').includes(productSearch)
@@ -191,40 +310,227 @@ const SalesManagement = () => {
   const statusLabels = { pending: 'Pendientes', paid: 'Pagadas', completed: 'Completadas', cancelled: 'Canceladas' };
 
   const cartTotal = cartItems.reduce((sum, item) => sum + item.price * item.qty, 0);
-  const changeAmount = paymentMethod === 'cash' && amountReceived ? Math.max(0, parseFloat(amountReceived) - cartTotal) : 0;
+  const changeAmount = paymentMethod && paymentMethod.name?.toLowerCase() === 'efectivo' && amountReceived
+    ? Math.max(0, parseFloat(amountReceived) - cartTotal)
+    : 0;
 
   const addToCart = (product: Product) => {
-    setCartItems(prev => {
-      const existing = prev.find(i => i.id === product.id);
-      if (existing) return prev.map(i => i.id === product.id ? { ...i, qty: i.qty + 1 } : i);
-      return [...prev, { ...product, qty: 1 }];
-    });
-    setProductSearch('');
+    const available = Number(product.stock ?? 0);
+    const existing = cartItems.find(i => i.id === product.id);
+    const currentQty = existing?.qty ?? 0;
+    const requestedQty = currentQty + 1;
+
+    // Si el stock es suficiente, agregar normalmente
+    if (requestedQty <= available) {
+      setCartItems(prev => {
+        if (existing) return prev.map(i => i.id === product.id ? { ...i, qty: i.qty + 1 } : i);
+        return [...prev, { ...product, qty: 1 }];
+      });
+      setProductSearch('');
+      return;
+    }
+
+    // Stock insuficiente o sin stock: preguntar cuánto más quiere agregar
+    setAvailabilityDialog({ open: true, product, requestedQty, availableStock: available });
+    setAdditionalQty('');
   };
-  const removeFromCart = (productId: string) => setCartItems(prev => prev.filter(i => i.id !== productId));
+  
+  const removeFromCart = (productId: string) => {
+    setCartItems(prev => prev.filter(i => i.id !== productId));
+    // También remover de la lista de autorizados si estaba ahí
+    setAdminAuthorizedProducts(prev => {
+      const newSet = new Set(prev);
+      newSet.delete(productId);
+      return newSet;
+    });
+  };
+  
   const updateQuantity = (productId: string, newQty: number) => {
     if (newQty <= 0) return removeFromCart(productId);
-    setCartItems(prev => prev.map(i => i.id === productId ? { ...i, qty: newQty } : i));
+    
+    const prod = availableProducts.find(p => p.id === productId);
+    if (!prod) return;
+    
+    const available = Number(prod.stock ?? 0);
+    
+    // Si la cantidad solicitada está dentro del stock, actualizar normalmente
+    if (newQty <= available) {
+      setCartItems(prev => prev.map(i => i.id === productId ? { ...i, qty: newQty } : i));
+      return;
+    }
+    
+    // Stock insuficiente: preguntar cuánto más quiere agregar
+    setAvailabilityDialog({ open: true, product: prod, requestedQty: newQty, availableStock: available });
+    setAdditionalQty('');
+  };
+
+  // Handle availability confirmation with additional quantity
+  const handleConfirmAdditionalQty = () => {
+    const additional = parseInt(additionalQty);
+    
+    if (!additional || additional <= 0 || isNaN(additional)) {
+      toast({ 
+        title: 'Cantidad inválida', 
+        description: 'Ingresa una cantidad válida mayor a 0.', 
+        variant: 'destructive' 
+      });
+      return;
+    }
+
+    const { product, availableStock } = availabilityDialog;
+    
+    // La cantidad total será: stock disponible + cantidad adicional
+    const totalQty = availableStock + additional;
+    
+    // Cerrar diálogo de disponibilidad y abrir autenticación de admin
+    setAvailabilityDialog({ open: false, product: null, requestedQty: 0, availableStock: 0 });
+    setAdminAuthDialog({ open: true, product, requestedQty: totalQty });
+  };
+
+  const handleCancelAvailability = () => {
+    setAvailabilityDialog({ open: false, product: null, requestedQty: 0, availableStock: 0 });
+    setAdditionalQty('');
+    toast({ 
+      title: 'Cancelado', 
+      description: 'No se agregó el producto.', 
+      variant: 'default' 
+    });
+  };
+
+  // Handle admin authentication
+  const handleAdminAuth = async () => {
+    if (!adminUsername.trim() || !adminPassword.trim()) {
+      toast({ 
+        title: 'Credenciales requeridas', 
+        description: 'Ingresa usuario y contraseña de administrador.', 
+        variant: 'destructive' 
+      });
+      return;
+    }
+
+    setIsAuthenticating(true);
+    
+    try {
+      // Validar credenciales con el backend
+      const response = await fetch('http://localhost:3000/api/auth/validate-admin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          username: adminUsername, 
+          password: adminPassword 
+        })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok || !data.valid) {
+        toast({ 
+          title: 'Credenciales inválidas', 
+          description: 'Usuario o contraseña incorrectos.', 
+          variant: 'destructive' 
+        });
+        setIsAuthenticating(false);
+        return;
+      }
+
+      // Credenciales válidas: agregar producto al carrito
+      const { product, requestedQty } = adminAuthDialog;
+      
+      if (product) {
+        const existing = cartItems.find(i => i.id === product.id);
+        
+        if (existing) {
+          // Actualizar cantidad existente
+          setCartItems(prev => prev.map(i => 
+            i.id === product.id ? { ...i, qty: requestedQty } : i
+          ));
+        } else {
+          // Agregar nuevo producto
+          setCartItems(prev => [...prev, { ...product, qty: requestedQty }]);
+        }
+
+        // Marcar este producto como autorizado por administrador
+        setAdminAuthorizedProducts(prev => new Set(prev).add(product.id));
+
+        toast({ 
+          title: 'Producto agregado', 
+          description: `Se agregó "${product.name}" con autorización de administrador.`, 
+          variant: 'default' 
+        });
+      }
+
+      // Limpiar y cerrar diálogos
+      setAdminUsername('');
+      setAdminPassword('');
+      setAdminAuthDialog({ open: false, product: null, requestedQty: 0 });
+      setProductSearch('');
+      
+    } catch (error) {
+      toast({ 
+        title: 'Error', 
+        description: 'No se pudo validar las credenciales. Intenta nuevamente.', 
+        variant: 'destructive' 
+      });
+    } finally {
+      setIsAuthenticating(false);
+    }
   };
 
   const processSale = async () => {
-    const paymentMethodId = 1; // TODO: map real payment method IDs
+    if (!paymentMethod) {
+      toast({ title: 'Selecciona un método de pago', description: 'Debes seleccionar un método de pago.', variant: 'destructive' });
+      return;
+    }
+    // Validación previa: sumar cantidades por producto y comparar contra stock actual
+    // EXCEPTO para productos autorizados por administrador
+    const qtyById = new Map<string, number>();
+    for (const item of cartItems) {
+      qtyById.set(item.id, (qtyById.get(item.id) || 0) + Number(item.qty || 0));
+    }
+    for (const [pid, requested] of qtyById.entries()) {
+      // Omitir validación de stock si el producto fue autorizado por admin
+      if (adminAuthorizedProducts.has(pid)) {
+        continue;
+      }
+      
+      const prod = availableProducts.find(p => p.id === pid);
+      const available = Number(prod?.stock ?? 0);
+      if (requested > available) {
+        toast({ title: 'Stock insuficiente', description: `"${prod?.name || 'Producto'}": disponible ${available}, solicitado ${requested}. Ajusta las cantidades.`, variant: 'destructive' });
+        return;
+      }
+    }
+    const isCash = paymentMethod.name?.toLowerCase() === 'efectivo';
+    const amountReceivedNum = isCash && amountReceived ? Number(amountReceived) : undefined;
+    const changeNum = isCash && amountReceivedNum !== undefined ? Math.max(0, amountReceivedNum - cartTotal) : undefined;
     const salePayload = {
       customer,
       customer_nit: customerNit,
       is_final_consumer: isFinalConsumer,
-      payment_method_id: paymentMethodId,
-      status_id: 0, // placeholder: backend lo ignora y asigna 'Pendiente'; ajustar tipo CreateSalePayload si se vuelve opcional
+      payment_method_id: paymentMethod.id,
+      status_id: 0, // backend asigna 'Pendiente'
       items: cartItems.map(item => ({ product_id: item.id, price: item.price, qty: item.qty })),
+      amount_received: amountReceivedNum,
+      change: changeNum,
+      admin_authorized_products: Array.from(adminAuthorizedProducts), // Enviar productos autorizados al backend
     };
+    setIsProcessingSale(true);
     try {
       await createSale(salePayload);
       toast({ title: 'Venta registrada', description: 'La venta se ha registrado correctamente.', variant: 'default' });
       refreshSales();
       setIsNewSaleOpen(false);
-      setCartItems([]); setCustomer(''); setCustomerNit(''); setPaymentMethod(''); setAmountReceived('');
+      // Reset form
+      setCartItems([]);
+      setCustomer('');
+      setCustomerNit('');
+      setPaymentMethod(null);
+      setAmountReceived('');
+      setAdminAuthorizedProducts(new Set()); // Limpiar productos autorizados
     } catch (e) {
       toast({ title: 'Error al registrar venta', description: (e as Error)?.message || 'No se pudo registrar la venta.', variant: 'destructive' });
+    } finally {
+      setIsProcessingSale(false);
     }
   };
 
@@ -253,9 +559,75 @@ const SalesManagement = () => {
   const viewSale = (sale: Sale) => { setSelectedSale(sale); setIsViewSaleOpen(true); };
   const deleteSale = (saleId: string) => toast({ title: 'Funcionalidad en progreso', description: 'Implementación pendiente.', variant: 'default' });
 
+  // Validate stocks and navigate to cash closure
+  const handleCashClosure = async () => {
+    setIsValidatingClosure(true);
+    try {
+      const response = await fetch(`${API_URL}/cash-closures/validate-stocks`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error('Error validating stocks');
+      }
+      
+      const data = await response.json();
+      
+      if (!data.valid && data.products.length > 0) {
+        // Hay productos con stock negativo
+        setNegativeStockDialog({
+          open: true,
+          products: data.products
+        });
+        toast({
+          title: 'Stock Negativo Detectado',
+          description: `${data.negative_stock_count} producto(s) con stock negativo deben ser corregidos antes del cierre.`,
+          variant: 'destructive'
+        });
+      } else {
+        // Todo bien, ir al módulo de cierre de caja
+        if (onSectionChange) {
+          onSectionChange('cash-closure');
+        }
+        toast({
+          title: 'Validación exitosa',
+          description: 'Todos los stocks están en orden. Puedes proceder con el cierre de caja.',
+        });
+      }
+    } catch (error) {
+      console.error('Error validating stocks:', error);
+      toast({
+        title: 'Error',
+        description: 'No se pudo validar el inventario',
+        variant: 'destructive'
+      });
+    } finally {
+      setIsValidatingClosure(false);
+    }
+  };
+
   const formatMoney = (value: unknown) => {
     const n = typeof value === 'number' ? value : (typeof value === 'string' ? parseFloat(value) : NaN);
     return Number.isFinite(n) ? n.toFixed(2) : '0.00';
+  };
+
+  // Formats date/time in a user-friendly way (e.g., '14 Sep 2025, 15:30')
+  const formatDateTime = (dateStr?: string) => {
+    if (!dateStr) return '';
+    // Remove timezone info if present - DB stores Guatemala time as-is
+    const cleanDate = dateStr.replace('Z', '').replace(/[+-]\d{2}:\d{2}$/, '');
+    const d = new Date(cleanDate);
+    if (isNaN(d.getTime())) return dateStr;
+    return new Intl.DateTimeFormat('es-GT', {
+      day: '2-digit', 
+      month: 'short', 
+      year: 'numeric', 
+      hour: '2-digit', 
+      minute: '2-digit', 
+      hour12: false
+    }).format(d);
   };
 
   const getStatusBadge = (status: SaleStatus) => {
@@ -288,9 +660,18 @@ const SalesManagement = () => {
               <SelectItem value='year'>Este año</SelectItem>
             </SelectContent>
           </Select>
+          <Button 
+            variant='outline' 
+            onClick={handleCashClosure}
+            disabled={isValidatingClosure}
+            className='border-green-600 text-green-600 hover:bg-green-50'
+          >
+            <Calculator className='w-4 h-4 mr-2' /> 
+            {isValidatingClosure ? 'Validando...' : 'Cierre de Caja'}
+          </Button>
           <Dialog open={isNewSaleOpen} onOpenChange={setIsNewSaleOpen}>
             <DialogTrigger asChild>
-              <Button className='bg-gradient-primary hover:opacity-90'>
+              <Button className='bg-primary hover:bg-primary/90'>
                 <Plus className='w-4 h-4 mr-2' /> Nueva Venta
               </Button>
             </DialogTrigger>
@@ -305,12 +686,24 @@ const SalesManagement = () => {
                     </div>
                     <div>
                       <Label htmlFor='payment'>Método de Pago *</Label>
-                      <Select value={paymentMethod} onValueChange={(v: PaymentMethod) => setPaymentMethod(v)}>
+                      <Select
+                        value={paymentMethod ? String(paymentMethod.id) : ''}
+                        onValueChange={(val) => {
+                          const found = paymentMethods.find(pm => String(pm.id) === val);
+                          setPaymentMethod(found ?? null);
+                        }}
+                      >
                         <SelectTrigger><SelectValue placeholder='Seleccionar método' /></SelectTrigger>
                         <SelectContent>
-                          <SelectItem value='cash'>Efectivo</SelectItem>
-                          <SelectItem value='card'>Tarjeta</SelectItem>
-                          <SelectItem value='transfer'>Transferencia</SelectItem>
+                          {paymentMethodsQuery.isLoading && (
+                            <SelectItem value='loading' disabled>Cargando...</SelectItem>
+                          )}
+                          {!paymentMethodsQuery.isLoading && paymentMethods.length === 0 && (
+                            <SelectItem value='no-methods' disabled>Sin métodos</SelectItem>
+                          )}
+                          {paymentMethods.map(pm => (
+                            <SelectItem key={pm.id} value={String(pm.id)}>{pm.name}</SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                     </div>
@@ -379,7 +772,7 @@ const SalesManagement = () => {
                 {cartItems.length > 0 && (
                   <div className='bg-muted/50 p-4 rounded-lg space-y-3'>
                     <div className='flex justify-between text-lg font-bold'><span>Total:</span><span>Q {cartTotal.toFixed(2)}</span></div>
-                    {paymentMethod === 'cash' && (
+                    {paymentMethod && paymentMethod.name.toLowerCase() === 'efectivo' && (
                       <>
                         <div>
                           <Label htmlFor='amountReceived'>Monto Recibido</Label>
@@ -396,9 +789,21 @@ const SalesManagement = () => {
                   </div>
                 )}
                 <div className='flex justify-end space-x-2'>
-                  <Button variant='outline' onClick={() => setIsNewSaleOpen(false)}>Cancelar</Button>
-                  <Button className='bg-gradient-primary' onClick={processSale} disabled={cartItems.length === 0}>
-                    <Receipt className='w-4 h-4 mr-2' /> Procesar Venta
+                  <Button variant='outline' onClick={() => setIsNewSaleOpen(false)} disabled={isProcessingSale}>Cancelar</Button>
+                  <Button className='bg-liquor-amber hover:bg-liquor-amber/90 text-white' onClick={processSale} disabled={cartItems.length === 0 || isProcessingSale}>
+                    {isProcessingSale ? (
+                      <>
+                        <svg className="animate-spin w-4 h-4 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+                        </svg>
+                        Procesando...
+                      </>
+                    ) : (
+                      <>
+                        <Receipt className='w-4 h-4 mr-2' /> Procesar Venta
+                      </>
+                    )}
                   </Button>
                 </div>
               </div>
@@ -407,12 +812,52 @@ const SalesManagement = () => {
         </div>
       </div>
 
-      {/* Stats quick (placeholder) */}
+      {/* Stats quick (calculated) */}
       <div className='grid grid-cols-1 md:grid-cols-4 gap-6'>
-        <Card><CardContent className='p-6'><div className='flex items-center justify-between'><div><p className='text-sm text-muted-foreground'>Ventas Hoy</p><p className='text-2xl font-bold text-foreground'>Q 0.00</p></div><DollarSign className='w-8 h-8 text-liquor-gold' /></div></CardContent></Card>
-        <Card><CardContent className='p-6'><div className='flex items-center justify-between'><div><p className='text-sm text-muted-foreground'>Transacciones</p><p className='text-2xl font-bold text-foreground'>0</p></div><ShoppingCart className='w-8 h-8 text-primary' /></div></CardContent></Card>
-        <Card><CardContent className='p-6'><div className='flex items-center justify-between'><div><p className='text-sm text-muted-foreground'>Ticket Promedio</p><p className='text-2xl font-bold text-foreground'>Q 0.00</p></div><Receipt className='w-8 h-8 text-accent' /></div></CardContent></Card>
-        <Card><CardContent className='p-6'><div className='flex items-center justify-between'><div><p className='text-sm text-muted-foreground'>Pago Preferido</p><p className='text-2xl font-bold text-foreground'>Efectivo</p></div><User className='w-8 h-8 text-liquor-burgundy' /></div></CardContent></Card>
+        <Card>
+          <CardContent className='p-6'>
+            <div className='flex items-center justify-between'>
+              <div>
+                <p className='text-sm text-muted-foreground'>Ventas Hoy</p>
+                <p className='text-2xl font-bold text-foreground'>Q {formatMoney(totalSalesToday)}</p>
+              </div>
+              <DollarSign className='w-8 h-8 text-liquor-gold' />
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className='p-6'>
+            <div className='flex items-center justify-between'>
+              <div>
+                <p className='text-sm text-muted-foreground'>Transacciones</p>
+                <p className='text-2xl font-bold text-foreground'>{transactionCountToday}</p>
+              </div>
+              <ShoppingCart className='w-8 h-8 text-primary' />
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className='p-6'>
+            <div className='flex items-center justify-between'>
+              <div>
+                <p className='text-sm text-muted-foreground'>Ticket Promedio</p>
+                <p className='text-2xl font-bold text-foreground'>Q {formatMoney(averageTicketToday)}</p>
+              </div>
+              <Receipt className='w-8 h-8 text-accent' />
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className='p-6'>
+            <div className='flex items-center justify-between'>
+              <div>
+                <p className='text-sm text-muted-foreground'>Pago Preferido</p>
+                <p className='text-2xl font-bold text-foreground'>{preferredPaymentMethod}</p>
+              </div>
+              <User className='w-8 h-8 text-liquor-burgundy' />
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       <Card>
@@ -491,14 +936,34 @@ const SalesManagement = () => {
                       <tbody>
                         {salesInStatus.map((sale, index) => (
                           <tr key={sale.id} className='border-b border-border hover:bg-muted transition-colors animate-slide-up' style={{ animationDelay: `${index * 50}ms` }}>
-                            <td className='p-3'><span className='font-medium text-primary'>{sale.id}</span></td>
-                            <td className='p-3'><div className='text-sm text-foreground'>{sale.date}</div></td>
+                            <td className='p-3'>
+                              <div className='flex items-center gap-2'>
+                                <span className='font-medium text-primary'>{sale.id}</span>
+                                {sale.hasReturns && (
+                                  <span title='Tiene devoluciones'>
+                                    <AlertTriangle className='w-4 h-4 text-orange-500' />
+                                  </span>
+                                )}
+                              </div>
+                            </td>
+                            <td className='p-3'><div className='text-sm text-foreground'>{formatDateTime(sale.date)}</div></td>
                             <td className='p-3'>
                               <div className='font-medium text-foreground'>{sale.customer}</div>
                               <div className='text-xs text-muted-foreground'>{sale.isFinalConsumer ? 'CF' : sale.customerNit}</div>
                             </td>
                             <td className='p-3 text-center'><span className='text-foreground'>{sale.items}</span></td>
-                            <td className='p-3 text-right'><span className='font-medium text-foreground'>Q {formatMoney(sale.total)}</span></td>
+                            <td className='p-3 text-right'>
+                              <div className='flex flex-col items-end'>
+                                {sale.hasReturns ? (
+                                  <>
+                                    <span className='font-medium text-green-700'>Q {formatMoney(sale.adjustedTotal || sale.total)}</span>
+                                    <span className='text-xs text-muted-foreground line-through'>Q {formatMoney(sale.total)}</span>
+                                  </>
+                                ) : (
+                                  <span className='font-medium text-foreground'>Q {formatMoney(sale.total)}</span>
+                                )}
+                              </div>
+                            </td>
                             <td className='p-3 text-center'><Badge variant='outline'>{sale.payment}</Badge></td>
                             <td className='p-3 text-center'>
                               <Select value={sale.status} onValueChange={(v: SaleStatus) => updateSaleStatus(sale.id, v)} disabled={updatingSaleIds.has(sale.id)}>
@@ -525,8 +990,29 @@ const SalesManagement = () => {
                 )}
               </CardContent>
               <div className='flex justify-end items-center gap-2 p-4'>
-                <Button className='px-2 py-1 bg-gray-200 rounded disabled:opacity-50' onClick={() => setPageFor(key, Math.max(1, info.page - 1))} disabled={info.page <= 1} aria-label={`Anterior ${key}`}><ChevronLeft className='w-4 h-4' /></Button>
-                <Button className='px-2 py-1 bg-gray-200 rounded disabled:opacity-50' onClick={() => setPageFor(key, Math.min(info.totalPages, info.page + 1))} disabled={info.page >= info.totalPages} aria-label={`Siguiente ${key}`}><ChevronRight className='w-4 h-4' /></Button>
+                <span className='text-sm text-muted-foreground mr-2'>
+                  Página {info.page} de {info.totalPages}
+                </span>
+                <Button 
+                  variant="outline"
+                  size="sm"
+                  className='hover:bg-liquor-amber hover:text-white transition-colors' 
+                  onClick={() => setPageFor(key, Math.max(1, info.page - 1))} 
+                  disabled={info.page <= 1} 
+                  aria-label={`Anterior ${key}`}
+                >
+                  <ChevronLeft className='w-4 h-4' />
+                </Button>
+                <Button 
+                  variant="outline"
+                  size="sm"
+                  className='hover:bg-liquor-amber hover:text-white transition-colors' 
+                  onClick={() => setPageFor(key, Math.min(info.totalPages, info.page + 1))} 
+                  disabled={info.page >= info.totalPages} 
+                  aria-label={`Siguiente ${key}`}
+                >
+                  <ChevronRight className='w-4 h-4' />
+                </Button>
               </div>
             </Card>
           );
@@ -534,20 +1020,34 @@ const SalesManagement = () => {
       </div>
 
       <Dialog open={isViewSaleOpen} onOpenChange={setIsViewSaleOpen}>
-        <DialogContent className='max-w-2xl'>
+        <DialogContent className='max-w-3xl max-h-[90vh] overflow-hidden flex flex-col'>
           <DialogHeader><DialogTitle>Detalle de Venta {selectedSale?.id}</DialogTitle></DialogHeader>
           {selectedSale && (
-            <div className='space-y-4'>
+            <div className='space-y-4 overflow-y-auto pr-2'>
               <div className='grid grid-cols-2 gap-4'>
                 <div><Label>Cliente</Label><div className='font-medium'>{selectedSale.customer}</div></div>
                 <div><Label>NIT / Tipo</Label><div className='font-medium'>{selectedSale.isFinalConsumer ? 'Consumidor Final' : selectedSale.customerNit}</div></div>
-                <div><Label>Fecha</Label><div className='font-medium'>{selectedSale.date}</div></div>
+                <div><Label>Fecha</Label><div className='font-medium'>{formatDateTime(selectedSale.date)}</div></div>
                 <div><Label>Método de Pago</Label><div className='font-medium'>{selectedSale.payment}</div></div>
                 <div><Label>Estado</Label><div>{getStatusBadge(selectedSale.status)}</div></div>
               </div>
+
+              {/* Alert if sale has returns */}
+              {selectedSale.hasReturns && (
+                <div className='bg-orange-50 border border-orange-200 rounded-lg p-3 flex items-start gap-3'>
+                  <AlertTriangle className='w-5 h-5 text-orange-600 flex-shrink-0 mt-0.5' />
+                  <div className='flex-1'>
+                    <p className='text-sm font-medium text-orange-900'>Esta venta tiene devoluciones</p>
+                    <p className='text-xs text-orange-700 mt-1'>
+                      Se han devuelto productos por un valor de Q {formatMoney(selectedSale.totalReturned || 0)}
+                    </p>
+                  </div>
+                </div>
+              )}
+              
               <div>
                 <Label>Productos</Label>
-                <div className='border rounded-lg divide-y'>
+                <div className='border rounded-lg divide-y max-h-64 overflow-y-auto'>
                   {selectedSale.products.map((p, i) => (
                     <div key={i} className='p-3 flex justify-between'>
                       <div>
@@ -562,18 +1062,293 @@ const SalesManagement = () => {
                   ))}
                 </div>
               </div>
+
+              {/* Returns Section */}
+              {selectedSale.hasReturns && selectedSale.returnDetails && selectedSale.returnDetails.length > 0 && (
+                <div>
+                  <Label className='flex items-center gap-2'>
+                    <PackageX className='w-4 h-4 text-orange-600' />
+                    Devoluciones
+                  </Label>
+                  <div className='border border-orange-200 rounded-lg divide-y mt-2 bg-orange-50/30'>
+                    {selectedSale.returnDetails.map((ret, idx) => (
+                      <div key={idx} className='p-3 space-y-2'>
+                        <div className='flex justify-between items-start'>
+                          <div>
+                            <div className='text-sm font-medium text-orange-900'>
+                              Devolución {idx + 1}
+                            </div>
+                            <div className='text-xs text-muted-foreground'>
+                              {formatDateTime(ret.date)}
+                            </div>
+                          </div>
+                          <Badge variant={ret.status === 'Completada' ? 'default' : 'secondary'} className='text-xs'>
+                            {ret.status}
+                          </Badge>
+                        </div>
+                        {ret.reason && (
+                          <div className='text-xs text-muted-foreground italic'>
+                            Razón: {ret.reason}
+                          </div>
+                        )}
+                        <div className='space-y-1'>
+                          {ret.items.map((item, itemIdx) => (
+                            <div key={itemIdx} className='flex justify-between text-xs bg-white/50 p-2 rounded'>
+                              <span>{item.productName} × {item.qty}</span>
+                              <span className='font-medium text-orange-700'>-Q {formatMoney(item.refund)}</span>
+                            </div>
+                          ))}
+                        </div>
+                        <div className='text-right text-sm font-bold text-orange-900 border-t pt-1'>
+                          Total devuelto: Q {formatMoney(ret.totalRefund)}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               <div className='bg-muted/50 p-4 rounded-lg space-y-2'>
-                <div className='flex justify-between'><span>Subtotal:</span><span>Q {formatMoney(selectedSale.total)}</span></div>
+                <div className='flex justify-between'><span>Subtotal Original:</span><span>Q {formatMoney(selectedSale.total)}</span></div>
+                {selectedSale.hasReturns && (
+                  <>
+                    <div className='flex justify-between text-orange-700'>
+                      <span>(-) Devoluciones:</span>
+                      <span>-Q {formatMoney(selectedSale.totalReturned || 0)}</span>
+                    </div>
+                    <div className='flex justify-between text-lg font-bold border-t pt-2 text-green-700'>
+                      <span>Total Neto:</span>
+                      <span>Q {formatMoney(selectedSale.adjustedTotal || selectedSale.total)}</span>
+                    </div>
+                  </>
+                )}
                 {selectedSale.payment === 'Efectivo' && (
                   <>
                     <div className='flex justify-between'><span>Monto Recibido:</span><span>Q {formatMoney(selectedSale.amountReceived)}</span></div>
                     <div className='flex justify-between font-bold'><span>Vuelto:</span><span>Q {formatMoney(selectedSale.change)}</span></div>
                   </>
                 )}
-                <div className='flex justify-between text-lg font-bold border-t pt-2'><span>Total:</span><span>Q {formatMoney(selectedSale.total)}</span></div>
+                {!selectedSale.hasReturns && (
+                  <div className='flex justify-between text-lg font-bold border-t pt-2'><span>Total:</span><span>Q {formatMoney(selectedSale.total)}</span></div>
+                )}
               </div>
+              
+              {/* Return Button - Only for completed sales */}
+              {selectedSale.status === 'completed' && (
+                <div className='pt-4 border-t'>
+                  <Button 
+                    variant='outline' 
+                    className='w-full text-orange-600 border-orange-300 hover:bg-orange-50'
+                    onClick={() => {
+                      setIsViewSaleOpen(false)
+                      navigate(`/returns/new?sale_id=${selectedSale.id}`)
+                    }}
+                  >
+                    <RotateCcw className='w-4 h-4 mr-2' />
+                    Procesar Devolución
+                  </Button>
+                </div>
+              )}
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Availability Confirmation Dialog */}
+      <Dialog open={availabilityDialog.open} onOpenChange={(open) => !open && handleCancelAvailability()}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Producto sin stock suficiente</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <p className="text-sm text-muted-foreground">
+              El producto <strong>"{availabilityDialog.product?.name}"</strong> no tiene suficiente stock en el sistema.
+            </p>
+            <div className="bg-muted p-3 rounded-md space-y-1">
+              <div className="flex justify-between text-sm">
+                <span>Stock en sistema:</span>
+                <span className="font-medium">{availabilityDialog.availableStock} unidades</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span>Cantidad solicitada:</span>
+                <span className="font-medium text-orange-600">{availabilityDialog.requestedQty} unidades</span>
+              </div>
+              <div className="flex justify-between text-sm border-t pt-1 mt-1">
+                <span>Faltante:</span>
+                <span className="font-medium text-red-600">
+                  {Math.max(0, availabilityDialog.requestedQty - availabilityDialog.availableStock)} unidades
+                </span>
+              </div>
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="additional-qty" className="text-sm font-medium">
+                ¿Cuántas unidades adicionales hay disponibles físicamente?
+              </Label>
+              <Input
+                id="additional-qty"
+                type="number"
+                min="1"
+                placeholder="Ej: 5"
+                value={additionalQty}
+                onChange={(e) => setAdditionalQty(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleConfirmAdditionalQty()}
+                className="text-center text-lg"
+                autoFocus
+              />
+              <p className="text-xs text-muted-foreground">
+                Total disponible: {availabilityDialog.availableStock} + {additionalQty || '0'} = <strong>{availabilityDialog.availableStock + (parseInt(additionalQty) || 0)}</strong> unidades
+              </p>
+            </div>
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={handleCancelAvailability}>
+              Cancelar
+            </Button>
+            <Button onClick={handleConfirmAdditionalQty}>
+              Continuar con Autorización
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Admin Authentication Dialog */}
+      <Dialog open={adminAuthDialog.open} onOpenChange={(open) => {
+        if (!open) {
+          setAdminAuthDialog({ open: false, product: null, requestedQty: 0 });
+          setAdminUsername('');
+          setAdminPassword('');
+        }
+      }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Autorización de Administrador</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <p className="text-sm text-muted-foreground">
+              Para agregar productos sin stock registrado, necesitas autorización de un administrador.
+            </p>
+            <div className="space-y-3">
+              <div className="space-y-2">
+                <Label htmlFor="admin-username">Usuario</Label>
+                <Input
+                  id="admin-username"
+                  type="text"
+                  placeholder="Usuario de administrador"
+                  value={adminUsername}
+                  onChange={(e) => setAdminUsername(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleAdminAuth()}
+                  disabled={isAuthenticating}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="admin-password">Contraseña</Label>
+                <Input
+                  id="admin-password"
+                  type="password"
+                  placeholder="Contraseña"
+                  value={adminPassword}
+                  onChange={(e) => setAdminPassword(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleAdminAuth()}
+                  disabled={isAuthenticating}
+                />
+              </div>
+            </div>
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                setAdminAuthDialog({ open: false, product: null, requestedQty: 0 });
+                setAdminUsername('');
+                setAdminPassword('');
+              }}
+              disabled={isAuthenticating}
+            >
+              Cancelar
+            </Button>
+            <Button onClick={handleAdminAuth} disabled={isAuthenticating}>
+              {isAuthenticating ? 'Verificando...' : 'Autorizar'}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Negative Stock Warning Dialog */}
+      <Dialog open={negativeStockDialog.open} onOpenChange={(open) => {
+        if (!open) {
+          setNegativeStockDialog({ open: false, products: [] });
+        }
+      }}>
+        <DialogContent className="sm:max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-600">
+              <AlertTriangle className="h-5 w-5" />
+              No se puede generar el Cierre de Caja
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <Alert variant="destructive">
+              <AlertTriangle className="h-4 w-4" />
+              <AlertDescription>
+                Hay {negativeStockDialog.products.length} producto(s) con stock negativo que deben ser corregidos antes de realizar el cierre de caja.
+                <br />
+                <strong>Por favor, ajusta el inventario de estos productos primero.</strong>
+              </AlertDescription>
+            </Alert>
+
+            <div className="space-y-2">
+              <h4 className="font-semibold text-sm">Productos con stock negativo:</h4>
+              <div className="border rounded-lg divide-y max-h-96 overflow-y-auto">
+                {negativeStockDialog.products.map((product) => (
+                  <div key={product.id} className="p-3 hover:bg-muted/50">
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1">
+                        <p className="font-medium">{product.name}</p>
+                        <div className="flex gap-4 text-sm text-muted-foreground mt-1">
+                          <span>Categoría: {product.category}</span>
+                          <span>Proveedor: {product.supplier}</span>
+                          {product.barcode && <span>Código: {product.barcode}</span>}
+                        </div>
+                      </div>
+                      <Badge variant="destructive" className="ml-4">
+                        Stock: {product.current_stock}
+                      </Badge>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <h5 className="font-semibold text-sm text-blue-900 mb-2">¿Cómo corregir el stock?</h5>
+              <ol className="text-sm text-blue-800 space-y-1 list-decimal list-inside">
+                <li>Ve al módulo de <strong>Inventario</strong> o <strong>Productos</strong></li>
+                <li>Busca cada producto listado arriba</li>
+                <li>Haz clic en "Ajustar Stock" para cada producto</li>
+                <li>Ingresa la cantidad correcta de stock disponible</li>
+                <li>Una vez corregidos todos, regresa aquí para generar el cierre</li>
+              </ol>
+            </div>
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button 
+              variant="outline"
+              onClick={() => setNegativeStockDialog({ open: false, products: [] })}
+            >
+              Cerrar
+            </Button>
+            <Button 
+              onClick={() => {
+                setNegativeStockDialog({ open: false, products: [] });
+                if (onSectionChange) {
+                  onSectionChange('inventory');
+                }
+              }}
+            >
+              Ir a Inventario
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

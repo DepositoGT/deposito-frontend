@@ -18,7 +18,7 @@ export interface Alert extends BaseEntity {
   title: string;
   message: string;
   product: string;
-  category: ProductCategory;
+  category: ProductCategory | string;
   currentStock: number;
   minStock: number;
   timestamp: string;

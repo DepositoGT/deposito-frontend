@@ -148,19 +148,80 @@ const SuppliersManagement = () => {
   const { mutateAsync: updateMutateAsync, isLoading: updateIsLoading } = (updateMutation as unknown) as { mutateAsync: (opts: { id: string; payload: Record<string, unknown> }) => Promise<unknown>; isLoading: boolean };
 
   const handleCreateSupplier = async () => {
-    if (!newName) {
-      toast({ title: "Nombre requerido", description: "Proporcione el nombre de la empresa" });
+    // Validaciones de campos requeridos
+    if (!newName || newName.trim() === "") {
+      toast({ 
+        title: "Campo requerido", 
+        description: "El nombre de la empresa es obligatorio",
+        variant: "destructive" 
+      });
+      return;
+    }
+
+    if (!newContact || newContact.trim() === "") {
+      toast({ 
+        title: "Campo requerido", 
+        description: "La persona de contacto es obligatoria",
+        variant: "destructive" 
+      });
+      return;
+    }
+
+    if (!newPhone || newPhone.trim() === "") {
+      toast({ 
+        title: "Campo requerido", 
+        description: "El teléfono es obligatorio",
+        variant: "destructive" 
+      });
+      return;
+    }
+
+    if (!newEmail || newEmail.trim() === "") {
+      toast({ 
+        title: "Campo requerido", 
+        description: "El email es obligatorio",
+        variant: "destructive" 
+      });
+      return;
+    }
+
+    // Validar formato de email
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(newEmail)) {
+      toast({ 
+        title: "Email inválido", 
+        description: "Por favor ingrese un email válido",
+        variant: "destructive" 
+      });
+      return;
+    }
+
+    if (!newAddress || newAddress.trim() === "") {
+      toast({ 
+        title: "Campo requerido", 
+        description: "La dirección es obligatoria",
+        variant: "destructive" 
+      });
+      return;
+    }
+
+    if (!newCategoryId) {
+      toast({ 
+        title: "Campo requerido", 
+        description: "La categoría es obligatoria",
+        variant: "destructive" 
+      });
       return;
     }
 
     try {
       await createMutateAsync({
-        name: newName,
-        contact: newContact,
-        phone: newPhone,
-        email: newEmail,
-        address: newAddress,
-        category_id: newCategoryId ? Number(newCategoryId) : undefined,
+        name: newName.trim(),
+        contact: newContact.trim(),
+        phone: newPhone.trim(),
+        email: newEmail.trim(),
+        address: newAddress.trim(),
+        category_id: Number(newCategoryId),
         payment_terms_id: newPaymentTermId ? Number(newPaymentTermId) : undefined,
       });
   setIsNewSupplierOpen(false);
@@ -243,7 +304,7 @@ const SuppliersManagement = () => {
         
         <Dialog open={isNewSupplierOpen} onOpenChange={setIsNewSupplierOpen}>
           <DialogTrigger asChild>
-            <Button className="bg-gradient-primary hover:opacity-90" disabled={!isAdmin}>
+            <Button className="bg-liquor-amber hover:bg-liquor-amber/90 text-white" disabled={!isAdmin}>
               <Plus className="w-4 h-4 mr-2" />
               Nuevo Proveedor
             </Button>
@@ -331,7 +392,7 @@ const SuppliersManagement = () => {
               <Button variant="outline" onClick={() => setIsNewSupplierOpen(false)} disabled={createIsLoading}>
                 Cancelar
               </Button>
-              <Button className="bg-gradient-primary" disabled={!isAdmin || createIsLoading} onClick={handleCreateSupplier}>
+              <Button className="bg-liquor-amber hover:bg-liquor-amber/90 text-white" disabled={!isAdmin || createIsLoading} onClick={handleCreateSupplier}>
                 {createIsLoading ? (
                   <svg className="animate-spin w-4 h-4 mr-2 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
@@ -523,12 +584,23 @@ const SuppliersManagement = () => {
                           </AlertDialogDescription>
                         </AlertDialogHeader>
                         <AlertDialogFooter>
-                          <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                          <AlertDialogCancel disabled={deleteIsLoading}>Cancelar</AlertDialogCancel>
                           <AlertDialogAction 
                             onClick={() => deleteSupplier(supplier.id)}
                             className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                            disabled={deleteIsLoading}
                           >
-                            Eliminar
+                            {deleteIsLoading ? (
+                              <>
+                                <svg className="animate-spin w-4 h-4 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+                                </svg>
+                                Eliminando...
+                              </>
+                            ) : (
+                              "Eliminar"
+                            )}
                           </AlertDialogAction>
                         </AlertDialogFooter>
                       </AlertDialogContent>
@@ -773,17 +845,84 @@ const SuppliersManagement = () => {
               Cancelar
             </Button>
             <Button 
-              className="bg-gradient-primary"
+              className="bg-liquor-amber hover:bg-liquor-amber/90 text-white"
               onClick={async () => {
                 if (!selectedSupplier) return;
+
+                // Validaciones de campos requeridos
+                if (!editName || editName.trim() === "") {
+                  toast({ 
+                    title: "Campo requerido", 
+                    description: "El nombre de la empresa es obligatorio",
+                    variant: "destructive" 
+                  });
+                  return;
+                }
+
+                if (!editContact || editContact.trim() === "") {
+                  toast({ 
+                    title: "Campo requerido", 
+                    description: "La persona de contacto es obligatoria",
+                    variant: "destructive" 
+                  });
+                  return;
+                }
+
+                if (!editPhone || editPhone.trim() === "") {
+                  toast({ 
+                    title: "Campo requerido", 
+                    description: "El teléfono es obligatorio",
+                    variant: "destructive" 
+                  });
+                  return;
+                }
+
+                if (!editEmail || editEmail.trim() === "") {
+                  toast({ 
+                    title: "Campo requerido", 
+                    description: "El email es obligatorio",
+                    variant: "destructive" 
+                  });
+                  return;
+                }
+
+                // Validar formato de email
+                const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+                if (!emailRegex.test(editEmail)) {
+                  toast({ 
+                    title: "Email inválido", 
+                    description: "Por favor ingrese un email válido",
+                    variant: "destructive" 
+                  });
+                  return;
+                }
+
+                if (!editAddress || editAddress.trim() === "") {
+                  toast({ 
+                    title: "Campo requerido", 
+                    description: "La dirección es obligatoria",
+                    variant: "destructive" 
+                  });
+                  return;
+                }
+
+                if (!editCategoryId) {
+                  toast({ 
+                    title: "Campo requerido", 
+                    description: "La categoría es obligatoria",
+                    variant: "destructive" 
+                  });
+                  return;
+                }
+
                 try {
                   await updateMutateAsync({ id: selectedSupplier.id, payload: {
-                    name: editName,
-                    contact: editContact,
-                    phone: editPhone,
-                    email: editEmail,
-                    address: editAddress,
-                    category_id: editCategoryId ? Number(editCategoryId) : undefined,
+                    name: editName.trim(),
+                    contact: editContact.trim(),
+                    phone: editPhone.trim(),
+                    email: editEmail.trim(),
+                    address: editAddress.trim(),
+                    category_id: Number(editCategoryId),
                     payment_terms_id: editPaymentTermId ? Number(editPaymentTermId) : undefined,
                     status_id: editStatusId ? Number(editStatusId) : undefined,
                   } });
