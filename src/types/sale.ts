@@ -4,6 +4,19 @@ import { CartProduct } from "./product";
 // Tipo de estado específico para ventas
 export type SaleStatus = "pending" | "paid" | "completed" | "cancelled";
 
+// Interfaz de detalle de devolución
+export interface ReturnDetail {
+  date: string;
+  status: string;
+  reason?: string;
+  totalRefund: number;
+  items: Array<{
+    productName: string;
+    qty: number;
+    refund: number;
+  }>;
+}
+
 // Interfaz principal de venta
 export interface Sale extends BaseEntity {
   date: string;
@@ -11,6 +24,10 @@ export interface Sale extends BaseEntity {
   customerNit?: string; // NIT del cliente (opcional)
   isFinalConsumer: boolean; // Si es consumidor final (CF)
   total: number;
+  totalReturned?: number; // Total devuelto
+  adjustedTotal?: number; // Total ajustado (total - devoluciones)
+  hasReturns?: boolean; // Indica si tiene devoluciones
+  returnDetails?: ReturnDetail[]; // Detalles de las devoluciones
   items: number;
   payment: PaymentMethod;
   status: SaleStatus;

@@ -25,6 +25,7 @@ export interface MenuItem {
   id: string;
   label: string;
   icon: IconComponent; // Lucide icon component
+  adminOnly?: boolean; // Opción visible solo para administradores
 }
 
 // Tipos para reportes
