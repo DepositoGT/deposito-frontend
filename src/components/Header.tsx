@@ -20,12 +20,12 @@ const Header = () => {
       <div className="flex items-center justify-between">
         {/* Logo y título */}
         <div className="flex items-center space-x-3">
-          <div className="flex items-center justify-center w-10 h-10 bg-gradient-primary rounded-lg shadow-elegant">
-            <Wine className="w-6 h-6 text-primary-foreground" />
+          <div className="flex items-center justify-center w-10 h-10 rounded-lg shadow-card bg-primary text-primary-foreground">
+            <Wine className="w-6 h-6" />
           </div>
           <div>
             <h1 className="text-xl font-bold text-foreground">Deposito</h1>
-            <p className="text-sm text-muted-foreground">Sistema de Inventario</p>
+            <p className="text-sm text-muted-foreground"> © Sistema de Inventario todos los derechos reservados ©</p>
           </div>
         </div>
 

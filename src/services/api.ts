@@ -28,7 +28,10 @@ export const apiFetch = async <T>(path: string, options: RequestInit = {}): Prom
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
   };
 
-  const res = await fetch(`${API_BASE_URL}${path}`, {
+  // Ensure path starts with /api
+  const apiPath = path.startsWith('/api') ? path : `/api${path}`;
+
+  const res = await fetch(`${API_BASE_URL}${apiPath}`, {
     ...options,
     headers,
   });
@@ -54,3 +57,18 @@ export const apiFetch = async <T>(path: string, options: RequestInit = {}): Prom
 
   return data as T;
 };
+
+// Alerts helpers
+export interface AlertAssignPayload { user_id: string }
+export const reassignAlert = async (id: string, user_id: string) => {
+  return apiFetch(`/api/alerts/${id}/assign`, {
+    method: 'POST',
+    body: JSON.stringify({ user_id } as AlertAssignPayload),
+  })
+}
+
+export const resolveAlert = async (id: string) => {
+  return apiFetch(`/api/alerts/${id}/resolve`, {
+    method: 'PATCH',
+  })
+}

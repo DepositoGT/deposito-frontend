@@ -1,12 +1,10 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { 
   TrendingUp, 
   TrendingDown, 
   Calendar,
-  Download,
   Filter,
   BarChart3
 } from "lucide-react";
@@ -17,14 +15,30 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { toast } from "@/hooks/use-toast";
-import { getBusinessDataByPeriod, topProducts, categoryPerformance } from "@/utils/businessData";
+import { useAnalytics } from "@/hooks/useAnalytics";
 
 const Analytics = () => {
-  const [selectedPeriod, setSelectedPeriod] = useState("30days");
-  
-  const currentData = getBusinessDataByPeriod(selectedPeriod);
-  const salesData = currentData.salesData;
+  // Filtro de año desde 2025 hasta el actual, con opción "Todos"
+  const currentYear = new Date().getFullYear();
+  const initialYear = currentYear < 2025 ? 2025 : currentYear;
+  const [selectedYear, setSelectedYear] = useState<number | 'all'>(initialYear);
+  const years = useMemo(() => {
+    const list: number[] = [];
+    for (let y = 2025; y <= currentYear; y++) list.push(y);
+    return list;
+  }, [currentYear]);
+
+  const { data, isLoading } = useAnalytics(selectedYear);
+  const salesData = useMemo(() => {
+    const months = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
+    return (data?.monthly ?? []).map((m) => ({ 
+      month: months[m.month - 1], 
+      ventas: m.ventas,  // Bruto
+      ventasNetas: m.ventasNetas || (m.ventas - (m.devoluciones || 0)),  // Neto
+      devoluciones: m.devoluciones || 0,
+      costo: m.costo 
+    }));
+  }, [data]);
 
   return (
     <div className="p-6 space-y-6 animate-fade-in">
@@ -35,47 +49,22 @@ const Analytics = () => {
           <p className="text-muted-foreground">Insights detallados de tu negocio</p>
         </div>
         <div className="flex space-x-2">
-          <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
+          <Select
+            value={String(selectedYear)}
+            onValueChange={(v) => setSelectedYear(v === 'all' ? 'all' : Number(v))}
+          >
             <SelectTrigger className="w-48">
               <Calendar className="w-4 h-4 mr-2" />
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="7days">Últimos 7 días</SelectItem>
-              <SelectItem value="30days">Últimos 30 días</SelectItem>
-              <SelectItem value="90days">Últimos 3 meses</SelectItem>
-              <SelectItem value="year">Este año</SelectItem>
+              <SelectItem key="all" value="all">Todos</SelectItem>
+              {years.map(y => (
+                <SelectItem key={y} value={String(y)}>{y}</SelectItem>
+              ))}
             </SelectContent>
           </Select>
-          <Button variant="outline" onClick={() => {
-            const periodText = {
-              "7days": "últimos 7 días",
-              "30days": "últimos 30 días", 
-              "90days": "últimos 3 meses",
-              "year": "este año"
-            }[selectedPeriod] || "período seleccionado";
-            
-            // Simular descarga de CSV
-            const csvContent = `Período,Ventas,Costo,Ganancia\n${salesData.map(row => 
-              `${row.month},${row.ventas},${row.costo},${row.ventas - row.costo}`
-            ).join('\n')}`;
-            
-            const blob = new Blob([csvContent], { type: 'text/csv' });
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `reporte-analisis-${periodText.replace(/\s+/g, '-')}.csv`;
-            a.click();
-            window.URL.revokeObjectURL(url);
-            
-            toast({
-              title: "Reporte exportado",
-              description: `Análisis de ${periodText} descargado como CSV`
-            });
-          }}>
-            <Download className="w-4 h-4 mr-2" />
-            Exportar
-          </Button>
+          {/* Export removed as requested */}
         </div>
       </div>
 
@@ -84,15 +73,17 @@ const Analytics = () => {
         <Card className="animate-slide-up">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Ventas Totales</p>
-                <p className="text-2xl font-bold text-foreground">{currentData.totalSales}</p>
-                <div className="flex items-center mt-1">
-                  <TrendingUp className="w-3 h-3 text-liquor-gold mr-1" />
-                  <span className="text-xs text-liquor-gold">+15.3%</span>
-                </div>
+              <div className="flex-1">
+                <p className="text-sm text-muted-foreground">Ventas Netas</p>
+                <p className="text-2xl font-bold text-green-700">{isLoading ? '...' : (data?.totals.totalSales?.toLocaleString?.('es-GT', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) ?? '0.00')}</p>
+                {data?.totals.totalReturns && data.totals.totalReturns > 0 && (
+                  <div className="mt-1 flex flex-col gap-0.5">
+                    <p className="text-xs text-muted-foreground line-through">Q {data.totals.totalSalesGross?.toFixed(2)}</p>
+                    <p className="text-xs text-orange-600">(-) Dev: Q {data.totals.totalReturns.toFixed(2)}</p>
+                  </div>
+                )}
               </div>
-              <div className="w-12 h-12 bg-gradient-primary rounded-lg flex items-center justify-center">
+              <div className="w-12 h-12 bg-primary rounded-lg flex items-center justify-center text-primary-foreground">
                 <BarChart3 className="w-6 h-6 text-primary-foreground" />
               </div>
             </div>
@@ -104,13 +95,15 @@ const Analytics = () => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">Margen Promedio</p>
-                <p className="text-2xl font-bold text-foreground">{currentData.totalMargin}</p>
-                <div className="flex items-center mt-1">
-                  <TrendingUp className="w-3 h-3 text-liquor-gold mr-1" />
-                  <span className="text-xs text-liquor-gold">+2.1%</span>
-                </div>
+                <p className="text-2xl font-bold text-foreground">{isLoading ? '...' : (() => {
+                  const sales = data?.totals.totalSales || 0;
+                  const profit = (data?.totals.totalProfit || 0);
+                  const pct = sales > 0 ? ((profit / sales) * 100).toFixed(1) : '0.0';
+                  return `${pct}%`;
+                })()}</p>
+                {/* removed mock growth badge */}
               </div>
-              <div className="w-12 h-12 bg-gradient-accent rounded-lg flex items-center justify-center">
+              <div className="w-12 h-12 bg-accent rounded-lg flex items-center justify-center text-accent-foreground">
                 <TrendingUp className="w-6 h-6 text-accent-foreground" />
               </div>
             </div>
@@ -122,11 +115,8 @@ const Analytics = () => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">Productos Vendidos</p>
-                <p className="text-2xl font-bold text-foreground">{currentData.productsCount.toLocaleString()}</p>
-                <div className="flex items-center mt-1">
-                  <TrendingDown className="w-3 h-3 text-accent mr-1" />
-                  <span className="text-xs text-accent">-3.2%</span>
-                </div>
+                <p className="text-2xl font-bold text-foreground">{isLoading ? '...' : (data?.totals.productsCount?.toLocaleString?.() ?? '0')}</p>
+                {/* removed mock growth badge */}
               </div>
               <div className="w-12 h-12 bg-muted rounded-lg flex items-center justify-center">
                 <BarChart3 className="w-6 h-6 text-muted-foreground" />
@@ -137,19 +127,29 @@ const Analytics = () => {
 
         <Card className="animate-slide-up" style={{ animationDelay: "300ms" }}>
           <CardContent className="p-6">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between mb-3">
               <div>
                 <p className="text-sm text-muted-foreground">Rotación Stock</p>
-                <p className="text-2xl font-bold text-foreground">{currentData.stockRotation}</p>
-                <div className="flex items-center mt-1">
-                  <TrendingUp className="w-3 h-3 text-liquor-gold mr-1" />
-                  <span className="text-xs text-liquor-gold">+0.8x</span>
-                </div>
+                <p className="text-2xl font-bold text-foreground">{isLoading ? '...' : (data?.totals.stockRotation ?? 0)}</p>
               </div>
               <div className="w-12 h-12 bg-liquor-gold/20 rounded-lg flex items-center justify-center">
                 <Filter className="w-6 h-6 text-liquor-gold" />
               </div>
             </div>
+            {!isLoading && data && (
+              <div className="pt-2 border-t border-border">
+                <p className="text-xs text-muted-foreground italic">
+                  {(() => {
+                    const rotation = data.totals.stockRotation;
+                    if (rotation >= 300) return "🚀 Excelente rotación! Tu inventario se mueve muy rápido.";
+                    if (rotation >= 200) return "✅ Buena rotación. El inventario tiene movimiento saludable.";
+                    if (rotation >= 100) return "⚠️ Rotación moderada. Considera promocionar productos lentos.";
+                    if (rotation >= 50) return "⚡ Rotación baja. Revisa productos con poco movimiento.";
+                    return "🔴 Rotación muy baja. Urgente: optimiza tu inventario.";
+                  })()}
+                </p>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -164,8 +164,10 @@ const Analytics = () => {
           <CardContent>
             <div className="space-y-4">
               {salesData.map((month, index) => {
-                const profit = month.ventas - month.costo;
-                const margin = ((profit / month.ventas) * 100).toFixed(1);
+                const ventasNetas = month.ventasNetas;
+                const profit = ventasNetas - month.costo;
+                const margin = ventasNetas > 0 ? ((profit / ventasNetas) * 100).toFixed(1) : '0.0';
+                const hasDevoluciones = month.devoluciones > 0;
                 
                 return (
                   <div key={month.month} className="flex items-center space-x-4">
@@ -174,14 +176,22 @@ const Analytics = () => {
                     </div>
                     <div className="flex-1">
                       <div className="flex items-center justify-between mb-1">
-                        <span className="text-sm text-foreground">Q {month.ventas.toLocaleString()}</span>
+                        <div className="flex flex-col">
+                          <span className="text-sm font-semibold text-green-700">Q {ventasNetas.toLocaleString()}</span>
+                          {hasDevoluciones && (
+                            <div className="flex gap-2 text-xs">
+                              <span className="text-muted-foreground line-through">Q {month.ventas.toFixed(2)}</span>
+                              <span className="text-orange-600">-Q {month.devoluciones.toFixed(2)}</span>
+                            </div>
+                          )}
+                        </div>
                         <span className="text-xs text-muted-foreground">{margin}% margen</span>
                       </div>
                       <div className="w-full bg-muted rounded-full h-2">
                         <div 
-                          className="bg-gradient-primary h-2 rounded-full transition-all duration-500"
+                          className="bg-primary h-2 rounded-full transition-all duration-500"
                           style={{ 
-                            width: `${(month.ventas / Math.max(...salesData.map(d => d.ventas))) * 100}%`,
+                            width: `${(() => { const max = Math.max(1, ...(salesData.map(d => d.ventasNetas) as number[])); return (ventasNetas / max) * 100; })()}%`,
                             animationDelay: `${index * 100}ms`
                           }}
                         />
@@ -201,7 +211,7 @@ const Analytics = () => {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {topProducts.map((product, index) => (
+              {(data?.topProducts ?? []).map((product, index) => (
                 <div key={index} className="flex items-center justify-between p-3 bg-muted rounded-lg">
                   <div className="flex-1">
                     <div className="font-medium text-foreground">{product.name}</div>
@@ -211,11 +221,7 @@ const Analytics = () => {
                     <div className="font-medium text-foreground">Q {product.revenue.toLocaleString()}</div>
                     <div className="flex items-center justify-end">
                       <span className="text-sm text-muted-foreground mr-2">{product.ventas} unidades</span>
-                      {product.trend === "up" ? (
-                        <TrendingUp className="w-3 h-3 text-liquor-gold" />
-                      ) : (
-                        <TrendingDown className="w-3 h-3 text-accent" />
-                      )}
+                      <TrendingUp className="w-3 h-3 text-liquor-gold" />
                     </div>
                   </div>
                 </div>
@@ -225,31 +231,55 @@ const Analytics = () => {
         </Card>
       </div>
 
-      {/* Rendimiento por Categoría */}
+  {/* Rendimiento por Categoría (reemplazo sin gradients) */}
       <Card className="animate-bounce-in" style={{ animationDelay: "400ms" }}>
         <CardHeader>
           <CardTitle>Rendimiento por Categoría</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-            {categoryPerformance.map((category, index) => (
-              <div key={index} className="text-center">
-                <div className="relative w-24 h-24 mx-auto mb-3">
-                  <div className="absolute inset-0 bg-muted rounded-full"></div>
-                  <div 
-                    className={`absolute inset-0 ${category.color} rounded-full transition-all duration-1000`}
-                    style={{ 
-                      clipPath: `polygon(50% 50%, 50% 0%, ${50 + (category.percentage / 100) * 50}% 0%, 100% 100%, 0% 100%)`,
-                      animationDelay: `${index * 200}ms`
-                    }}
-                  ></div>
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <span className="text-lg font-bold text-foreground">{category.percentage}%</span>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-6">
+            {[...((data?.categoryPerformance ?? []) as import("@/services/analyticsService").AnalyticsResponse["categoryPerformance"])]
+              .sort((a,b) => (b.percentage || 0) - (a.percentage || 0))
+              .map((cat, idx) => {
+                const pct = Math.max(0, Math.min(100, cat.percentage || 0))
+                const radius = 42; // circle radius
+                const circumference = 2 * Math.PI * radius;
+                const offset = circumference - (pct / 100) * circumference;
+                return (
+                  <div key={`${cat.category}-${idx}`} className="text-center">
+                    <svg width={96} height={96} className="mx-auto">
+                      <circle
+                        cx={48}
+                        cy={48}
+                        r={radius}
+                        stroke="#e5e7eb"
+                        strokeWidth={8}
+                        fill="none"
+                      />
+                      <circle
+                        cx={48}
+                        cy={48}
+                        r={radius}
+                        stroke="#f59e0b"
+                        strokeWidth={8}
+                        fill="none"
+                        strokeDasharray={circumference}
+                        strokeDashoffset={offset}
+                        strokeLinecap="round"
+                      />
+                      <text
+                        x="50%"
+                        y="50%"
+                        dominantBaseline="middle"
+                        textAnchor="middle"
+                        className="fill-foreground font-semibold"
+                        fontSize={16}
+                      >{pct}%</text>
+                    </svg>
+                    <div className="mt-2 text-sm font-medium text-foreground truncate" title={cat.category}>{cat.category}</div>
                   </div>
-                </div>
-                <div className="font-medium text-foreground">{category.category}</div>
-              </div>
-            ))}
+                )
+              })}
           </div>
         </CardContent>
       </Card>

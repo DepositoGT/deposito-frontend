@@ -1,0 +1,139 @@
+/**
+ * useProductForm - Custom hook for managing product form state and validation
+ */
+import { useState, useCallback } from 'react'
+import { useToast } from '@/hooks/use-toast'
+import type { Product } from '@/types/product'
+import { ProductFormData, EMPTY_PRODUCT_FORM } from '../types'
+
+interface UseProductFormReturn {
+    formData: ProductFormData
+    setFormData: React.Dispatch<React.SetStateAction<ProductFormData>>
+    resetForm: () => void
+    validateForm: () => boolean
+    populateFromProduct: (product: Product, suppliers: Array<{ id: string | number; name: string }>, categories: Array<{ id: string | number; name: string }>) => void
+    generateBarcode: () => string
+}
+
+export const useProductForm = (): UseProductFormReturn => {
+    const { toast } = useToast()
+    const [formData, setFormData] = useState<ProductFormData>(EMPTY_PRODUCT_FORM)
+
+    const resetForm = useCallback(() => {
+        setFormData(EMPTY_PRODUCT_FORM)
+    }, [])
+
+    const validateForm = useCallback((): boolean => {
+        if (!formData.name || formData.name.trim() === '') {
+            toast({
+                title: 'Campo requerido',
+                description: 'El nombre del producto es obligatorio',
+                variant: 'destructive'
+            })
+            return false
+        }
+
+        if (!formData.category) {
+            toast({
+                title: 'Campo requerido',
+                description: 'La categoría del producto es obligatoria',
+                variant: 'destructive'
+            })
+            return false
+        }
+
+        if (!formData.price || Number(formData.price) <= 0) {
+            toast({
+                title: 'Campo requerido',
+                description: 'El precio debe ser mayor a 0',
+                variant: 'destructive'
+            })
+            return false
+        }
+
+        if (!formData.supplier) {
+            toast({
+                title: 'Campo requerido',
+                description: 'El proveedor es obligatorio',
+                variant: 'destructive'
+            })
+            return false
+        }
+
+        if (formData.minStock && Number(formData.minStock) < 0) {
+            toast({
+                title: 'Valor inválido',
+                description: 'El stock mínimo no puede ser negativo',
+                variant: 'destructive'
+            })
+            return false
+        }
+
+        if (formData.stock && Number(formData.stock) < 0) {
+            toast({
+                title: 'Valor inválido',
+                description: 'El stock no puede ser negativo',
+                variant: 'destructive'
+            })
+            return false
+        }
+
+        if (formData.cost && Number(formData.cost) < 0) {
+            toast({
+                title: 'Valor inválido',
+                description: 'El costo no puede ser negativo',
+                variant: 'destructive'
+            })
+            return false
+        }
+
+        return true
+    }, [formData, toast])
+
+    const populateFromProduct = useCallback((
+        product: Product,
+        suppliers: Array<{ id: string | number; name: string }>,
+        categories: Array<{ id: string | number; name: string }>
+    ) => {
+        let supplierValue = String(product.supplier ?? '')
+        const matchSupplier = suppliers.find(s =>
+            String(s.name).toLowerCase() === String(product.supplier ?? '').toLowerCase()
+        )
+        if (matchSupplier) supplierValue = String(matchSupplier.id)
+
+        let categoryValue = String(product.category ?? '')
+        const matchCategory = categories.find(c =>
+            String(c.name).toLowerCase() === String(product.category ?? '').toLowerCase()
+        )
+        if (matchCategory) categoryValue = String(matchCategory.id)
+
+        setFormData({
+            name: product.name,
+            category: categoryValue,
+            brand: product.brand,
+            size: product.size,
+            price: product.price.toString(),
+            cost: product.cost.toString(),
+            stock: product.stock.toString(),
+            minStock: product.minStock.toString(),
+            supplier: supplierValue,
+            barcode: product.barcode,
+            description: product.description || ''
+        })
+    }, [])
+
+    const generateBarcode = useCallback((): string => {
+        const code = Date.now().toString().slice(-10)
+        setFormData(prev => ({ ...prev, barcode: code }))
+        return code
+    }, [])
+
+    return {
+        formData,
+        setFormData,
+        resetForm,
+        validateForm,
+        populateFromProduct,
+        generateBarcode
+    }
+}
