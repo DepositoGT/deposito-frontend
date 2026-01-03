@@ -7,3 +7,5 @@ export { NegativeStockDialog } from './NegativeStockDialog'
 export { SalesStatusTable } from './SalesStatusTable'
 export { SaleDetailDialog } from './SaleDetailDialog'
 export { NewSaleDialog } from './NewSaleDialog'
+export { PromotionCodeInput } from './PromotionCodeInput'
+
