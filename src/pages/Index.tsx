@@ -13,6 +13,7 @@ import UserManagement from "@/components/UserManagement";
 import { CatalogsManagement } from "@/components/CatalogsManagement";
 import ReturnsManagement from "@/components/ReturnsManagement";
 import CashClosureManagement from "@/components/CashClosureManagement";
+import PromotionsManagement from "@/components/PromotionsManagement";
 
 const Index = () => {
   const [activeSection, setActiveSectionState] = useState("dashboard");
@@ -35,34 +36,36 @@ const Index = () => {
   };
 
   const renderContent = () => {
-  switch (activeSection) {
+    switch (activeSection) {
       case "dashboard":
-    return isSeller ? <SalesManagement onSectionChange={setActiveSection} /> : <Dashboard onSectionChange={setActiveSection} />;
+        return isSeller ? <SalesManagement onSectionChange={setActiveSection} /> : <Dashboard onSectionChange={setActiveSection} />;
       case "products":
       case "inventory":
-    return isSeller ? <SalesManagement onSectionChange={setActiveSection} /> : <ProductManagement />;
+        return isSeller ? <SalesManagement onSectionChange={setActiveSection} /> : <ProductManagement />;
       case "analytics":
-    return isSeller ? <SalesManagement onSectionChange={setActiveSection} /> : <Analytics />;
+        return isSeller ? <SalesManagement onSectionChange={setActiveSection} /> : <Analytics />;
       case "sales":
         return <SalesManagement onSectionChange={setActiveSection} />;
       case "suppliers":
-    return isSeller ? <SalesManagement onSectionChange={setActiveSection} /> : <SuppliersManagement />;
+        return isSeller ? <SalesManagement onSectionChange={setActiveSection} /> : <SuppliersManagement />;
       case "reports":
-    return isSeller ? <SalesManagement /> : <ReportsManagement />;
+        return isSeller ? <SalesManagement /> : <ReportsManagement />;
       case "alerts":
-    return isSeller ? <SalesManagement /> : <AlertsManagement />;
+        return isSeller ? <SalesManagement /> : <AlertsManagement />;
       case "scanner":
-    return isSeller ? <SalesManagement /> : <ScannerManagement />;
+        return isSeller ? <SalesManagement /> : <ScannerManagement />;
       case "catalogs":
-    return isSeller ? <SalesManagement /> : <CatalogsManagement />;
+        return isSeller ? <SalesManagement /> : <CatalogsManagement />;
       case "returns":
-    return isSeller ? <SalesManagement /> : <ReturnsManagement />;
+        return isSeller ? <SalesManagement /> : <ReturnsManagement />;
       case "cash-closure":
-    return <CashClosureManagement />;
+        return <CashClosureManagement />;
       case "users":
-    return isSeller ? <SalesManagement onSectionChange={setActiveSection} /> : <UserManagement />;
+        return isSeller ? <SalesManagement onSectionChange={setActiveSection} /> : <UserManagement />;
+      case "promotions":
+        return isSeller ? <SalesManagement onSectionChange={setActiveSection} /> : <PromotionsManagement />;
       default:
-    return isSeller ? <SalesManagement onSectionChange={setActiveSection} /> : <Dashboard />;
+        return isSeller ? <SalesManagement onSectionChange={setActiveSection} /> : <Dashboard />;
     }
   };
 

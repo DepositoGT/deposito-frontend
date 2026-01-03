@@ -8,9 +8,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Receipt } from 'lucide-react'
 import { CartPanel } from './CartPanel'
+import { PromotionCodeInput } from './PromotionCodeInput'
 import type { Product } from '@/types/product'
 import type { CartProduct } from '../types'
 import type { PaymentMethod } from '@/hooks/usePaymentMethods'
+import type { AppliedPromotion } from '@/services/promotionService'
 
 interface NewSaleDialogProps {
     open: boolean
@@ -44,6 +46,13 @@ interface NewSaleDialogProps {
     // Submit
     isProcessing: boolean
     onSubmit: () => void
+    // Promotions
+    appliedPromotions?: AppliedPromotion[]
+    totalDiscount?: number
+    finalTotal?: number
+    isValidatingPromotion?: boolean
+    onApplyPromoCode?: (code: string) => Promise<boolean>
+    onRemovePromotion?: (promotionId: string) => void
 }
 
 export const NewSaleDialog = ({
@@ -72,8 +81,16 @@ export const NewSaleDialog = ({
     onAmountReceivedChange,
     changeAmount,
     isProcessing,
-    onSubmit
+    onSubmit,
+    // Promotions
+    appliedPromotions = [],
+    totalDiscount = 0,
+    finalTotal,
+    isValidatingPromotion = false,
+    onApplyPromoCode,
+    onRemovePromotion
 }: NewSaleDialogProps) => {
+    const displayTotal = finalTotal ?? cartTotal
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className='max-w-4xl max-h-[90vh] overflow-y-auto'>
@@ -159,6 +176,34 @@ export const NewSaleDialog = ({
                         changeAmount={changeAmount}
                     />
 
+                    {/* Promotion Code Input */}
+                    {onApplyPromoCode && onRemovePromotion && (
+                        <PromotionCodeInput
+                            appliedPromotions={appliedPromotions}
+                            totalDiscount={totalDiscount}
+                            isValidating={isValidatingPromotion}
+                            onApplyCode={onApplyPromoCode}
+                            onRemovePromotion={onRemovePromotion}
+                        />
+                    )}
+
+                    {/* Total Summary with Discounts */}
+                    {totalDiscount > 0 && (
+                        <div className='bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-950/30 dark:to-emerald-950/30 border border-green-200 dark:border-green-800 rounded-lg p-4'>
+                            <div className='flex justify-between text-sm text-muted-foreground'>
+                                <span>Subtotal:</span>
+                                <span>Q {cartTotal.toFixed(2)}</span>
+                            </div>
+                            <div className='flex justify-between text-sm text-green-600 dark:text-green-400 font-medium'>
+                                <span>Descuentos:</span>
+                                <span>-Q {totalDiscount.toFixed(2)}</span>
+                            </div>
+                            <div className='flex justify-between text-lg font-bold mt-2 pt-2 border-t border-green-200 dark:border-green-800'>
+                                <span>Total a Pagar:</span>
+                                <span className='text-green-700 dark:text-green-300'>Q {displayTotal.toFixed(2)}</span>
+                            </div>
+                        </div>
+                    )}
                     {/* Actions */}
                     <div className='flex justify-end space-x-2'>
                         <Button variant='outline' onClick={() => onOpenChange(false)} disabled={isProcessing}>

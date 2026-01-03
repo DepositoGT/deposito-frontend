@@ -20,6 +20,7 @@ import { usePaymentMethods, PaymentMethod as PaymentMethodType } from '@/hooks/u
 
 // Feature imports
 import { useCart, useSalesData } from './hooks'
+import { usePromotions } from '@/hooks/usePromotions'
 import {
     SalesKPICards,
     SalesFilters,
@@ -28,7 +29,8 @@ import {
     NegativeStockDialog,
     SalesStatusTable,
     SaleDetailDialog,
-    NewSaleDialog
+    NewSaleDialog,
+    PromotionCodeInput
 } from './components'
 import { STATUS_DB_NAMES, NegativeStockDialogState, SaleStatusKey } from './types'
 
@@ -49,6 +51,20 @@ const SalesManagement = ({ onSectionChange }: SalesManagementProps = {}) => {
     const availableProducts = useMemo(() => productsQuery.data ?? [], [productsQuery.data])
     const salesData = useSalesData()
     const cart = useCart({ availableProducts })
+
+    // Promotions hook - prepare cart items for validation
+    const promotionCartItems = useMemo(() =>
+        cart.cartItems.map(item => ({
+            product_id: item.id,
+            price: Number(item.price),
+            qty: item.qty
+        })),
+        [cart.cartItems]
+    )
+    const promotions = usePromotions({
+        cartItems: promotionCartItems,
+        cartTotal: cart.cartTotal
+    })
 
     // UI state
     const [isNewSaleOpen, setIsNewSaleOpen] = useState(false)
@@ -83,7 +99,7 @@ const SalesManagement = ({ onSectionChange }: SalesManagementProps = {}) => {
         [availableProducts, productSearch]
     )
     const changeAmount = paymentMethod?.name?.toLowerCase() === 'efectivo' && amountReceived
-        ? Math.max(0, parseFloat(amountReceived) - cart.cartTotal) : 0
+        ? Math.max(0, parseFloat(amountReceived) - promotions.finalTotal) : 0
 
     // Process sale
     const processSale = async () => {
@@ -102,6 +118,7 @@ const SalesManagement = ({ onSectionChange }: SalesManagementProps = {}) => {
             amount_received: isCash && amountReceived ? Number(amountReceived) : undefined,
             change: isCash ? changeAmount : undefined,
             admin_authorized_products: Array.from(cart.adminAuthorizedProducts),
+            promotion_codes: promotions.promotionCodes,
         }
         setIsProcessingSale(true)
         try {
@@ -110,6 +127,7 @@ const SalesManagement = ({ onSectionChange }: SalesManagementProps = {}) => {
             salesData.refreshSales()
             setIsNewSaleOpen(false)
             cart.clearCart()
+            promotions.clearPromotions()
             setCustomer(''); setCustomerNit(''); setPaymentMethod(null); setAmountReceived('')
         } catch (e) {
             toast({ title: 'Error', description: (e as Error)?.message, variant: 'destructive' })
@@ -243,6 +261,13 @@ const SalesManagement = ({ onSectionChange }: SalesManagementProps = {}) => {
                 changeAmount={changeAmount}
                 isProcessing={isProcessingSale}
                 onSubmit={processSale}
+                // Promotion props
+                appliedPromotions={promotions.appliedPromotions}
+                totalDiscount={promotions.totalDiscount}
+                finalTotal={promotions.finalTotal}
+                isValidatingPromotion={promotions.isValidating}
+                onApplyPromoCode={promotions.applyCode}
+                onRemovePromotion={promotions.removePromotion}
             />
 
             <SaleDetailDialog

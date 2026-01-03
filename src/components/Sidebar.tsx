@@ -1,11 +1,11 @@
 import { useState } from "react";
-import { 
-  BarChart3, 
-  Package, 
-  ShoppingCart, 
-  Users, 
-  AlertTriangle, 
-  FileText, 
+import {
+  BarChart3,
+  Package,
+  ShoppingCart,
+  Users,
+  AlertTriangle,
+  FileText,
   Home,
   Boxes,
   TrendingUp,
@@ -14,7 +14,8 @@ import {
   UserCog,
   FolderKanban,
   RotateCcw,
-  Calculator
+  Calculator,
+  Tag
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -34,6 +35,7 @@ const menuItems: MenuItem[] = [
   { id: "reports", label: "Reportes", icon: FileText },
   { id: "alerts", label: "Alertas", icon: AlertTriangle },
   { id: "scanner", label: "Scanner", icon: Scan },
+  { id: "promotions", label: "Promociones", icon: Tag, adminOnly: true },
   { id: "catalogs", label: "Catálogos", icon: FolderKanban, adminOnly: true },
   { id: "users", label: "Usuarios", icon: UserCog, adminOnly: true },
 ];
@@ -62,8 +64,8 @@ const Sidebar = ({ activeSection = "dashboard", onSectionChange }: SidebarProps)
   const isSeller = typeof roleName === 'string' && ['seller', 'vendedor'].includes(roleName.toLowerCase());
   const isAdmin = typeof roleName === 'string' && roleName.toLowerCase() === 'admin';
 
-  const visibleMenu = isSeller 
-    ? menuItems.filter((m) => m.id === 'sales' || m.id === 'cash-closure') 
+  const visibleMenu = isSeller
+    ? menuItems.filter((m) => m.id === 'sales' || m.id === 'cash-closure')
     : menuItems.filter((m) => !m.adminOnly || isAdmin);
 
   // Contar productos con stock bajo (productos críticos)
@@ -99,7 +101,7 @@ const Sidebar = ({ activeSection = "dashboard", onSectionChange }: SidebarProps)
           {visibleMenu.map((item) => {
             const Icon = item.icon;
             const isActive = activeSection === item.id;
-            
+
             return (
               <Button
                 key={item.id}
@@ -123,9 +125,9 @@ const Sidebar = ({ activeSection = "dashboard", onSectionChange }: SidebarProps)
       {!isCollapsed && !criticalLoading && showInventoryAlert && lowStockProducts > 0 && !isSeller && (
         <div className="p-4 pt-0 mt-auto">
           <div className="p-4 rounded-lg bg-destructive/10 border border-destructive/30 relative">
-            <Button 
-              size="sm" 
-              variant="ghost" 
+            <Button
+              size="sm"
+              variant="ghost"
               className="absolute top-1 right-1 h-6 w-6 p-0 text-destructive hover:bg-destructive/10"
               onClick={handleCloseAlert}
             >
@@ -136,14 +138,14 @@ const Sidebar = ({ activeSection = "dashboard", onSectionChange }: SidebarProps)
               <div className="flex-1">
                 <h4 className="font-semibold text-sm text-foreground">Stock Crítico</h4>
                 <p className="text-xs mt-1 text-muted-foreground">
-                  {lowStockProducts === 1 
-                    ? "1 producto con stock bajo" 
+                  {lowStockProducts === 1
+                    ? "1 producto con stock bajo"
                     : `${lowStockProducts} productos con stock bajo`
                   }
                 </p>
-                <Button 
-                  size="sm" 
-                  variant="destructive" 
+                <Button
+                  size="sm"
+                  variant="destructive"
                   className="mt-2 w-full h-7 text-xs"
                   onClick={handleViewAlerts}
                 >
