@@ -101,7 +101,7 @@ const drawTicket = (
             doc.roundedRect(x + padding, currentY - 3, 25, 15, 2, 2, 'FD')
             doc.setFontSize(5)
             doc.setTextColor(150, 150, 150)
-            doc.text('TU LOGO', x + padding + 12.5, currentY + 4, { align: 'center' })
+            doc.text('LOGO DE LA EMPRESA', x + padding + 12.5, currentY + 4, { align: 'center' })
         }
     } else {
         // Draw placeholder
@@ -110,7 +110,7 @@ const drawTicket = (
         doc.roundedRect(x + padding, currentY - 3, 25, 15, 2, 2, 'FD')
         doc.setFontSize(5)
         doc.setTextColor(150, 150, 150)
-        doc.text('TU LOGO', x + padding + 12.5, currentY + 4, { align: 'center' })
+        doc.text('LOGO DE LA EMPRESA', x + padding + 12.5, currentY + 4, { align: 'center' })
     }
 
     // Promo value on the right (bold)
@@ -137,14 +137,19 @@ const drawTicket = (
     doc.text(nameLines.slice(0, 2), x + width / 2, currentY, { align: 'center' })
     currentY += (Math.min(nameLines.length, 2) * 4) + 2
 
-    // Description (normal, smaller)
+    // Description (normal, smaller) - limited to 30 words
     if (promotion.description) {
         doc.setFontSize(7)
         doc.setFont('helvetica', 'normal')
         doc.setTextColor(100, 100, 100)
-        const descLines = doc.splitTextToSize(promotion.description, innerWidth - 10)
-        doc.text(descLines.slice(0, 2), x + width / 2, currentY, { align: 'center' })
-        currentY += (Math.min(descLines.length, 2) * 3) + 4
+        // Truncate to 30 words max
+        const words = promotion.description.split(/\s+/)
+        const truncatedDesc = words.length > 30
+            ? words.slice(0, 30).join(' ') + '...'
+            : promotion.description
+        const descLines = doc.splitTextToSize(truncatedDesc, innerWidth - 6)
+        doc.text(descLines.slice(0, 4), x + width / 2, currentY, { align: 'center' })
+        currentY += (Math.min(descLines.length, 4) * 3) + 4
     } else {
         currentY += 4
     }
@@ -209,7 +214,7 @@ export const generatePromotionTicketsPDF = (options: TicketOptions) => {
 
     const margin = 10
     const ticketWidth = (pageWidth - (margin * 3)) / 2  // 2 columns with gap
-    const ticketHeight = 110  // Height to fit all content including description
+    const ticketHeight = 125  // Height to fit full description (up to 4 lines)
     const gapX = margin
     const gapY = 8
 

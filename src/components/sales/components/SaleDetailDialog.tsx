@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { AlertTriangle, PackageX, RotateCcw } from 'lucide-react'
+import { AlertTriangle, PackageX, RotateCcw, Tag } from 'lucide-react'
 import { Sale, SaleStatus } from '@/types'
 import { formatMoney, formatDateTime } from '@/utils'
 import { useNavigate } from 'react-router-dom'
@@ -83,6 +83,39 @@ export const SaleDetailDialog = ({
                         </div>
                     </div>
 
+                    {/* Promotions Applied */}
+                    {sale.promotions && sale.promotions.length > 0 && (
+                        <div>
+                            <Label className='flex items-center gap-2'>
+                                <Tag className='w-4 h-4 text-green-600' />Promociones Aplicadas
+                            </Label>
+                            <div className='border border-green-200 rounded-lg divide-y mt-2 bg-green-50/30'>
+                                {sale.promotions.map((promo, idx) => (
+                                    <div key={idx} className='p-3 flex justify-between items-center'>
+                                        <div>
+                                            <div className='text-sm font-medium text-green-900'>
+                                                {promo.promotion?.name || 'Promoción'}
+                                            </div>
+                                            {promo.code_used && (
+                                                <div className='text-xs text-muted-foreground'>
+                                                    Código: <code className='bg-muted px-1 rounded'>{promo.code_used}</code>
+                                                </div>
+                                            )}
+                                            {promo.promotion?.type?.name && (
+                                                <Badge variant='outline' className='text-xs mt-1'>
+                                                    {promo.promotion.type.name}
+                                                </Badge>
+                                            )}
+                                        </div>
+                                        <div className='text-right font-medium text-green-700'>
+                                            -{formatMoney(promo.discount_applied)}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
                     {/* Returns Section */}
                     {sale.hasReturns && sale.returnDetails && sale.returnDetails.length > 0 && (
                         <div>
@@ -123,10 +156,24 @@ export const SaleDetailDialog = ({
 
                     {/* Totals */}
                     <div className='bg-muted/50 p-4 rounded-lg space-y-2'>
-                        <div className='flex justify-between'>
-                            <span>Subtotal Original:</span>
-                            <span>{formatMoney(sale.total)}</span>
-                        </div>
+                        {/* Show subtotal when there are promotions */}
+                        {sale.discountTotal && sale.discountTotal > 0 ? (
+                            <>
+                                <div className='flex justify-between'>
+                                    <span>Subtotal:</span>
+                                    <span>{formatMoney(sale.subtotal || sale.total + sale.discountTotal)}</span>
+                                </div>
+                                <div className='flex justify-between text-green-700'>
+                                    <span>(-) Descuentos:</span>
+                                    <span>-{formatMoney(sale.discountTotal)}</span>
+                                </div>
+                            </>
+                        ) : (
+                            <div className='flex justify-between'>
+                                <span>Subtotal Original:</span>
+                                <span>{formatMoney(sale.total)}</span>
+                            </div>
+                        )}
                         {sale.hasReturns && (
                             <>
                                 <div className='flex justify-between text-orange-700'>

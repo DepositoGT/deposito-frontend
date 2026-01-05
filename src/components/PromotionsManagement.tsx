@@ -954,14 +954,27 @@ const PromotionDialog = ({ dialog, setDialog, promotionTypes, onCreate, onUpdate
                     </div>
 
                     <div>
-                        <Label htmlFor='description'>Descripción</Label>
+                        <Label htmlFor='description'>Descripción <span className='text-xs text-muted-foreground'>(máx. 30 palabras / 170 caracteres)</span></Label>
                         <Textarea
                             id='description'
                             value={formData.description}
-                            onChange={e => setFormData({ ...formData, description: e.target.value })}
+                            onChange={e => {
+                                const newValue = e.target.value
+                                const words = newValue.trim().split(/\s+/).filter(w => w.length > 0)
+                                const isDeleting = newValue.length < formData.description.length
+                                // Allow if deleting, or if both limits are satisfied
+                                if (isDeleting || (words.length <= 30 && newValue.length <= 170)) {
+                                    setFormData({ ...formData, description: newValue })
+                                }
+                            }}
                             placeholder='Descripción opcional...'
                             rows={2}
+                            maxLength={170}
                         />
+                        <div className='text-xs text-muted-foreground text-right mt-1 flex justify-between'>
+                            <span>{formData.description.length}/170 caracteres</span>
+                            <span>{formData.description.trim().split(/\s+/).filter(w => w.length > 0).length}/30 palabras</span>
+                        </div>
                     </div>
 
                     {/* Conditional Fields based on Type */}
