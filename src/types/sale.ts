@@ -17,6 +17,21 @@ export interface ReturnDetail {
   }>;
 }
 
+// Interfaz de promoción aplicada a venta
+export interface SalePromotion {
+  id: number;
+  promotion_id: string;
+  discount_applied: number;
+  code_used?: string;
+  promotion?: {
+    id: string;
+    name: string;
+    type?: {
+      name: string;
+    };
+  };
+}
+
 // Interfaz principal de venta
 export interface Sale extends BaseEntity {
   date: string;
@@ -24,10 +39,13 @@ export interface Sale extends BaseEntity {
   customerNit?: string; // NIT del cliente (opcional)
   isFinalConsumer: boolean; // Si es consumidor final (CF)
   total: number;
+  subtotal?: number; // Subtotal antes de descuentos
+  discountTotal?: number; // Total de descuentos aplicados
   totalReturned?: number; // Total devuelto
   adjustedTotal?: number; // Total ajustado (total - devoluciones)
   hasReturns?: boolean; // Indica si tiene devoluciones
   returnDetails?: ReturnDetail[]; // Detalles de las devoluciones
+  promotions?: SalePromotion[]; // Promociones aplicadas
   items: number;
   payment: PaymentMethod;
   status: SaleStatus;
