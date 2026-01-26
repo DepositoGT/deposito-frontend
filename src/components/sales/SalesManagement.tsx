@@ -33,14 +33,16 @@ import {
     PromotionCodeInput
 } from './components'
 import { STATUS_DB_NAMES, NegativeStockDialogState, SaleStatusKey } from './types'
+import { useNavigate } from 'react-router-dom'
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000/api'
+const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api'
 
 interface SalesManagementProps {
-    onSectionChange?: (section: string) => void
+    onSectionChange?: (section: string) => void;
 }
 
-const SalesManagement = ({ onSectionChange }: SalesManagementProps = {}) => {
+const SalesManagement = ({ onSectionChange }: SalesManagementProps) => {
+    const navigate = useNavigate()
     const { isAuthenticated } = useAuth()
     const { toast } = useToast()
 
@@ -160,7 +162,7 @@ const SalesManagement = ({ onSectionChange }: SalesManagementProps = {}) => {
             if (!data.valid && data.products.length > 0) {
                 setNegativeStockDialog({ open: true, products: data.products })
             } else {
-                if (onSectionChange) onSectionChange('cash-closure')
+                navigate('/cierre-caja')
             }
         } catch {
             toast({ title: 'Error', description: 'No se pudo validar el inventario', variant: 'destructive' })
@@ -170,28 +172,28 @@ const SalesManagement = ({ onSectionChange }: SalesManagementProps = {}) => {
     }
 
     return (
-        <div className='p-6 space-y-6 animate-fade-in'>
+        <div className='p-3 sm:p-6 space-y-4 sm:space-y-6 animate-fade-in'>
             {/* Header */}
-            <div className='flex items-center justify-between'>
-                <div>
-                    <h2 className='text-2xl font-bold text-foreground'>Gestión de Ventas</h2>
-                    <p className='text-muted-foreground'>Control completo de transacciones</p>
+            <div className='flex flex-col sm:flex-row sm:items-center gap-3 sm:justify-between'>
+                <div className='min-w-0'>
+                    <h2 className='text-lg sm:text-2xl font-bold text-foreground'>Ventas</h2>
+                    <p className='text-xs sm:text-sm text-muted-foreground'>Control de transacciones</p>
                 </div>
-                <div className='flex space-x-2'>
+                <div className='flex gap-2 overflow-x-auto pb-1 -mx-3 px-3 sm:mx-0 sm:px-0 sm:overflow-visible'>
                     <Select value={salesData.filters.period} onValueChange={salesData.setPeriod}>
-                        <SelectTrigger className='w-48'><Calendar className='w-4 h-4 mr-2' /><SelectValue /></SelectTrigger>
+                        <SelectTrigger className='w-28 sm:w-36 shrink-0'><Calendar className='w-4 h-4 mr-1 sm:mr-2' /><SelectValue /></SelectTrigger>
                         <SelectContent>
                             <SelectItem value='today'>Hoy</SelectItem>
-                            <SelectItem value='week'>Esta semana</SelectItem>
-                            <SelectItem value='month'>Este mes</SelectItem>
+                            <SelectItem value='week'>Semana</SelectItem>
+                            <SelectItem value='month'>Mes</SelectItem>
                         </SelectContent>
                     </Select>
-                    <Button variant='outline' onClick={handleCashClosure} disabled={isValidatingClosure} className='border-green-600 text-green-600'>
-                        <Calculator className='w-4 h-4 mr-2' />{isValidatingClosure ? 'Validando...' : 'Cierre de Caja'}
+                    <Button variant='outline' onClick={handleCashClosure} disabled={isValidatingClosure} className='border-green-600 text-green-600 whitespace-nowrap shrink-0 text-xs sm:text-sm'>
+                        <Calculator className='w-4 h-4 sm:mr-2' /><span className='hidden sm:inline'>{isValidatingClosure ? 'Validando...' : 'Cierre de Caja'}</span>
                     </Button>
                     <Dialog open={isNewSaleOpen} onOpenChange={setIsNewSaleOpen}>
                         <DialogTrigger asChild>
-                            <Button className='bg-primary hover:bg-primary/90'><Plus className='w-4 h-4 mr-2' />Nueva Venta</Button>
+                            <Button className='bg-primary hover:bg-primary/90 whitespace-nowrap shrink-0 text-xs sm:text-sm'><Plus className='w-4 h-4 sm:mr-2' /><span className='hidden sm:inline'>Nueva Venta</span></Button>
                         </DialogTrigger>
                     </Dialog>
                 </div>
@@ -300,7 +302,7 @@ const SalesManagement = ({ onSectionChange }: SalesManagementProps = {}) => {
                 onClose={() => setNegativeStockDialog({ open: false, products: [] })}
                 onGoToInventory={() => {
                     setNegativeStockDialog({ open: false, products: [] })
-                    if (onSectionChange) onSectionChange('inventory')
+                    navigate('/inventario')
                 }}
             />
         </div>

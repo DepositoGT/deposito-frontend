@@ -5,10 +5,10 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { 
-  Plus, 
-  Search, 
-  Phone, 
+import {
+  Plus,
+  Search,
+  Phone,
   Mail,
   MapPin,
   Building,
@@ -18,8 +18,9 @@ import {
   Eye,
   Edit,
   Trash2,
-  Users
-  ,Printer
+  Users,
+  Printer,
+  FileUp
 } from "lucide-react";
 import {
   Dialog,
@@ -56,12 +57,14 @@ import { useCreateSupplier } from "@/hooks/useCreateSupplier";
 import { useSupplier } from "@/hooks/useSupplier";
 import { useUpdateSupplier } from "@/hooks/useUpdateSupplier";
 import { useDeleteSupplier } from "@/hooks/useDeleteSupplier";
+import { SupplierImportDialog } from "@/components/suppliers/SupplierImportDialog";
 
 const SuppliersManagement = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [isNewSupplierOpen, setIsNewSupplierOpen] = useState(false);
   const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(null);
   const [isViewOpen, setIsViewOpen] = useState(false);
+  const [isImportOpen, setIsImportOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const printRef = useRef<HTMLDivElement | null>(null);
 
@@ -88,9 +91,9 @@ const SuppliersManagement = () => {
     totalProducts: suppliers.reduce((sum, s) => sum + ((s.productsList?.length ?? s.products) || 0), 0),
     avgRating: suppliers.length
       ? (
-          suppliers.reduce((sum, s) => sum + (Number.isFinite(s.rating) ? s.rating : 0), 0) /
-          suppliers.length
-        ).toFixed(1)
+        suppliers.reduce((sum, s) => sum + (Number.isFinite(s.rating) ? s.rating : 0), 0) /
+        suppliers.length
+      ).toFixed(1)
       : "0.0",
   };
 
@@ -150,37 +153,37 @@ const SuppliersManagement = () => {
   const handleCreateSupplier = async () => {
     // Validaciones de campos requeridos
     if (!newName || newName.trim() === "") {
-      toast({ 
-        title: "Campo requerido", 
+      toast({
+        title: "Campo requerido",
         description: "El nombre de la empresa es obligatorio",
-        variant: "destructive" 
+        variant: "destructive"
       });
       return;
     }
 
     if (!newContact || newContact.trim() === "") {
-      toast({ 
-        title: "Campo requerido", 
+      toast({
+        title: "Campo requerido",
         description: "La persona de contacto es obligatoria",
-        variant: "destructive" 
+        variant: "destructive"
       });
       return;
     }
 
     if (!newPhone || newPhone.trim() === "") {
-      toast({ 
-        title: "Campo requerido", 
+      toast({
+        title: "Campo requerido",
         description: "El teléfono es obligatorio",
-        variant: "destructive" 
+        variant: "destructive"
       });
       return;
     }
 
     if (!newEmail || newEmail.trim() === "") {
-      toast({ 
-        title: "Campo requerido", 
+      toast({
+        title: "Campo requerido",
         description: "El email es obligatorio",
-        variant: "destructive" 
+        variant: "destructive"
       });
       return;
     }
@@ -188,28 +191,28 @@ const SuppliersManagement = () => {
     // Validar formato de email
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(newEmail)) {
-      toast({ 
-        title: "Email inválido", 
+      toast({
+        title: "Email inválido",
         description: "Por favor ingrese un email válido",
-        variant: "destructive" 
+        variant: "destructive"
       });
       return;
     }
 
     if (!newAddress || newAddress.trim() === "") {
-      toast({ 
-        title: "Campo requerido", 
+      toast({
+        title: "Campo requerido",
         description: "La dirección es obligatoria",
-        variant: "destructive" 
+        variant: "destructive"
       });
       return;
     }
 
     if (!newCategoryId) {
-      toast({ 
-        title: "Campo requerido", 
+      toast({
+        title: "Campo requerido",
         description: "La categoría es obligatoria",
-        variant: "destructive" 
+        variant: "destructive"
       });
       return;
     }
@@ -224,7 +227,7 @@ const SuppliersManagement = () => {
         category_id: Number(newCategoryId),
         payment_terms_id: newPaymentTermId ? Number(newPaymentTermId) : undefined,
       });
-  setIsNewSupplierOpen(false);
+      setIsNewSupplierOpen(false);
       // reset form
       setNewName("");
       setNewContact("");
@@ -233,14 +236,14 @@ const SuppliersManagement = () => {
       setNewCategoryId(undefined);
       setNewPaymentTermId(undefined);
       setNewAddress("");
-  toast({ title: "Proveedor agregado", description: "Proveedor creado correctamente" });
+      toast({ title: "Proveedor agregado", description: "Proveedor creado correctamente" });
     } catch (err: unknown) {
       let message = "No se pudo crear el proveedor";
-        if (err && typeof err === "object" && "message" in err) {
-          const m = (err as { message?: unknown }).message;
-          if (m !== undefined) message = String(m) || message;
-        }
-  toast({ title: "Error", description: message });
+      if (err && typeof err === "object" && "message" in err) {
+        const m = (err as { message?: unknown }).message;
+        if (m !== undefined) message = String(m) || message;
+      }
+      toast({ title: "Error", description: message });
     }
   };
 
@@ -251,7 +254,7 @@ const SuppliersManagement = () => {
 
   const editSupplier = (supplier: Supplier) => {
     setSelectedSupplier(supplier);
-  // status will be populated when the supplier details are fetched (useSupplier -> useEffect)
+    // status will be populated when the supplier details are fetched (useSupplier -> useEffect)
     setIsEditOpen(true);
   };
 
@@ -274,15 +277,15 @@ const SuppliersManagement = () => {
 
   const getRatingStars = (rating: number) => {
     return Array.from({ length: 5 }, (_, i) => (
-      <Star 
-        key={i} 
-        className={`w-4 h-4 ${i < rating ? 'text-liquor-gold fill-liquor-gold' : 'text-muted-foreground'}`} 
+      <Star
+        key={i}
+        className={`w-4 h-4 ${i < rating ? 'text-liquor-gold fill-liquor-gold' : 'text-muted-foreground'}`}
       />
     ));
   };
 
   const getStatusBadge = (status: string | undefined) => {
-    return status === "active" 
+    return status === "active"
       ? <Badge className="bg-liquor-gold text-liquor-bronze">Activo</Badge>
       : <Badge variant="secondary">Inactivo</Badge>;
   };
@@ -301,111 +304,122 @@ const SuppliersManagement = () => {
           <h2 className="text-2xl font-bold text-foreground">Gestión de Proveedores</h2>
           <p className="text-muted-foreground">Administra tus socios comerciales</p>
         </div>
-        
-        <Dialog open={isNewSupplierOpen} onOpenChange={setIsNewSupplierOpen}>
-          <DialogTrigger asChild>
-            <Button className="bg-liquor-amber hover:bg-liquor-amber/90 text-white" disabled={!isAdmin}>
-              <Plus className="w-4 h-4 mr-2" />
-              Nuevo Proveedor
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-2xl">
-            <DialogHeader>
-              <DialogTitle>Agregar Nuevo Proveedor</DialogTitle>
-            </DialogHeader>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-4">
-                <div>
-                  <Label htmlFor="name">Nombre de la Empresa</Label>
-                  <Input id="name" value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Ej: Diageo Guatemala" />
+
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            onClick={() => setIsImportOpen(true)}
+            disabled={!isAdmin}
+          >
+            <FileUp className="w-4 h-4 mr-2" />
+            Importar
+          </Button>
+          <SupplierImportDialog open={isImportOpen} onOpenChange={setIsImportOpen} />
+          <Dialog open={isNewSupplierOpen} onOpenChange={setIsNewSupplierOpen}>
+            <DialogTrigger asChild>
+              <Button className="bg-liquor-amber hover:bg-liquor-amber/90 text-white" disabled={!isAdmin}>
+                <Plus className="w-4 h-4 mr-2" />
+                Nuevo Proveedor
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-2xl">
+              <DialogHeader>
+                <DialogTitle>Agregar Nuevo Proveedor</DialogTitle>
+              </DialogHeader>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-4">
+                  <div>
+                    <Label htmlFor="name">Nombre de la Empresa</Label>
+                    <Input id="name" value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Ej: Diageo Guatemala" />
+                  </div>
+                  <div>
+                    <Label htmlFor="contact">Persona de Contacto</Label>
+                    <Input id="contact" value={newContact} onChange={(e) => setNewContact(e.target.value)} placeholder="Nombre completo" />
+                  </div>
+                  <div>
+                    <Label htmlFor="phone">Teléfono</Label>
+                    <Input id="phone" value={newPhone} onChange={(e) => setNewPhone(e.target.value)} placeholder="+502 2345-6789" />
+                  </div>
+                  <div>
+                    <Label htmlFor="email">Email</Label>
+                    <Input id="email" type="email" value={newEmail} onChange={(e) => setNewEmail(e.target.value)} placeholder="contacto@empresa.com" />
+                  </div>
                 </div>
-                <div>
-                  <Label htmlFor="contact">Persona de Contacto</Label>
-                  <Input id="contact" value={newContact} onChange={(e) => setNewContact(e.target.value)} placeholder="Nombre completo" />
-                </div>
-                <div>
-                  <Label htmlFor="phone">Teléfono</Label>
-                  <Input id="phone" value={newPhone} onChange={(e) => setNewPhone(e.target.value)} placeholder="+502 2345-6789" />
-                </div>
-                <div>
-                  <Label htmlFor="email">Email</Label>
-                  <Input id="email" type="email" value={newEmail} onChange={(e) => setNewEmail(e.target.value)} placeholder="contacto@empresa.com" />
+                <div className="space-y-4">
+                  <div>
+                    <Label htmlFor="category">Categoría</Label>
+                    <Select value={newCategoryId} onValueChange={(v) => setNewCategoryId(v)}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Seleccionar categoría" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {categories.length > 0 ? (
+                          categories.map((c) => (
+                            <SelectItem key={String(c.id)} value={String(c.id)}>
+                              {c.name}
+                            </SelectItem>
+                          ))
+                        ) : (
+                          <>
+                            <SelectItem value="1">Whisky/Licores Premium</SelectItem>
+                            <SelectItem value="2">Vinos</SelectItem>
+                            <SelectItem value="3">Cervezas</SelectItem>
+                            <SelectItem value="4">Rones</SelectItem>
+                            <SelectItem value="5">Vodkas/Ginebras</SelectItem>
+                          </>
+                        )}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label htmlFor="terms">Términos de Pago</Label>
+                    <Select value={newPaymentTermId} onValueChange={(v) => setNewPaymentTermId(v)}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Seleccionar términos" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {paymentTerms.length > 0 ? (
+                          paymentTerms.map((t) => (
+                            <SelectItem key={String(t.id)} value={String(t.id)}>
+                              {t.name}
+                            </SelectItem>
+                          ))
+                        ) : (
+                          <>
+                            <SelectItem value="1">7 días</SelectItem>
+                            <SelectItem value="2">15 días</SelectItem>
+                            <SelectItem value="3">30 días</SelectItem>
+                            <SelectItem value="4">45 días</SelectItem>
+                          </>
+                        )}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label htmlFor="address">Dirección</Label>
+                    <Textarea id="address" value={newAddress} onChange={(e) => setNewAddress(e.target.value)} placeholder="Dirección completa" rows={3} />
+                  </div>
                 </div>
               </div>
-              <div className="space-y-4">
-                <div>
-                  <Label htmlFor="category">Categoría</Label>
-                  <Select value={newCategoryId} onValueChange={(v) => setNewCategoryId(v)}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Seleccionar categoría" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {categories.length > 0 ? (
-                        categories.map((c) => (
-                          <SelectItem key={String(c.id)} value={String(c.id)}>
-                            {c.name}
-                          </SelectItem>
-                        ))
-                      ) : (
-                        <>
-                          <SelectItem value="1">Whisky/Licores Premium</SelectItem>
-                          <SelectItem value="2">Vinos</SelectItem>
-                          <SelectItem value="3">Cervezas</SelectItem>
-                          <SelectItem value="4">Rones</SelectItem>
-                          <SelectItem value="5">Vodkas/Ginebras</SelectItem>
-                        </>
-                      )}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label htmlFor="terms">Términos de Pago</Label>
-                  <Select value={newPaymentTermId} onValueChange={(v) => setNewPaymentTermId(v)}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Seleccionar términos" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {paymentTerms.length > 0 ? (
-                        paymentTerms.map((t) => (
-                          <SelectItem key={String(t.id)} value={String(t.id)}>
-                            {t.name}
-                          </SelectItem>
-                        ))
-                      ) : (
-                        <>
-                          <SelectItem value="1">7 días</SelectItem>
-                          <SelectItem value="2">15 días</SelectItem>
-                          <SelectItem value="3">30 días</SelectItem>
-                          <SelectItem value="4">45 días</SelectItem>
-                        </>
-                      )}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label htmlFor="address">Dirección</Label>
-                  <Textarea id="address" value={newAddress} onChange={(e) => setNewAddress(e.target.value)} placeholder="Dirección completa" rows={3} />
-                </div>
+              <div className="flex justify-end space-x-2 mt-6">
+                <Button variant="outline" onClick={() => setIsNewSupplierOpen(false)} disabled={createIsLoading}>
+                  Cancelar
+                </Button>
+                <Button className="bg-liquor-amber hover:bg-liquor-amber/90 text-white" disabled={!isAdmin || createIsLoading} onClick={handleCreateSupplier}>
+                  {createIsLoading ? (
+                    <svg className="animate-spin w-4 h-4 mr-2 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+                    </svg>
+                  ) : (
+                    <Building className="w-4 h-4 mr-2" />
+                  )}
+                  {createIsLoading ? 'Creando...' : 'Agregar Proveedor'}
+                </Button>
               </div>
-            </div>
-            <div className="flex justify-end space-x-2 mt-6">
-              <Button variant="outline" onClick={() => setIsNewSupplierOpen(false)} disabled={createIsLoading}>
-                Cancelar
-              </Button>
-              <Button className="bg-liquor-amber hover:bg-liquor-amber/90 text-white" disabled={!isAdmin || createIsLoading} onClick={handleCreateSupplier}>
-                {createIsLoading ? (
-                  <svg className="animate-spin w-4 h-4 mr-2 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
-                  </svg>
-                ) : (
-                  <Building className="w-4 h-4 mr-2" />
-                )}
-                {createIsLoading ? 'Creando...' : 'Agregar Proveedor'}
-              </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
 
       {/* Estadísticas */}
@@ -491,8 +505,8 @@ const SuppliersManagement = () => {
             </Card>
           ) : (
             filteredSuppliers.map((supplier, index) => (
-              <Card 
-                key={supplier.id} 
+              <Card
+                key={supplier.id}
                 className="animate-bounce-in hover:shadow-card transition-all duration-300"
                 style={{ animationDelay: `${index * 100}ms` }}
               >
@@ -553,16 +567,16 @@ const SuppliersManagement = () => {
 
                   {/* Acciones */}
                   <div className="flex justify-end space-x-2 pt-2">
-                    <Button 
-                      variant="outline" 
+                    <Button
+                      variant="outline"
                       size="sm"
                       onClick={() => viewSupplier(supplier)}
                     >
                       <Eye className="w-4 h-4 mr-1" />
                       Ver
                     </Button>
-                    <Button 
-                      variant="outline" 
+                    <Button
+                      variant="outline"
                       size="sm"
                       onClick={() => editSupplier(supplier)}
                     >
@@ -585,7 +599,7 @@ const SuppliersManagement = () => {
                         </AlertDialogHeader>
                         <AlertDialogFooter>
                           <AlertDialogCancel disabled={deleteIsLoading}>Cancelar</AlertDialogCancel>
-                          <AlertDialogAction 
+                          <AlertDialogAction
                             onClick={() => deleteSupplier(supplier.id)}
                             className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                             disabled={deleteIsLoading}
@@ -616,122 +630,122 @@ const SuppliersManagement = () => {
       {/* Modal Ver Proveedor */}
       <Dialog open={isViewOpen} onOpenChange={setIsViewOpen}>
         <DialogContent className="max-w-3xl">
-            <DialogHeader>
-              <div className="flex items-center justify-between w-full">
-                <DialogTitle>Información del Proveedor</DialogTitle>
-                <div>
-                  <Button variant="ghost" size="sm" onClick={() => {
-                    // print only the modal content referenced by printRef
-                    if (!printRef.current) return;
-                    const content = printRef.current.innerHTML;
-                    const w = window.open('', '_blank', 'width=800,height=600');
-                    if (!w) return;
-                    w.document.write(`<!doctype html><html><head><title>Imprimir Proveedor</title><style>body{font-family:Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial;} .text-foreground{color:#0f172a} .text-muted-foreground{color:#64748b}</style></head><body>${content}</body></html>`);
-                    w.document.close();
-                    w.focus();
-                    setTimeout(() => { w.print(); w.close(); }, 300);
-                  }}>
-                    <Printer className="w-4 h-4" />
-                  </Button>
-                </div>
-              </div>
-            </DialogHeader>
-            <div ref={printRef}>
-              {selectedSupplier && (
-                <div className="space-y-6">
-              {/* Información básica */}
-              <div className="grid grid-cols-2 gap-6">
-                <div className="space-y-4">
-                  <div>
-                    <Label className="text-muted-foreground">Nombre de la Empresa</Label>
-                    <p className="text-foreground font-medium">{selectedSupplier.name}</p>
-                  </div>
-                  <div>
-                    <Label className="text-muted-foreground">Persona de Contacto</Label>
-                    <p className="text-foreground font-medium">{selectedSupplier.contact}</p>
-                  </div>
-                  <div>
-                    <Label className="text-muted-foreground">Teléfono</Label>
-                    <p className="text-foreground font-medium">{selectedSupplier.phone}</p>
-                  </div>
-                  <div>
-                    <Label className="text-muted-foreground">Email</Label>
-                    <p className="text-foreground font-medium">{selectedSupplier.email}</p>
-                  </div>
-                </div>
-                <div className="space-y-4">
-                  <div>
-                    <Label className="text-muted-foreground">Categoría</Label>
-                    <p className="text-foreground font-medium">{String(selectedSupplier.category)}</p>
-                  </div>
-                  <div>
-                    <Label className="text-muted-foreground">Estado</Label>
-                    <div className="mt-1">{getStatusBadge(String(selectedSupplier.status))}</div>
-                  </div>
-                  <div>
-                    <Label className="text-muted-foreground">Términos de Pago</Label>
-                    <p className="text-foreground font-medium">{selectedSupplier.paymentTerms}</p>
-                  </div>
-                  <div>
-                    <Label className="text-muted-foreground">Calificación</Label>
-                    <div className="flex items-center space-x-1 mt-1">
-                      {getRatingStars(selectedSupplier.rating)}
-                      <span className="text-muted-foreground ml-2">({selectedSupplier.rating}/5)</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              
-              {/* Productos del Proveedor */}
-              <div className="space-y-3">
-                <Label className="text-lg font-medium">Productos que Suministra</Label>
-                <div className="border rounded-lg max-h-64 overflow-y-auto">
-                  {selectedSupplier.productsList && selectedSupplier.productsList.length > 0 ? (
-                    <div className="space-y-2 p-3">
-                      {selectedSupplier.productsList.map((product) => (
-                        <div key={product.id} className="flex items-center justify-between p-2 bg-muted/50 rounded">
-                          <div>
-                            <p className="font-medium text-sm">{product.name}</p>
-                            <p className="text-xs text-muted-foreground">Stock: {product.stock} unidades</p>
-                          </div>
-                          <div className="text-right">
-                            <p className="font-medium text-sm">Q {product.price.toFixed(2)}</p>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="p-4 text-center text-muted-foreground">
-                      No hay productos asociados a este proveedor
-                    </div>
-                  )}
-                </div>
-              </div>
-              
-              {/* Dirección */}
+          <DialogHeader>
+            <div className="flex items-center justify-between w-full">
+              <DialogTitle>Información del Proveedor</DialogTitle>
               <div>
-                <Label className="text-muted-foreground">Dirección</Label>
-                <p className="text-foreground font-medium">{selectedSupplier.address}</p>
+                <Button variant="ghost" size="sm" onClick={() => {
+                  // print only the modal content referenced by printRef
+                  if (!printRef.current) return;
+                  const content = printRef.current.innerHTML;
+                  const w = window.open('', '_blank', 'width=800,height=600');
+                  if (!w) return;
+                  w.document.write(`<!doctype html><html><head><title>Imprimir Proveedor</title><style>body{font-family:Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial;} .text-foreground{color:#0f172a} .text-muted-foreground{color:#64748b}</style></head><body>${content}</body></html>`);
+                  w.document.close();
+                  w.focus();
+                  setTimeout(() => { w.print(); w.close(); }, 300);
+                }}>
+                  <Printer className="w-4 h-4" />
+                </Button>
               </div>
-
-              {/* Métricas */}
-              <div className="grid grid-cols-3 gap-4 pt-4 border-t border-border">
-                <div className="text-center">
-                  <p className="text-2xl font-bold text-foreground">{selectedSupplier.productsList?.length ?? selectedSupplier.products}</p>
-                  <p className="text-sm text-muted-foreground">Productos</p>
-                </div>
-                <div className="text-center">
-                  <p className="text-2xl font-bold text-foreground">Q {selectedSupplier.totalPurchases.toLocaleString()}</p>
-                  <p className="text-sm text-muted-foreground">Total Compras</p>
-                </div>
-                <div className="text-center">
-                  <p className="text-2xl font-bold text-foreground">{selectedSupplier.lastOrder}</p>
-                  <p className="text-sm text-muted-foreground">Último Pedido</p>
-                </div>
-              </div>
-                </div>
-              )}
             </div>
+          </DialogHeader>
+          <div ref={printRef}>
+            {selectedSupplier && (
+              <div className="space-y-6">
+                {/* Información básica */}
+                <div className="grid grid-cols-2 gap-6">
+                  <div className="space-y-4">
+                    <div>
+                      <Label className="text-muted-foreground">Nombre de la Empresa</Label>
+                      <p className="text-foreground font-medium">{selectedSupplier.name}</p>
+                    </div>
+                    <div>
+                      <Label className="text-muted-foreground">Persona de Contacto</Label>
+                      <p className="text-foreground font-medium">{selectedSupplier.contact}</p>
+                    </div>
+                    <div>
+                      <Label className="text-muted-foreground">Teléfono</Label>
+                      <p className="text-foreground font-medium">{selectedSupplier.phone}</p>
+                    </div>
+                    <div>
+                      <Label className="text-muted-foreground">Email</Label>
+                      <p className="text-foreground font-medium">{selectedSupplier.email}</p>
+                    </div>
+                  </div>
+                  <div className="space-y-4">
+                    <div>
+                      <Label className="text-muted-foreground">Categoría</Label>
+                      <p className="text-foreground font-medium">{String(selectedSupplier.category)}</p>
+                    </div>
+                    <div>
+                      <Label className="text-muted-foreground">Estado</Label>
+                      <div className="mt-1">{getStatusBadge(String(selectedSupplier.status))}</div>
+                    </div>
+                    <div>
+                      <Label className="text-muted-foreground">Términos de Pago</Label>
+                      <p className="text-foreground font-medium">{selectedSupplier.paymentTerms}</p>
+                    </div>
+                    <div>
+                      <Label className="text-muted-foreground">Calificación</Label>
+                      <div className="flex items-center space-x-1 mt-1">
+                        {getRatingStars(selectedSupplier.rating)}
+                        <span className="text-muted-foreground ml-2">({selectedSupplier.rating}/5)</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Productos del Proveedor */}
+                <div className="space-y-3">
+                  <Label className="text-lg font-medium">Productos que Suministra</Label>
+                  <div className="border rounded-lg max-h-64 overflow-y-auto">
+                    {selectedSupplier.productsList && selectedSupplier.productsList.length > 0 ? (
+                      <div className="space-y-2 p-3">
+                        {selectedSupplier.productsList.map((product) => (
+                          <div key={product.id} className="flex items-center justify-between p-2 bg-muted/50 rounded">
+                            <div>
+                              <p className="font-medium text-sm">{product.name}</p>
+                              <p className="text-xs text-muted-foreground">Stock: {product.stock} unidades</p>
+                            </div>
+                            <div className="text-right">
+                              <p className="font-medium text-sm">Q {product.price.toFixed(2)}</p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="p-4 text-center text-muted-foreground">
+                        No hay productos asociados a este proveedor
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Dirección */}
+                <div>
+                  <Label className="text-muted-foreground">Dirección</Label>
+                  <p className="text-foreground font-medium">{selectedSupplier.address}</p>
+                </div>
+
+                {/* Métricas */}
+                <div className="grid grid-cols-3 gap-4 pt-4 border-t border-border">
+                  <div className="text-center">
+                    <p className="text-2xl font-bold text-foreground">{selectedSupplier.productsList?.length ?? selectedSupplier.products}</p>
+                    <p className="text-sm text-muted-foreground">Productos</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-2xl font-bold text-foreground">Q {selectedSupplier.totalPurchases.toLocaleString()}</p>
+                    <p className="text-sm text-muted-foreground">Total Compras</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-2xl font-bold text-foreground">{selectedSupplier.lastOrder}</p>
+                    <p className="text-sm text-muted-foreground">Último Pedido</p>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
         </DialogContent>
       </Dialog>
 
@@ -844,44 +858,44 @@ const SuppliersManagement = () => {
             <Button variant="outline" onClick={() => setIsEditOpen(false)}>
               Cancelar
             </Button>
-            <Button 
+            <Button
               className="bg-liquor-amber hover:bg-liquor-amber/90 text-white"
               onClick={async () => {
                 if (!selectedSupplier) return;
 
                 // Validaciones de campos requeridos
                 if (!editName || editName.trim() === "") {
-                  toast({ 
-                    title: "Campo requerido", 
+                  toast({
+                    title: "Campo requerido",
                     description: "El nombre de la empresa es obligatorio",
-                    variant: "destructive" 
+                    variant: "destructive"
                   });
                   return;
                 }
 
                 if (!editContact || editContact.trim() === "") {
-                  toast({ 
-                    title: "Campo requerido", 
+                  toast({
+                    title: "Campo requerido",
                     description: "La persona de contacto es obligatoria",
-                    variant: "destructive" 
+                    variant: "destructive"
                   });
                   return;
                 }
 
                 if (!editPhone || editPhone.trim() === "") {
-                  toast({ 
-                    title: "Campo requerido", 
+                  toast({
+                    title: "Campo requerido",
                     description: "El teléfono es obligatorio",
-                    variant: "destructive" 
+                    variant: "destructive"
                   });
                   return;
                 }
 
                 if (!editEmail || editEmail.trim() === "") {
-                  toast({ 
-                    title: "Campo requerido", 
+                  toast({
+                    title: "Campo requerido",
                     description: "El email es obligatorio",
-                    variant: "destructive" 
+                    variant: "destructive"
                   });
                   return;
                 }
@@ -889,43 +903,45 @@ const SuppliersManagement = () => {
                 // Validar formato de email
                 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
                 if (!emailRegex.test(editEmail)) {
-                  toast({ 
-                    title: "Email inválido", 
+                  toast({
+                    title: "Email inválido",
                     description: "Por favor ingrese un email válido",
-                    variant: "destructive" 
+                    variant: "destructive"
                   });
                   return;
                 }
 
                 if (!editAddress || editAddress.trim() === "") {
-                  toast({ 
-                    title: "Campo requerido", 
+                  toast({
+                    title: "Campo requerido",
                     description: "La dirección es obligatoria",
-                    variant: "destructive" 
+                    variant: "destructive"
                   });
                   return;
                 }
 
                 if (!editCategoryId) {
-                  toast({ 
-                    title: "Campo requerido", 
+                  toast({
+                    title: "Campo requerido",
                     description: "La categoría es obligatoria",
-                    variant: "destructive" 
+                    variant: "destructive"
                   });
                   return;
                 }
 
                 try {
-                  await updateMutateAsync({ id: selectedSupplier.id, payload: {
-                    name: editName.trim(),
-                    contact: editContact.trim(),
-                    phone: editPhone.trim(),
-                    email: editEmail.trim(),
-                    address: editAddress.trim(),
-                    category_id: Number(editCategoryId),
-                    payment_terms_id: editPaymentTermId ? Number(editPaymentTermId) : undefined,
-                    status_id: editStatusId ? Number(editStatusId) : undefined,
-                  } });
+                  await updateMutateAsync({
+                    id: selectedSupplier.id, payload: {
+                      name: editName.trim(),
+                      contact: editContact.trim(),
+                      phone: editPhone.trim(),
+                      email: editEmail.trim(),
+                      address: editAddress.trim(),
+                      category_id: Number(editCategoryId),
+                      payment_terms_id: editPaymentTermId ? Number(editPaymentTermId) : undefined,
+                      status_id: editStatusId ? Number(editStatusId) : undefined,
+                    }
+                  });
                   setIsEditOpen(false);
                   toast({ title: "Proveedor Actualizado", description: "Los datos del proveedor han sido actualizados exitosamente" });
                 } catch (err: unknown) {

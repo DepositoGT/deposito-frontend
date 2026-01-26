@@ -12,7 +12,7 @@ import { Badge } from '@/components/ui/badge'
 import { Label } from '@/components/ui/label'
 import {
     Plus, Search, Filter, Edit, Trash2, Eye, ScanLine, Download, MoreVertical,
-    QrCode, PackagePlus, ChevronLeft, ChevronRight
+    QrCode, PackagePlus, ChevronLeft, ChevronRight, Upload
 } from 'lucide-react'
 import {
     DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger
@@ -35,7 +35,7 @@ import useAdjustStock from '@/hooks/useAdjustStock'
 
 // Feature imports
 import { useProductForm } from './hooks'
-import { ProductFormDialog, StockAdjustDialog, ProductDetailDialog } from './components'
+import { ProductFormDialog, StockAdjustDialog, ProductDetailDialog, ImportDialog } from './components'
 import type { StockAdjustment } from './types'
 
 const ProductManagement = () => {
@@ -73,6 +73,7 @@ const ProductManagement = () => {
     const [isScannerOpen, setIsScannerOpen] = useState(false)
     const [isStockAdjustOpen, setIsStockAdjustOpen] = useState(false)
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
+    const [isImportDialogOpen, setIsImportDialogOpen] = useState(false)
 
     // Selected product
     const [selectedProduct, setSelectedProduct] = useState<Product | null>(null)
@@ -282,20 +283,23 @@ const ProductManagement = () => {
     }
 
     return (
-        <div className="p-6 space-y-6 animate-fade-in">
+        <div className="p-3 sm:p-6 space-y-4 sm:space-y-6 animate-fade-in">
             {/* Header */}
-            <div className="flex items-center justify-between">
-                <div>
-                    <h2 className="text-2xl font-bold text-foreground">Gestión de Productos</h2>
-                    <p className="text-muted-foreground">Administra tu catálogo de productos</p>
+            <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:justify-between">
+                <div className="min-w-0">
+                    <h2 className="text-lg sm:text-2xl font-bold text-foreground">Inventario</h2>
+                    <p className="text-xs sm:text-sm text-muted-foreground">Administra tu catálogo</p>
                 </div>
-                <div className="flex space-x-2">
-                    <Button variant="outline" onClick={handleExport}>
-                        <Download className="w-4 h-4 mr-2" />Exportar
+                <div className="flex gap-2 overflow-x-auto pb-1 -mx-3 px-3 sm:mx-0 sm:px-0 sm:overflow-visible">
+                    <Button variant="outline" onClick={handleExport} size="sm" className="shrink-0">
+                        <Download className="w-4 h-4 sm:mr-2" /><span className="hidden sm:inline">Exportar</span>
+                    </Button>
+                    <Button variant="outline" onClick={() => setIsImportDialogOpen(true)} size="sm" className="shrink-0">
+                        <Upload className="w-4 h-4 sm:mr-2" /><span className="hidden sm:inline">Importar</span>
                     </Button>
                     <Dialog open={isScannerOpen} onOpenChange={setIsScannerOpen}>
                         <DialogTrigger asChild>
-                            <Button variant="outline"><ScanLine className="w-4 h-4 mr-2" />Escanear</Button>
+                            <Button variant="outline" size="sm" className="shrink-0"><ScanLine className="w-4 h-4 sm:mr-2" /><span className="hidden sm:inline">Escanear</span></Button>
                         </DialogTrigger>
                         <DialogContent className="max-w-md">
                             <DialogHeader><DialogTitle>Escáner de Códigos</DialogTitle></DialogHeader>
@@ -323,7 +327,7 @@ const ProductManagement = () => {
                     </Dialog>
                     <Dialog open={isNewProductOpen} onOpenChange={setIsNewProductOpen}>
                         <DialogTrigger asChild>
-                            <Button><Plus className="w-4 h-4 mr-2" />Nuevo Producto</Button>
+                            <Button size="sm" className="shrink-0"><Plus className="w-4 h-4 sm:mr-2" /><span className="hidden sm:inline">Nuevo Producto</span></Button>
                         </DialogTrigger>
                     </Dialog>
                 </div>
@@ -525,6 +529,16 @@ const ProductManagement = () => {
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
+
+            {/* Import Dialog */}
+            <ImportDialog
+                open={isImportDialogOpen}
+                onOpenChange={setIsImportDialogOpen}
+                onImportSuccess={() => {
+                    // Trigger refetch by invalidating query
+                    window.location.reload()
+                }}
+            />
         </div>
     )
 }
