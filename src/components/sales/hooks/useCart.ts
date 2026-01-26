@@ -3,6 +3,7 @@
  */
 import { useState, useCallback } from 'react'
 import { useToast } from '@/hooks/use-toast'
+import { getApiBaseUrl } from '@/services/api'
 import type { Product } from '@/types/product'
 import type { CartProduct, AvailabilityDialogState, AdminAuthDialogState } from '../types'
 
@@ -159,7 +160,7 @@ export const useCart = ({ availableProducts }: UseCartOptions): UseCartReturn =>
         setIsAuthenticating(true)
 
         try {
-            const response = await fetch('http://localhost:3000/api/auth/validate-admin', {
+            const response = await fetch(`${getApiBaseUrl()}/auth/validate-admin`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ username: adminUsername, password: adminPassword })

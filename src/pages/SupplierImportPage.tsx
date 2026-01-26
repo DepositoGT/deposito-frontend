@@ -9,6 +9,7 @@
  * - Manual category association for non-existent categories
  */
 import { useState, useEffect, useMemo } from 'react'
+import { getApiBaseUrl } from '@/services/api'
 import { useNavigate } from 'react-router-dom'
 import * as XLSX from 'xlsx'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -287,7 +288,7 @@ export default function SupplierImportPage() {
             })
 
             const token = localStorage.getItem('auth:token')
-            const response = await fetch('/api/suppliers/validate-import-mapped', {
+            const response = await fetch(`${getApiBaseUrl()}/suppliers/validate-import-mapped`, {
                 method: 'POST',
                 headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
                 body: JSON.stringify({ suppliers: mappedData })
@@ -362,7 +363,7 @@ export default function SupplierImportPage() {
             setImportProgress(60)
 
             const token = localStorage.getItem('auth:token')
-            const response = await fetch('/api/suppliers/bulk-import-mapped', {
+            const response = await fetch(`${getApiBaseUrl()}/suppliers/bulk-import-mapped`, {
                 method: 'POST',
                 headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
                 body: JSON.stringify({ suppliers: mappedData })

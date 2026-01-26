@@ -8,6 +8,7 @@
  * - Bulk import execution
  */
 import { useState, useCallback, useRef } from 'react'
+import { getApiBaseUrl } from '@/services/api'
 import { useNavigate } from 'react-router-dom'
 import * as XLSX from 'xlsx'
 import {
@@ -105,7 +106,7 @@ export function ImportDialog({ open, onOpenChange, onImportSuccess }: ImportDial
     // Download template
     const handleDownloadTemplate = async () => {
         try {
-            const response = await fetch('/api/products/import-template', {
+            const response = await fetch(`${getApiBaseUrl()}/products/import-template`, {
                 headers: {
                     'Authorization': `Bearer ${localStorage.getItem('auth:token')}`
                 }
@@ -170,7 +171,7 @@ export function ImportDialog({ open, onOpenChange, onImportSuccess }: ImportDial
             const formData = new FormData()
             formData.append('file', selectedFile)
 
-            const response = await fetch('/api/products/validate-import', {
+            const response = await fetch(`${getApiBaseUrl()}/products/validate-import`, {
                 method: 'POST',
                 headers: {
                     'Authorization': `Bearer ${localStorage.getItem('auth:token')}`
@@ -205,7 +206,7 @@ export function ImportDialog({ open, onOpenChange, onImportSuccess }: ImportDial
 
             setImportProgress(30)
 
-            const response = await fetch('/api/products/bulk-import', {
+            const response = await fetch(`${getApiBaseUrl()}/products/bulk-import`, {
                 method: 'POST',
                 headers: {
                     'Authorization': `Bearer ${localStorage.getItem('auth:token')}`

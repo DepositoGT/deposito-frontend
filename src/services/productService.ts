@@ -1,4 +1,4 @@
-import { apiFetch } from "./api";
+import { apiFetch, getApiBaseUrl } from "./api";
 import type { Product, StockStatus } from "@/types";
 import type { ApiProduct as ApiProductType, CreateProductPayload as CreateProductPayloadType, UpdateProductPayload as UpdateProductPayloadType } from "@/types/product";
 
@@ -45,21 +45,21 @@ export const adaptApiProduct = (p: ApiProduct): Product => {
     (typeof p.category === "object" && p.category?.name)
       ? p.category.name
       : (typeof p.category === "string" ? p.category : undefined) ||
-        p.category_name ||
-        (p.category_id != null ? String(p.category_id) : "");
+      p.category_name ||
+      (p.category_id != null ? String(p.category_id) : "");
 
   const supplier =
     (typeof p.supplier === "object" && p.supplier?.name)
       ? p.supplier.name
       : (typeof p.supplier === "string" ? p.supplier : undefined) ||
-        p.supplier_name ||
-        (p.supplier_id != null ? String(p.supplier_id) : "");
+      p.supplier_name ||
+      (p.supplier_id != null ? String(p.supplier_id) : "");
 
   const statusRaw: string | number | undefined =
     (typeof p.status === "object" && (p.status as { id?: string | number; name?: string }).name)
       ? (p.status as { id?: string | number; name?: string }).name!
       : (typeof p.status === "string" ? p.status : undefined) ??
-        (typeof p.status_id !== "undefined" ? Number(p.status_id) : undefined);
+      (typeof p.status_id !== "undefined" ? Number(p.status_id) : undefined);
 
   const status = mapStatus(statusRaw);
 
@@ -111,10 +111,9 @@ export const deleteProduct = async (id: string): Promise<{ ok?: boolean }> => {
 
 // Download products PDF report (returns void; triggers browser download)
 export const exportProductsPdf = async (): Promise<void> => {
-  const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:3000";
   const token = localStorage.getItem("auth:token");
 
-  const res = await fetch(`${API_BASE}/api/products/report.pdf`, {
+  const res = await fetch(`${getApiBaseUrl()}/products/report.pdf`, {
     method: "GET",
     headers: {
       ...(token ? { Authorization: `Bearer ${token}` } : {}),

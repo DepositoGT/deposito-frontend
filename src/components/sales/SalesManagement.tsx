@@ -34,8 +34,9 @@ import {
 } from './components'
 import { STATUS_DB_NAMES, NegativeStockDialogState, SaleStatusKey } from './types'
 import { useNavigate } from 'react-router-dom'
+import { getApiBaseUrl } from '@/services/api'
 
-const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api'
+const API_URL = getApiBaseUrl()
 
 interface SalesManagementProps {
     onSectionChange?: (section: string) => void;
