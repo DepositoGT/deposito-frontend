@@ -8,6 +8,7 @@
  * - Real-time validation feedback
  */
 import { useState, useEffect, useMemo } from 'react'
+import { getApiBaseUrl } from '@/services/api'
 import { useNavigate } from 'react-router-dom'
 import * as XLSX from 'xlsx'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -218,9 +219,9 @@ export default function CatalogImportPage() {
 
             const token = localStorage.getItem('auth:token')
             const endpoint = catalogType === 'categories'
-                ? '/api/catalogs/product-categories/validate-import-mapped'
-                : '/api/catalogs/payment-terms/validate-import-mapped'
-            
+                ? `${getApiBaseUrl()}/catalogs/product-categories/validate-import-mapped`
+                : `${getApiBaseUrl()}/catalogs/payment-terms/validate-import-mapped`
+
             const response = await fetch(endpoint, {
                 method: 'POST',
                 headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
@@ -288,9 +289,9 @@ export default function CatalogImportPage() {
 
             const token = localStorage.getItem('auth:token')
             const endpoint = catalogType === 'categories'
-                ? '/api/catalogs/product-categories/bulk-import-mapped'
-                : '/api/catalogs/payment-terms/bulk-import-mapped'
-            
+                ? `${getApiBaseUrl()}/catalogs/product-categories/bulk-import-mapped`
+                : `${getApiBaseUrl()}/catalogs/payment-terms/bulk-import-mapped`
+
             const response = await fetch(endpoint, {
                 method: 'POST',
                 headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },

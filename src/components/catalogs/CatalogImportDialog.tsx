@@ -7,6 +7,7 @@
  * - Navigate to import page after file upload
  */
 import { useState, useCallback, useRef } from 'react'
+import { getApiBaseUrl } from '@/services/api'
 import { useNavigate } from 'react-router-dom'
 import {
     Dialog,
@@ -58,10 +59,10 @@ export function CatalogImportDialog({ open, onOpenChange, type }: CatalogImportD
     // Download template
     const handleDownloadTemplate = async () => {
         try {
-            const endpoint = type === 'categories' 
-                ? '/api/catalogs/product-categories/template'
-                : '/api/catalogs/payment-terms/template'
-            
+            const endpoint = type === 'categories'
+                ? `${getApiBaseUrl()}/catalogs/product-categories/template`
+                : `${getApiBaseUrl()}/catalogs/payment-terms/template`
+
             const response = await fetch(endpoint, {
                 headers: {
                     'Authorization': `Bearer ${localStorage.getItem('auth:token')}`
@@ -73,7 +74,7 @@ export function CatalogImportDialog({ open, onOpenChange, type }: CatalogImportD
             const url = window.URL.createObjectURL(blob)
             const a = document.createElement('a')
             a.href = url
-            a.download = type === 'categories' 
+            a.download = type === 'categories'
                 ? 'plantilla_categorias.xlsx'
                 : 'plantilla_terminos_pago.xlsx'
             document.body.appendChild(a)
@@ -252,7 +253,7 @@ export function CatalogImportDialog({ open, onOpenChange, type }: CatalogImportD
     }
 
     const title = type === 'categories' ? 'Importar Categorías' : 'Importar Términos de Pago'
-    const description = type === 'categories' 
+    const description = type === 'categories'
         ? 'Importa categorías masivamente desde un archivo Excel'
         : 'Importa términos de pago masivamente desde un archivo Excel'
 

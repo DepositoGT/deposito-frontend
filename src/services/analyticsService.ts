@@ -1,3 +1,5 @@
+import { getApiBaseUrl } from '@/services/api'
+
 export type AnalyticsResponse = {
   year: number;
   totals: {
@@ -9,9 +11,9 @@ export type AnalyticsResponse = {
     productsCount: number;
     stockRotation: number;
   };
-  monthly: { 
-    month: number; 
-    ventas: number; 
+  monthly: {
+    month: number;
+    ventas: number;
     costo: number;
     devoluciones?: number;
     ventasNetas?: number;
@@ -21,7 +23,7 @@ export type AnalyticsResponse = {
 }
 
 export async function getAnalytics(year: number | 'all'): Promise<AnalyticsResponse> {
-  const res = await fetch(`/api/analytics/summary?year=${year}`)
+  const res = await fetch(`${getApiBaseUrl()}/analytics/summary?year=${year}`)
   if (!res.ok) throw new Error('No se pudo obtener el resumen de análisis')
   return res.json()
 }
