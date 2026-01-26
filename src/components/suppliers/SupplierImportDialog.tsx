@@ -7,6 +7,7 @@
  * - Navigate to import page after file upload
  */
 import { useState, useCallback, useRef } from 'react'
+import { getApiBaseUrl } from '@/services/api'
 import { useNavigate } from 'react-router-dom'
 import {
     Dialog,
@@ -57,7 +58,7 @@ export function SupplierImportDialog({ open, onOpenChange }: SupplierImportDialo
     // Download template
     const handleDownloadTemplate = async () => {
         try {
-            const response = await fetch('/api/suppliers/template', {
+            const response = await fetch(`${getApiBaseUrl()}/suppliers/template`, {
                 headers: {
                     'Authorization': `Bearer ${localStorage.getItem('auth:token')}`
                 }

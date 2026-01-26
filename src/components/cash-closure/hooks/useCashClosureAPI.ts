@@ -3,9 +3,11 @@
  */
 import { useState, useCallback } from 'react'
 import { useToast } from '@/hooks/use-toast'
+import { getApiBaseUrl } from '@/services/api'
 import type { CashClosure, TheoreticalData, PaymentMethodBreakdown, Denomination } from '../types'
 
-const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api'
+// Use centralized API URL
+const API_URL = getApiBaseUrl()
 
 interface FetchClosuresResponse {
     closures: CashClosure[]

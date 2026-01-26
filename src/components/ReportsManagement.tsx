@@ -1,8 +1,9 @@
 import { useState } from "react";
+import { getApiBaseUrl } from '@/services/api';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { 
-  Download, 
+import {
+  Download,
   Calendar,
   TrendingUp,
   Package,
@@ -35,13 +36,13 @@ const ReportsManagement = () => {
   // Modal de filtros
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [pendingReport, setPendingReport] = useState<Report | null>(null);
-  const [fPeriod, setFPeriod] = useState<'week'|'month'|'quarter'|'semester'|'year'|'all'>('month');
-  const [fYear, setFYear] = useState<number|'all'>(initialYear);
+  const [fPeriod, setFPeriod] = useState<'week' | 'month' | 'quarter' | 'semester' | 'year' | 'all'>('month');
+  const [fYear, setFYear] = useState<number | 'all'>(initialYear);
   const [fMonth, setFMonth] = useState<number | null>(null);
   const [isGeneratingReport, setIsGeneratingReport] = useState(false);
   const [generatingReportId, setGeneratingReportId] = useState<string | null>(null);
-  const [fSem, setFSem] = useState<1|2>(1);
-  const [fFormat, setFFormat] = useState<'pdf'|'csv'>('pdf');
+  const [fSem, setFSem] = useState<1 | 2>(1);
+  const [fFormat, setFFormat] = useState<'pdf' | 'csv'>('pdf');
 
   // Generadores locales (mock) removidos. Toda la generación ocurre en el backend.
 
@@ -113,7 +114,7 @@ const ReportsManagement = () => {
 
   return (
     <div className="p-6 space-y-6 animate-fade-in">
-      <Dialog open={filtersOpen} onOpenChange={(o)=>{ if(!o){ setPendingReport(null);} setFiltersOpen(o) }}>
+      <Dialog open={filtersOpen} onOpenChange={(o) => { if (!o) { setPendingReport(null); } setFiltersOpen(o) }}>
         <DialogContent className="sm:max-w-[520px]">
           <DialogHeader>
             <DialogTitle>Generar {pendingReport?.name || 'Reporte'}</DialogTitle>
@@ -123,7 +124,7 @@ const ReportsManagement = () => {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <p className="text-sm font-medium">Período</p>
-                <Select value={fPeriod} onValueChange={(v)=>{ setFPeriod(v as 'week'|'month'|'quarter'|'semester'|'year'|'all'); if(v!=='month'){ setFMonth(null);} }}>
+                <Select value={fPeriod} onValueChange={(v) => { setFPeriod(v as 'week' | 'month' | 'quarter' | 'semester' | 'year' | 'all'); if (v !== 'month') { setFMonth(null); } }}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="week">Semana</SelectItem>
@@ -137,7 +138,7 @@ const ReportsManagement = () => {
               </div>
               <div className="space-y-2">
                 <p className="text-sm font-medium">Formato</p>
-                <Select value={fFormat} onValueChange={(v)=> setFFormat(v as 'pdf'|'csv')}>
+                <Select value={fFormat} onValueChange={(v) => setFFormat(v as 'pdf' | 'csv')}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="pdf">PDF</SelectItem>
@@ -149,7 +150,7 @@ const ReportsManagement = () => {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <p className="text-sm font-medium">Año</p>
-                <Select value={String(fYear)} onValueChange={(v)=> setFYear(v==='all' ? 'all' : Number(v))}>
+                <Select value={String(fYear)} onValueChange={(v) => setFYear(v === 'all' ? 'all' : Number(v))}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todos</SelectItem>
@@ -162,11 +163,11 @@ const ReportsManagement = () => {
               {fPeriod === 'month' && (
                 <div className="space-y-2">
                   <p className="text-sm font-medium">Mes</p>
-                  <Select value={fMonth? String(fMonth): ''} onValueChange={(v)=> setFMonth(Number(v))}>
+                  <Select value={fMonth ? String(fMonth) : ''} onValueChange={(v) => setFMonth(Number(v))}>
                     <SelectTrigger><SelectValue placeholder="Selecciona mes" /></SelectTrigger>
                     <SelectContent>
-                      {Array.from({length:12}, (_,i)=> i+1).map(m => (
-                        <SelectItem key={m} value={String(m)}>{m.toString().padStart(2,'0')}</SelectItem>
+                      {Array.from({ length: 12 }, (_, i) => i + 1).map(m => (
+                        <SelectItem key={m} value={String(m)}>{m.toString().padStart(2, '0')}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -175,7 +176,7 @@ const ReportsManagement = () => {
               {fPeriod === 'semester' && (
                 <div className="space-y-2">
                   <p className="text-sm font-medium">Semestre</p>
-                  <Select value={String(fSem)} onValueChange={(v)=> setFSem(v==='2' ? 2 : 1)}>
+                  <Select value={String(fSem)} onValueChange={(v) => setFSem(v === '2' ? 2 : 1)}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="1">1</SelectItem>
@@ -188,8 +189,8 @@ const ReportsManagement = () => {
             {fPeriod === 'quarter' && (
               <div className="space-y-2">
                 <p className="text-sm font-medium">Trimestre</p>
-                <Select value={String(Math.ceil((fMonth||new Date().getMonth()+1)/3))} onValueChange={(v)=>{
-                  const q = Number(v); const qm = (q-1)*3+1; setFMonth(qm)
+                <Select value={String(Math.ceil((fMonth || new Date().getMonth() + 1) / 3))} onValueChange={(v) => {
+                  const q = Number(v); const qm = (q - 1) * 3 + 1; setFMonth(qm)
                 }}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
@@ -202,36 +203,36 @@ const ReportsManagement = () => {
               </div>
             )}
             <div className="flex justify-end space-x-2 pt-2">
-              <Button variant="outline" onClick={()=>{ setFiltersOpen(false); setPendingReport(null); }} disabled={isGeneratingReport}>Cancelar</Button>
+              <Button variant="outline" onClick={() => { setFiltersOpen(false); setPendingReport(null); }} disabled={isGeneratingReport}>Cancelar</Button>
               <Button
                 className="bg-liquor-amber hover:bg-liquor-amber/90 text-white"
                 disabled={isGeneratingReport}
-                onClick={async ()=>{
-                  if(!pendingReport){ return }
+                onClick={async () => {
+                  if (!pendingReport) { return }
                   setIsGeneratingReport(true);
                   try {
-                    toast({ title:'Generando...', description: pendingReport.name })
+                    toast({ title: 'Generando...', description: pendingReport.name })
                     const params = new URLSearchParams()
                     params.set('period', fPeriod)
                     if (fYear !== 'all') params.set('year', String(fYear))
                     if (fPeriod === 'month' && fMonth) params.set('month', String(fMonth))
-                    if (fPeriod === 'quarter' && fMonth) params.set('quarter', String(Math.ceil(fMonth/3)))
+                    if (fPeriod === 'quarter' && fMonth) params.set('quarter', String(Math.ceil(fMonth / 3)))
                     if (fPeriod === 'semester') params.set('semester', String(fSem))
                     params.set('format', fFormat)
-                    const res = await fetch(`/api/reports/${pendingReport.id}?${params.toString()}`)
-                    if(!res.ok) throw new Error('Error al generar el reporte')
+                    const res = await fetch(`${getApiBaseUrl()}/reports/${pendingReport.id}?${params.toString()}`)
+                    if (!res.ok) throw new Error('Error al generar el reporte')
                     const blob = await res.blob()
                     const url = window.URL.createObjectURL(blob)
                     const a = document.createElement('a')
                     const ext = fFormat === 'pdf' ? 'pdf' : 'csv'
                     a.href = url
-                    a.download = `${pendingReport.name.toLowerCase().replace(/\s+/g,'-')}-${fPeriod}.${ext}`
+                    a.download = `${pendingReport.name.toLowerCase().replace(/\s+/g, '-')}-${fPeriod}.${ext}`
                     a.click()
                     window.URL.revokeObjectURL(url)
-                    toast({ title:'Reporte listo', description:`${pendingReport.name} descargado` })
-                  } catch(err){
+                    toast({ title: 'Reporte listo', description: `${pendingReport.name} descargado` })
+                  } catch (err) {
                     const msg = err instanceof Error ? err.message : 'No se pudo generar el reporte'
-                    toast({ title:'Error', description: msg, variant:'destructive' })
+                    toast({ title: 'Error', description: msg, variant: 'destructive' })
                   } finally {
                     setIsGeneratingReport(false);
                     setFiltersOpen(false)
@@ -273,8 +274,8 @@ const ReportsManagement = () => {
           {reportTypes.map((report, index) => {
             const Icon = report.icon;
             return (
-              <Card 
-                key={report.id} 
+              <Card
+                key={report.id}
                 className="animate-bounce-in hover:shadow-card transition-all duration-300 cursor-pointer"
                 style={{ animationDelay: `${index * 100}ms` }}
               >
@@ -291,8 +292,8 @@ const ReportsManagement = () => {
                     </div>
                   </div>
                   <div className="flex space-x-2 mt-4">
-                    <Button 
-                      size="sm" 
+                    <Button
+                      size="sm"
                       className="flex-1 bg-liquor-amber hover:bg-liquor-amber/90 text-white"
                       disabled={generatingReportId === report.id}
                       onClick={async () => {
@@ -300,9 +301,9 @@ const ReportsManagement = () => {
                           // Descargar directamente el mismo PDF usado en Gestión de Productos
                           setGeneratingReportId(report.id);
                           try {
-                            toast({ title:'Generando...', description: report.name })
-                            const res = await fetch(`/api/products/report.pdf`)
-                            if(!res.ok) throw new Error('Error al generar el reporte de inventario')
+                            toast({ title: 'Generando...', description: report.name })
+                            const res = await fetch(`${getApiBaseUrl()}/products/report.pdf`)
+                            if (!res.ok) throw new Error('Error al generar el reporte de inventario')
                             const blob = await res.blob()
                             const url = window.URL.createObjectURL(blob)
                             const a = document.createElement('a')
@@ -310,10 +311,10 @@ const ReportsManagement = () => {
                             a.download = `productos_reporte.pdf`
                             a.click()
                             window.URL.revokeObjectURL(url)
-                            toast({ title:'Reporte listo', description:`${report.name} descargado` })
-                          } catch(err){
+                            toast({ title: 'Reporte listo', description: `${report.name} descargado` })
+                          } catch (err) {
                             const msg = err instanceof Error ? err.message : 'No se pudo generar el reporte'
-                            toast({ title:'Error', description: msg, variant:'destructive' })
+                            toast({ title: 'Error', description: msg, variant: 'destructive' })
                           } finally {
                             setGeneratingReportId(null);
                           }
