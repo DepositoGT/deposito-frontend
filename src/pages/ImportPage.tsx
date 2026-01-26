@@ -8,6 +8,7 @@
  * - Real-time validation feedback
  */
 import { useState, useEffect, useMemo } from 'react'
+import { getApiBaseUrl } from '@/services/api'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import * as XLSX from 'xlsx'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -322,7 +323,7 @@ export default function ImportPage() {
 
             // Send to server for validation and import
             const token = localStorage.getItem('auth:token')
-            const response = await fetch('/api/products/bulk-import-mapped', {
+            const response = await fetch(`${getApiBaseUrl()}/products/bulk-import-mapped`, {
                 method: 'POST',
                 headers: {
                     'Authorization': `Bearer ${token}`,
@@ -392,7 +393,7 @@ export default function ImportPage() {
 
             // Send to server for validation only
             const token = localStorage.getItem('auth:token')
-            const response = await fetch('/api/products/validate-import-mapped', {
+            const response = await fetch(`${getApiBaseUrl()}/products/validate-import-mapped`, {
                 method: 'POST',
                 headers: {
                     'Authorization': `Bearer ${token}`,

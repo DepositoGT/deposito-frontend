@@ -1,4 +1,12 @@
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:3000";
+/**
+ * API Base URL - uses VITE_API_URL from environment
+ * In development: http://localhost:3000/api
+ * In production: https://your-backend.vercel.app/api
+ */
+const API_BASE_URL = import.meta.env.VITE_API_URL ?? "http://localhost:3000/api";
+
+// Export for use in other files that need direct access
+export const getApiBaseUrl = () => API_BASE_URL;
 
 export class ApiError extends Error {
   status: number;
@@ -28,10 +36,15 @@ export const apiFetch = async <T>(path: string, options: RequestInit = {}): Prom
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
   };
 
-  // Ensure path starts with /api
-  const apiPath = path.startsWith('/api') ? path : `/api${path}`;
+  // Clean path - remove leading /api if present since API_BASE_URL already includes it
+  let cleanPath = path;
+  if (cleanPath.startsWith('/api/')) {
+    cleanPath = cleanPath.substring(4); // Remove '/api'
+  } else if (!cleanPath.startsWith('/')) {
+    cleanPath = '/' + cleanPath;
+  }
 
-  const res = await fetch(`${API_BASE_URL}${apiPath}`, {
+  const res = await fetch(`${API_BASE_URL}${cleanPath}`, {
     ...options,
     headers,
   });

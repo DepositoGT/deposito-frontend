@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { getApiBaseUrl } from "@/services/api";
 
 export interface PaymentMethod {
   id: number;
@@ -6,7 +7,7 @@ export interface PaymentMethod {
 }
 
 const fetchPaymentMethods = async (): Promise<PaymentMethod[]> => {
-  const res = await fetch("/api/catalogs/payment-methods");
+  const res = await fetch(`${getApiBaseUrl()}/catalogs/payment-methods`);
   console.log(res)
   if (!res.ok) throw new Error("Failed to fetch payment methods");
   return res.json();
