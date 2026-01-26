@@ -7,12 +7,13 @@ const USER_KEY = "auth:user";
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isLoading, setIsLoading] = useState(true); // Start as loading
   const [user, setUser] = useState<AuthUser | null>(null);
 
   useEffect(() => {
     const token = getAuthToken();
     const storedUser = localStorage.getItem(USER_KEY);
-    
+
     if (token) {
       setIsAuthenticated(true);
       if (storedUser) {
@@ -34,6 +35,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         }
       }
     }
+    // Done loading auth state
+    setIsLoading(false);
   }, []);
 
   useEffect(() => {
@@ -54,6 +57,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const value = useMemo(
     () => ({
       isAuthenticated,
+      isLoading,
       user,
       login: () => {
         setIsAuthenticated(true);
@@ -73,7 +77,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         setUser(null);
       },
     }),
-    [isAuthenticated, user]
+    [isAuthenticated, isLoading, user]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

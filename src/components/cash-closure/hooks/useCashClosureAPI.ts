@@ -5,7 +5,7 @@ import { useState, useCallback } from 'react'
 import { useToast } from '@/hooks/use-toast'
 import type { CashClosure, TheoreticalData, PaymentMethodBreakdown, Denomination } from '../types'
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000/api'
+const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api'
 
 interface FetchClosuresResponse {
     closures: CashClosure[]
