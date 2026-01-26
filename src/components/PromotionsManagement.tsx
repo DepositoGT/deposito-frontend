@@ -270,32 +270,32 @@ const PromotionsManagement = () => {
     }
 
     return (
-        <div className='p-6 space-y-6 animate-fade-in'>
+        <div className='p-3 sm:p-6 space-y-4 sm:space-y-6 animate-fade-in'>
             <Card>
-                <CardHeader>
-                    <div className='flex items-center justify-between'>
+                <CardHeader className='p-3 sm:p-6'>
+                    <div className='flex flex-col sm:flex-row sm:items-center gap-3 sm:justify-between'>
                         <div>
-                            <CardTitle className='flex items-center gap-2'>
-                                <Tag className='w-5 h-5 text-primary' />
-                                Gestión de Promociones
+                            <CardTitle className='flex items-center gap-2 text-lg sm:text-xl'>
+                                <Tag className='w-4 h-4 sm:w-5 sm:h-5 text-primary' />
+                                Promociones
                             </CardTitle>
-                            <CardDescription>
-                                Crea y administra códigos de descuento y promociones
+                            <CardDescription className='text-xs sm:text-sm'>
+                                Administra códigos de descuento
                             </CardDescription>
                         </div>
-                        <Button onClick={() => setDialog({ open: true, mode: 'create' })}>
+                        <Button onClick={() => setDialog({ open: true, mode: 'create' })} size='sm' className='w-full sm:w-auto'>
                             <Plus className='w-4 h-4 mr-2' />
                             Nueva Promoción
                         </Button>
                     </div>
                 </CardHeader>
-                <CardContent>
+                <CardContent className='p-3 sm:p-6 pt-0 sm:pt-0'>
                     {/* Search */}
                     <div className='mb-4'>
-                        <div className='relative max-w-sm'>
+                        <div className='relative'>
                             <Search className='absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground' />
                             <Input
-                                placeholder='Buscar por código o nombre...'
+                                placeholder='Buscar...'
                                 value={searchTerm}
                                 onChange={e => setSearchTerm(e.target.value)}
                                 className='pl-10'
@@ -954,14 +954,27 @@ const PromotionDialog = ({ dialog, setDialog, promotionTypes, onCreate, onUpdate
                     </div>
 
                     <div>
-                        <Label htmlFor='description'>Descripción</Label>
+                        <Label htmlFor='description'>Descripción <span className='text-xs text-muted-foreground'>(máx. 30 palabras / 170 caracteres)</span></Label>
                         <Textarea
                             id='description'
                             value={formData.description}
-                            onChange={e => setFormData({ ...formData, description: e.target.value })}
+                            onChange={e => {
+                                const newValue = e.target.value
+                                const words = newValue.trim().split(/\s+/).filter(w => w.length > 0)
+                                const isDeleting = newValue.length < formData.description.length
+                                // Allow if deleting, or if both limits are satisfied
+                                if (isDeleting || (words.length <= 30 && newValue.length <= 170)) {
+                                    setFormData({ ...formData, description: newValue })
+                                }
+                            }}
                             placeholder='Descripción opcional...'
                             rows={2}
+                            maxLength={170}
                         />
+                        <div className='text-xs text-muted-foreground text-right mt-1 flex justify-between'>
+                            <span>{formData.description.length}/170 caracteres</span>
+                            <span>{formData.description.trim().split(/\s+/).filter(w => w.length > 0).length}/30 palabras</span>
+                        </div>
                     </div>
 
                     {/* Conditional Fields based on Type */}

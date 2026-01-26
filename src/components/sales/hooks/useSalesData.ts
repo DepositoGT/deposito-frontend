@@ -105,6 +105,28 @@ export const normalizeRawSale = (raw: unknown): Sale => {
             }
         })
 
+    // Process promotions data
+    const promotionsRaw = Array.isArray(r.sale_promotions) ? r.sale_promotions : []
+    const promotions = promotionsRaw.map((promo: unknown) => {
+        const promoObj = promo as Record<string, unknown>
+        const promotion = promoObj.promotion as Record<string, unknown> | undefined
+        const promoType = promotion?.type as Record<string, unknown> | undefined
+        return {
+            id: Number(promoObj.id ?? 0),
+            promotion_id: String(promoObj.promotion_id ?? ''),
+            discount_applied: parseFloat(String(promoObj.discount_applied ?? '0')) || 0,
+            code_used: promoObj.code_used ? String(promoObj.code_used) : undefined,
+            promotion: promotion ? {
+                id: String(promotion.id ?? ''),
+                name: String(promotion.name ?? 'Promoción'),
+                type: promoType ? { name: String(promoType.name ?? '') } : undefined
+            } : undefined
+        }
+    })
+
+    const subtotal = parseFloat(String(r.subtotal ?? totalNum)) || totalNum
+    const discountTotal = parseFloat(String(r.discount_total ?? '0')) || 0
+
     return {
         id: String(r.id ?? ''),
         date: String(r.sold_at ?? r.date ?? ''),
@@ -112,10 +134,13 @@ export const normalizeRawSale = (raw: unknown): Sale => {
         customerNit,
         isFinalConsumer,
         total: totalNum,
+        subtotal,
+        discountTotal,
         totalReturned,
         adjustedTotal,
         hasReturns,
         returnDetails,
+        promotions,
         items: (r.items as number) ?? products.length,
         payment,
         status,
