@@ -42,7 +42,7 @@ const NewReturn = () => {
         description: 'No se especificó ID de venta',
         variant: 'destructive'
       })
-      navigate('/sales')
+      navigate('/')
       return
     }
 
@@ -62,7 +62,7 @@ const NewReturn = () => {
           description: 'Solo se pueden procesar devoluciones de ventas completadas',
           variant: 'destructive'
         })
-        navigate('/sales')
+        navigate('/')
         return
       }
 
@@ -86,7 +86,7 @@ const NewReturn = () => {
         description: (error as Error).message,
         variant: 'destructive'
       })
-      navigate('/sales')
+      navigate('/')
     } finally {
       setLoading(false)
     }
@@ -217,7 +217,7 @@ const NewReturn = () => {
   return (
     <div className="p-6 space-y-6">
       <div className="flex items-center gap-4">
-        <Button variant="outline" onClick={() => navigate('/sales')}>
+        <Button variant="outline" onClick={() => navigate('/')}>
           <ArrowLeft className="w-4 h-4 mr-2" />
           Volver a Ventas
         </Button>

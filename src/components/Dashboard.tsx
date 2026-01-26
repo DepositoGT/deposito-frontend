@@ -1,21 +1,27 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { 
-  TrendingUp, 
-  TrendingDown, 
-  Package, 
-  DollarSign, 
+import { useNavigate } from "react-router-dom";
+import {
+  TrendingUp,
+  TrendingDown,
+  Package,
+  DollarSign,
   AlertTriangle,
   Eye,
   Zap
 } from "lucide-react";
 import heroImage from "@/assets/hero-liquor.jpg";
-import { DashboardProps, DashboardStat, RecentProduct } from "@/types";
+import { DashboardStat, RecentProduct } from "@/types";
 import useCriticalProducts from "@/hooks/useCriticalProducts";
 import useDashboardStats from "@/hooks/useDashboardStats";
 
+interface DashboardProps {
+  onSectionChange?: (section: string) => void;
+}
+
 const Dashboard = ({ onSectionChange }: DashboardProps) => {
+  const navigate = useNavigate();
   const { data: statsData, isLoading: statsLoading } = useDashboardStats();
 
   // Formatear estadísticas desde la API
@@ -64,11 +70,11 @@ const Dashboard = ({ onSectionChange }: DashboardProps) => {
     const updateTime = new Date(statsData.timestamp);
     const diffMs = now.getTime() - updateTime.getTime();
     const diffMins = Math.floor(diffMs / 60000);
-    
+
     if (diffMins < 1) return 'hace un momento';
     if (diffMins === 1) return 'hace 1 min';
     if (diffMins < 60) return `hace ${diffMins} min`;
-    
+
     const diffHours = Math.floor(diffMins / 60);
     if (diffHours === 1) return 'hace 1 hora';
     return `hace ${diffHours} horas`;
@@ -77,7 +83,7 @@ const Dashboard = ({ onSectionChange }: DashboardProps) => {
   return (
     <div className="p-6 space-y-6 animate-fade-in">
       {/* Hero Section */}
-      <div 
+      <div
         className="relative h-48 rounded-xl overflow-hidden shadow-elegant"
         style={{
           backgroundImage: `url(${heroImage})`,
@@ -100,11 +106,11 @@ const Dashboard = ({ onSectionChange }: DashboardProps) => {
               </span>
             </div>
           </div>
-          <Button 
-            variant="secondary" 
-            size="lg" 
+          <Button
+            variant="secondary"
+            size="lg"
             className="shadow-glow"
-            onClick={() => onSectionChange?.("reports")}
+            onClick={() => navigate('/reportes')}
           >
             <Eye className="w-4 h-4 mr-2" />
             Ver Reportes
@@ -172,12 +178,12 @@ const Dashboard = ({ onSectionChange }: DashboardProps) => {
                   </div>
                   <div className="flex items-center space-x-3">
                     <span className="text-sm font-medium text-foreground">{product.stock} unidades</span>
-                    <Badge 
+                    <Badge
                       variant={product.status === "critical" ? "destructive" : product.status === "low" ? "secondary" : "default"}
                       className={
                         product.status === "critical" ? "bg-destructive" :
-                        product.status === "low" ? "bg-liquor-amber text-liquor-bronze" :
-                        "bg-liquor-gold text-liquor-bronze"
+                          product.status === "low" ? "bg-liquor-amber text-liquor-bronze" :
+                            "bg-liquor-gold text-liquor-bronze"
                       }
                     >
                       {product.status === "critical" ? "Crítico" : product.status === "low" ? "Bajo" : "Normal"}
@@ -195,33 +201,33 @@ const Dashboard = ({ onSectionChange }: DashboardProps) => {
             <CardTitle>Acciones Rápidas</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            <Button 
+            <Button
               className="w-full bg-primary hover:bg-primary/90 transition-colors"
-              onClick={() => onSectionChange?.("products")}
+              onClick={() => navigate('/productos')}
             >
               <Package className="w-4 h-4 mr-2" />
               Agregar Producto
             </Button>
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               className="w-full"
-              onClick={() => onSectionChange?.("sales")}
+              onClick={() => navigate('/ventas')}
             >
               <TrendingUp className="w-4 h-4 mr-2" />
               Registrar Venta
             </Button>
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               className="w-full"
-              onClick={() => onSectionChange?.("alerts")}
+              onClick={() => navigate('/alertas')}
             >
               <AlertTriangle className="w-4 h-4 mr-2" />
               Ver Alertas
             </Button>
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               className="w-full"
-              onClick={() => onSectionChange?.("reports")}
+              onClick={() => navigate('/reportes')}
             >
               <DollarSign className="w-4 h-4 mr-2" />
               Generar Reporte

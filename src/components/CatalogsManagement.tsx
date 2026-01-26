@@ -40,7 +40,8 @@ import {
 } from '../hooks/useProductCategories'
 import { useDeletedProducts, useRestoreProduct } from '../hooks/useProducts'
 import type { Product } from '../types'
-import { Pencil, Trash2, Plus, RotateCcw, Loader2 } from 'lucide-react'
+import { Pencil, Trash2, Plus, RotateCcw, Loader2, FileUp } from 'lucide-react'
+import { CatalogImportDialog } from './catalogs/CatalogImportDialog'
 
 // Tipos para los diálogos
 type PaymentTermDialogState = {
@@ -58,14 +59,14 @@ type ProductCategoryDialogState = {
 export function CatalogsManagement() {
   const [activeTab, setActiveTab] = useState('payment-terms')
   const [showDeleted, setShowDeleted] = useState(false)
-  
+
   // Payment Terms Dialog State
   const [paymentTermDialog, setPaymentTermDialog] = useState<{
     open: boolean
     mode: 'create' | 'edit'
     item?: PaymentTerm
   }>({ open: false, mode: 'create' })
-  
+
   // Product Categories Dialog State
   const [categoryDialog, setCategoryDialog] = useState<{
     open: boolean
@@ -73,19 +74,25 @@ export function CatalogsManagement() {
     item?: ProductCategory
   }>({ open: false, mode: 'create' })
 
+  // Import Dialog State
+  const [isImportDialogOpen, setIsImportDialogOpen] = useState(false)
+  const [importType, setImportType] = useState<'categories' | 'payment-terms'>('categories')
+
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-3 sm:p-6 space-y-4 sm:space-y-6">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Administración de Catálogos</h1>
-        <p className="text-muted-foreground">Gestiona términos de pago y categorías de productos</p>
+        <h1 className="text-xl sm:text-2xl md:text-3xl font-bold tracking-tight">Catálogos</h1>
+        <p className="text-xs sm:text-sm text-muted-foreground">Gestiona pagos y categorías</p>
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="payment-terms">Términos de Pago</TabsTrigger>
-          <TabsTrigger value="categories">Categorías de Productos</TabsTrigger>
-          <TabsTrigger value="deleted-products">Productos Eliminados</TabsTrigger>
-        </TabsList>
+        <div className="overflow-x-auto -mx-3 px-3 sm:mx-0 sm:px-0">
+          <TabsList className="inline-flex w-auto min-w-full sm:grid sm:grid-cols-3">
+            <TabsTrigger value="payment-terms" className="text-xs sm:text-sm whitespace-nowrap">Términos de Pago</TabsTrigger>
+            <TabsTrigger value="categories" className="text-xs sm:text-sm whitespace-nowrap">Categorías</TabsTrigger>
+            <TabsTrigger value="deleted-products" className="text-xs sm:text-sm whitespace-nowrap">Eliminados</TabsTrigger>
+          </TabsList>
+        </div>
 
         <TabsContent value="payment-terms" className="space-y-4">
           <PaymentTermsTab
@@ -93,6 +100,10 @@ export function CatalogsManagement() {
             setShowDeleted={setShowDeleted}
             dialog={paymentTermDialog}
             setDialog={setPaymentTermDialog}
+            onImportClick={() => {
+              setImportType('payment-terms')
+              setIsImportDialogOpen(true)
+            }}
           />
         </TabsContent>
 
@@ -102,6 +113,10 @@ export function CatalogsManagement() {
             setShowDeleted={setShowDeleted}
             dialog={categoryDialog}
             setDialog={setCategoryDialog}
+            onImportClick={() => {
+              setImportType('categories')
+              setIsImportDialogOpen(true)
+            }}
           />
         </TabsContent>
 
@@ -121,6 +136,13 @@ export function CatalogsManagement() {
         dialog={categoryDialog}
         setDialog={setCategoryDialog}
       />
+
+      {/* Import Dialog */}
+      <CatalogImportDialog
+        open={isImportDialogOpen}
+        onOpenChange={setIsImportDialogOpen}
+        type={importType}
+      />
     </div>
   )
 }
@@ -131,11 +153,13 @@ function PaymentTermsTab({
   setShowDeleted,
   dialog,
   setDialog,
+  onImportClick,
 }: {
   showDeleted: boolean
   setShowDeleted: (value: boolean) => void
   dialog: PaymentTermDialogState
   setDialog: (value: PaymentTermDialogState) => void
+  onImportClick: () => void
 }) {
   const { toast } = useToast()
   const { data: paymentTerms, isLoading } = usePaymentTerms(showDeleted)
@@ -144,7 +168,7 @@ function PaymentTermsTab({
 
   const handleDelete = async (id: number) => {
     if (!confirm('¿Estás seguro de eliminar este término de pago?')) return
-    
+
     try {
       await deleteMutation.mutateAsync(id)
       toast({
@@ -179,26 +203,37 @@ function PaymentTermsTab({
 
   return (
     <Card>
-      <CardHeader>
-        <div className="flex items-center justify-between">
+      <CardHeader className="p-3 sm:p-6">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:justify-between">
           <div>
-            <CardTitle>Términos de Pago</CardTitle>
-            <CardDescription>Administra los términos de pago disponibles</CardDescription>
+            <CardTitle className="text-lg sm:text-xl">Términos de Pago</CardTitle>
+            <CardDescription className="text-xs sm:text-sm">Administra los términos disponibles</CardDescription>
           </div>
           <div className="flex gap-2">
             <Button
               variant="outline"
               size="sm"
               onClick={() => setShowDeleted(!showDeleted)}
+              className="text-xs sm:text-sm"
             >
-              {showDeleted ? 'Ocultar eliminados' : 'Mostrar eliminados'}
+              {showDeleted ? 'Ocultar' : 'Ver eliminados'}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onImportClick}
+              className="text-xs sm:text-sm"
+            >
+              <FileUp className="w-4 h-4 sm:mr-2" />
+              <span className="hidden sm:inline">Importar</span>
             </Button>
             <Button
               size="sm"
               onClick={() => setDialog({ open: true, mode: 'create' })}
+              className="text-xs sm:text-sm"
             >
-              <Plus className="w-4 h-4 mr-2" />
-              Nuevo Término
+              <Plus className="w-4 h-4 sm:mr-2" />
+              <span className="hidden sm:inline">Nuevo</span>
             </Button>
           </div>
         </div>
@@ -296,11 +331,13 @@ function ProductCategoriesTab({
   setShowDeleted,
   dialog,
   setDialog,
+  onImportClick,
 }: {
   showDeleted: boolean
   setShowDeleted: (value: boolean) => void
   dialog: ProductCategoryDialogState
   setDialog: (value: ProductCategoryDialogState) => void
+  onImportClick: () => void
 }) {
   const { toast } = useToast()
   const { data: categories, isLoading } = useProductCategories(showDeleted)
@@ -309,7 +346,7 @@ function ProductCategoriesTab({
 
   const handleDelete = async (id: number) => {
     if (!confirm('¿Estás seguro de eliminar esta categoría?')) return
-    
+
     try {
       await deleteMutation.mutateAsync(id)
       toast({
@@ -344,26 +381,37 @@ function ProductCategoriesTab({
 
   return (
     <Card>
-      <CardHeader>
-        <div className="flex items-center justify-between">
+      <CardHeader className="p-3 sm:p-6">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:justify-between">
           <div>
-            <CardTitle>Categorías de Productos</CardTitle>
-            <CardDescription>Administra las categorías de productos disponibles</CardDescription>
+            <CardTitle className="text-lg sm:text-xl">Categorías</CardTitle>
+            <CardDescription className="text-xs sm:text-sm">Administra las categorías disponibles</CardDescription>
           </div>
           <div className="flex gap-2">
             <Button
               variant="outline"
               size="sm"
               onClick={() => setShowDeleted(!showDeleted)}
+              className="text-xs sm:text-sm"
             >
-              {showDeleted ? 'Ocultar eliminados' : 'Mostrar eliminados'}
+              {showDeleted ? 'Ocultar' : 'Ver eliminados'}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onImportClick}
+              className="text-xs sm:text-sm"
+            >
+              <FileUp className="w-4 h-4 sm:mr-2" />
+              <span className="hidden sm:inline">Importar</span>
             </Button>
             <Button
               size="sm"
               onClick={() => setDialog({ open: true, mode: 'create' })}
+              className="text-xs sm:text-sm"
             >
-              <Plus className="w-4 h-4 mr-2" />
-              Nueva Categoría
+              <Plus className="w-4 h-4 sm:mr-2" />
+              <span className="hidden sm:inline">Nueva</span>
             </Button>
           </div>
         </div>
@@ -483,7 +531,7 @@ function PaymentTermDialog({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    
+
     if (!name.trim()) {
       toast({
         variant: 'destructive',
@@ -507,7 +555,7 @@ function PaymentTermDialog({
           description: 'El término de pago ha sido actualizado correctamente',
         })
       }
-      
+
       handleOpenChange(false)
     } catch (error: unknown) {
       const apiError = error as { response?: { data?: { message?: string } } }
@@ -596,7 +644,7 @@ function ProductCategoryDialog({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    
+
     if (!name.trim()) {
       toast({
         variant: 'destructive',
@@ -620,7 +668,7 @@ function ProductCategoryDialog({
           description: 'La categoría ha sido actualizada correctamente',
         })
       }
-      
+
       handleOpenChange(false)
     } catch (error: unknown) {
       const apiError = error as { response?: { data?: { message?: string } } }
