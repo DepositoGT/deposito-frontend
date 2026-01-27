@@ -9,13 +9,13 @@
  */
 export const formatMoney = (value: number | string | unknown): string => {
   if (value === null || value === undefined) return 'Q 0.00'
-  
+
   const numValue = typeof value === 'number' ? value : parseFloat(String(value))
-  
+
   if (!Number.isFinite(numValue) || isNaN(numValue)) {
     return 'Q 0.00'
   }
-  
+
   return `Q ${numValue.toFixed(2)}`
 }
 
@@ -30,11 +30,44 @@ export const formatDateTime = (
   options?: Intl.DateTimeFormatOptions
 ): string => {
   if (!dateStr) return 'N/A'
-  
-  const date = typeof dateStr === 'string' ? new Date(dateStr) : dateStr
-  
+
+  let date: Date;
+
+  if (typeof dateStr === 'string') {
+
+    const cleanDateStr = dateStr.replace('Z', '').replace(/\.\d{3}$/, '');
+
+ 
+    const isoMatch = cleanDateStr.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})/)
+
+    if (isoMatch) {
+      // Create date with local interpretation of the components
+      const [, year, month, day, hour, minute, second] = isoMatch
+      date = new Date(
+        parseInt(year),
+        parseInt(month) - 1, // Month is 0-indexed
+        parseInt(day),
+        parseInt(hour),
+        parseInt(minute),
+        parseInt(second)
+      )
+    } else {
+      // Fallback for simpler date formats (e.g., "2026-01-26")
+      const simpleMatch = cleanDateStr.match(/^(\d{4})-(\d{2})-(\d{2})$/)
+      if (simpleMatch) {
+        const [, year, month, day] = simpleMatch
+        date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day))
+      } else {
+        // Last resort: let JavaScript parse it
+        date = new Date(dateStr)
+      }
+    }
+  } else {
+    date = dateStr
+  }
+
   if (isNaN(date.getTime())) return 'N/A'
-  
+
   const defaultOptions: Intl.DateTimeFormatOptions = {
     day: '2-digit',
     month: 'short',
@@ -44,7 +77,7 @@ export const formatDateTime = (
     hour12: false,
     ...options
   }
-  
+
   return new Intl.DateTimeFormat('es-GT', defaultOptions).format(date)
 }
 
@@ -81,11 +114,11 @@ export const formatTime = (dateStr?: string | Date | null): string => {
  */
 export const formatNumber = (value: number | string): string => {
   const numValue = typeof value === 'number' ? value : parseFloat(String(value))
-  
+
   if (!Number.isFinite(numValue) || isNaN(numValue)) {
     return '0'
   }
-  
+
   return numValue.toLocaleString('es-GT')
 }
 
