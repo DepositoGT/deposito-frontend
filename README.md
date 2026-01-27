@@ -31,3 +31,9 @@ npm run build
 ```sh
 npm run preview
 ```
+
+## 📄 Licencia
+
+Este proyecto está bajo una **Licencia Propietaria**. El código fuente es visible públicamente, pero **NO está permitido** su uso, copia, modificación o distribución sin autorización expresa del propietario.
+
+Para más detalles, consulta el archivo [LICENSE](./LICENSE).
