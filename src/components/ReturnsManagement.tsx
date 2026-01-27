@@ -20,6 +20,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { useToast } from '@/hooks/use-toast'
 import { useReturns, useCreateReturn, useUpdateReturnStatus } from '@/hooks/useReturns'
 import { Return } from '@/services/returnService'
+import { formatMoney, formatDateTime } from '@/utils'
 
 type ReturnStatusName = 'Pendiente' | 'Aprobada' | 'Rechazada' | 'Completada'
 
@@ -49,30 +50,12 @@ const ReturnsManagement = () => {
   const [isStatusUpdateOpen, setIsStatusUpdateOpen] = useState(false)
   const [statusToUpdate, setStatusToUpdate] = useState<ReturnStatusName | null>(null)
   const [returnToUpdate, setReturnToUpdate] = useState<Return | null>(null)
-  
+
   // Stock restoration confirmation (only for "Aprobada" status)
   const [isStockRestoreConfirmOpen, setIsStockRestoreConfirmOpen] = useState(false)
   const [shouldRestoreStock, setShouldRestoreStock] = useState(true)
 
-  const formatMoney = (value: number | string) => {
-    const n = typeof value === 'number' ? value : parseFloat(String(value))
-    return Number.isFinite(n) ? `Q ${n.toFixed(2)}` : 'Q 0.00'
-  }
 
-  const formatDateTime = (dateStr: string) => {
-    // Remove timezone info if present - DB stores Guatemala time as-is
-    const cleanDate = dateStr.replace('Z', '').replace(/[+-]\d{2}:\d{2}$/, '')
-    const d = new Date(cleanDate)
-    if (isNaN(d.getTime())) return dateStr
-    return new Intl.DateTimeFormat('es-GT', {
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: false
-    }).format(d)
-  }
 
   const getStatusBadge = (statusName: string) => {
     switch (statusName) {
@@ -97,7 +80,7 @@ const ReturnsManagement = () => {
   const openStatusUpdate = (returnRecord: Return, newStatus: ReturnStatusName) => {
     setReturnToUpdate(returnRecord)
     setStatusToUpdate(newStatus)
-    
+
     // Si el nuevo estado es "Aprobada", preguntar primero si desea restaurar stock
     if (newStatus === 'Aprobada') {
       setShouldRestoreStock(true) // Por defecto, sí restaurar
@@ -126,12 +109,12 @@ const ReturnsManagement = () => {
         payload
       })
 
-      const stockMessage = 
-        statusToUpdate === 'Aprobada' && restoreStock 
-          ? ' El stock ha sido restaurado.' 
+      const stockMessage =
+        statusToUpdate === 'Aprobada' && restoreStock
+          ? ' El stock ha sido restaurado.'
           : statusToUpdate === 'Aprobada' && !restoreStock
-          ? ' El stock NO fue restaurado.'
-          : ''
+            ? ' El stock NO fue restaurado.'
+            : ''
 
       toast({
         title: 'Estado actualizado',
@@ -462,8 +445,8 @@ const ReturnsManagement = () => {
               </div>
             </div>
             <div className="flex gap-2 justify-end">
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 onClick={() => {
                   setIsStockRestoreConfirmOpen(false)
                   setReturnToUpdate(null)
@@ -472,8 +455,8 @@ const ReturnsManagement = () => {
               >
                 Cancelar
               </Button>
-              <Button 
-                onClick={() => confirmStatusUpdate(shouldRestoreStock)} 
+              <Button
+                onClick={() => confirmStatusUpdate(shouldRestoreStock)}
                 disabled={updateStatusMutation.isPending}
               >
                 {updateStatusMutation.isPending ? 'Actualizando...' : 'Confirmar'}

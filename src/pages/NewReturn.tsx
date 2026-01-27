@@ -10,6 +10,7 @@ import { ArrowLeft, Minus, Plus, RotateCcw } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { useCreateReturn } from '@/hooks/useReturns'
 import { fetchSaleById, Sale, SaleItem } from '@/services/saleService'
+import { formatMoney, formatDateTime } from '@/utils'
 
 interface ReturnItem {
   sale_item_id: number
@@ -55,7 +56,7 @@ const NewReturn = () => {
     try {
       setLoading(true)
       const saleData = await fetchSaleById(saleId)
-      
+
       if (saleData.status.name !== 'Completada') {
         toast({
           title: 'Error',
@@ -67,7 +68,7 @@ const NewReturn = () => {
       }
 
       setSale(saleData)
-      
+
       // Initialize return items with all products from sale
       const initialItems: ReturnItem[] = saleData.sale_items.map(item => ({
         sale_item_id: item.id,
@@ -78,7 +79,7 @@ const NewReturn = () => {
         price: Number(item.price),
         reason: ''
       }))
-      
+
       setReturnItems(initialItems)
     } catch (error) {
       toast({
@@ -117,13 +118,13 @@ const NewReturn = () => {
   }
 
   const selectAllProducts = () => {
-    setReturnItems(items => 
+    setReturnItems(items =>
       items.map(item => ({ ...item, qty_returned: item.original_qty }))
     )
   }
 
   const clearSelection = () => {
-    setReturnItems(items => 
+    setReturnItems(items =>
       items.map(item => ({ ...item, qty_returned: 0 }))
     )
   }
@@ -131,7 +132,7 @@ const NewReturn = () => {
   const handleSubmit = async () => {
     // Validate at least one item has qty > 0
     const itemsToReturn = returnItems.filter(item => item.qty_returned > 0)
-    
+
     if (itemsToReturn.length === 0) {
       toast({
         title: 'Error',
@@ -179,25 +180,7 @@ const NewReturn = () => {
     }
   }
 
-  const formatMoney = (value: number) => {
-    return `Q ${value.toFixed(2)}`
-  }
 
-  const formatDateTime = (dateStr: string) => {
-    // Remove timezone info if present and parse as local time
-    // This is because our DB stores Guatemala time as-is (not UTC)
-    const cleanDate = dateStr.replace('Z', '').replace(/[+-]\d{2}:\d{2}$/, '')
-    const d = new Date(cleanDate)
-    
-    return new Intl.DateTimeFormat('es-GT', {
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: false
-    }).format(d)
-  }
 
   if (loading) {
     return (
@@ -343,7 +326,7 @@ const NewReturn = () => {
               </div>
             </div>
           ))}
-          
+
           {!hasItemsToReturn && (
             <div className="text-center py-8 text-muted-foreground bg-muted/50 rounded-lg">
               <RotateCcw className="w-12 h-12 mx-auto mb-3 opacity-50" />
