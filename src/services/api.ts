@@ -3,10 +3,15 @@
  * In development: http://localhost:3000/api
  * In production: https://your-backend.vercel.app/api
  */
-const API_BASE_URL = import.meta.env.VITE_API_URL ?? "http://localhost:3000/api";
+const VITE_API_URL = import.meta.env.VITE_API_URL;
+
+if (!VITE_API_URL) {
+  throw new Error('VITE_API_URL no está definida')
+}
+
 
 // Export for use in other files that need direct access
-export const getApiBaseUrl = () => API_BASE_URL;
+export const getApiBaseUrl = () => VITE_API_URL;
 
 export class ApiError extends Error {
   status: number;
@@ -44,7 +49,7 @@ export const apiFetch = async <T>(path: string, options: RequestInit = {}): Prom
     cleanPath = '/' + cleanPath;
   }
 
-  const res = await fetch(`${API_BASE_URL}${cleanPath}`, {
+  const res = await fetch(`${VITE_API_URL}${cleanPath}`, {
     ...options,
     headers,
   });
