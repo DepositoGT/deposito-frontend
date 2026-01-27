@@ -1,3 +1,13 @@
+/**
+ * Copyright (c) 2026 Diego Patzán. All Rights Reserved.
+ * 
+ * This source code is licensed under a Proprietary License.
+ * Unauthorized copying, modification, distribution, or use of this file,
+ * via any medium, is strictly prohibited without express written permission.
+ * 
+ * For licensing inquiries: GitHub @dpatzan2
+ */
+
 import { useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
