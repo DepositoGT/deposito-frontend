@@ -5,6 +5,7 @@ A Vite + React + TypeScript + Tailwind CSS project.
 ## Development
 
 Prerequisites:
+
 - Node.js 18+
 - npm or bun
 
@@ -16,6 +17,7 @@ npm run dev
 ```
 
 ## Tech Stack
+
 - Vite
 - TypeScript
 - React
@@ -23,17 +25,23 @@ npm run dev
 - Tailwind CSS
 
 ## Build
+
 ```sh
 npm run build
 ```
 
 ## Preview build
+
 ```sh
 npm run preview
 ```
 
-## 📄 Licencia
+## Licencia
 
 Este proyecto está bajo una **Licencia Propietaria**. El código fuente es visible públicamente, pero **NO está permitido** su uso, copia, modificación o distribución sin autorización expresa del propietario.
 
 Para más detalles, consulta el archivo [LICENSE](./LICENSE).
+
+## Propiedad
+
+Este repositorio está alojado bajo una organización de GitHub únicamente con propósitos administrativos. **Todos los derechos de propiedad intelectual pertenecen exclusivamente a Diego Patzán.**
