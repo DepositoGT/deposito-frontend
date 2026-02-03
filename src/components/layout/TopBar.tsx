@@ -29,13 +29,18 @@ import { AppLauncher } from './AppLauncher'
 import { appModules, getUserRole } from '@/config/appModules'
 import { useCriticalProducts } from '@/hooks/useCriticalProducts'
 import { useAuth } from '@/context/useAuth'
+import type { User as UserType } from '@/services/userService'
 
 export const TopBar = () => {
     const [launcherOpen, setLauncherOpen] = useState(false)
+    const [imageError, setImageError] = useState(false)
     const location = useLocation()
     const navigate = useNavigate()
-    const { user } = getUserRole()
-    const { logout } = useAuth()
+    const { user: roleUser } = getUserRole()
+    const { user: authUser, logout } = useAuth()
+
+    // Obtener el usuario completo del contexto de autenticación
+    const currentUser = authUser || roleUser
 
     // Get critical products for notification badge
     const { data: criticalProducts = [] } = useCriticalProducts()
@@ -109,17 +114,28 @@ export const TopBar = () => {
                 <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                         <Button variant='ghost' size='icon' className='rounded-full'>
-                            <div className='w-8 h-8 bg-secondary rounded-full flex items-center justify-center'>
-                                <User className='w-4 h-4' />
-                            </div>
+                            {currentUser && (currentUser as UserType)?.photo_url && !imageError ? (
+                                <div className='w-8 h-8 rounded-full overflow-hidden bg-secondary flex items-center justify-center border border-border'>
+                                    <img 
+                                        src={(currentUser as UserType).photo_url!} 
+                                        alt={currentUser?.name || 'Usuario'}
+                                        className='w-full h-full object-cover'
+                                        onError={() => setImageError(true)}
+                                    />
+                                </div>
+                            ) : (
+                                <div className='w-8 h-8 bg-secondary rounded-full flex items-center justify-center'>
+                                    <User className='w-4 h-4' />
+                                </div>
+                            )}
                         </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align='end' className='w-56'>
                         <DropdownMenuLabel>
                             <div className='flex flex-col'>
-                                <span>{user?.name || 'Usuario'}</span>
+                                <span>{currentUser?.name || 'Usuario'}</span>
                                 <span className='text-xs font-normal text-muted-foreground'>
-                                    {user?.email || user?.role?.name || 'Sin rol'}
+                                    {currentUser?.email || (currentUser as any)?.role?.name || 'Sin rol'}
                                 </span>
                             </div>
                         </DropdownMenuLabel>

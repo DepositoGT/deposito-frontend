@@ -42,6 +42,8 @@ import { useCreateProduct } from '@/hooks/useCreateProduct'
 import { useDeleteProduct } from '@/hooks/useDeleteProduct'
 import useUpdateProduct from '@/hooks/useUpdateProduct'
 import useAdjustStock from '@/hooks/useAdjustStock'
+import { adaptApiProduct } from '@/services/productService'
+import { Pagination } from '@/components/shared/Pagination'
 
 // Feature imports
 import { useProductForm } from './hooks'
@@ -51,30 +53,13 @@ import type { StockAdjustment } from './types'
 const ProductManagement = () => {
     const { toast } = useToast()
 
-    // Data hooks
-    const { data: productsData, isLoading, isError } = useProducts()
-    const { data: suppliersData } = useSuppliers()
-    const { data: categoriesData } = useCategories()
-    const suppliers = useMemo(() => suppliersData ?? [], [suppliersData])
-    const products = useMemo(() => productsData ?? [], [productsData])
-    const normalizedCategories = useMemo(() =>
-        (categoriesData ?? []).map(c => ({ id: String(c.id), name: String(c.name) })),
-        [categoriesData]
-    )
-
-    // Mutations
-    const createProductMutation = useCreateProduct()
-    const updateMutation = useUpdateProduct()
-    const deleteMutation = useDeleteProduct()
-    const adjustStockMutation = useAdjustStock()
-    const { mutateAsync: deleteMutateAsync, isPending: deleteIsLoading } = deleteMutation
-
-    // Form hook
-    const productForm = useProductForm()
-
     // Filter state
     const [searchTerm, setSearchTerm] = useState('')
     const [categoryFilter, setCategoryFilter] = useState('all')
+
+    // Pagination
+    const [currentPage, setCurrentPage] = useState(1)
+    const [pageSize, setPageSize] = useState(5) // Default page size
 
     // Dialog states
     const [isNewProductOpen, setIsNewProductOpen] = useState(false)
@@ -93,9 +78,34 @@ const ProductManagement = () => {
         amount: '', reason: '', type: 'add'
     })
 
-    // Pagination
-    const [currentPage, setCurrentPage] = useState(1)
-    const [pageSize, setPageSize] = useState(5)
+    // Data hooks
+    const { data: productsData, isLoading, isError, refetch: refetchProducts } = useProducts({
+        page: currentPage,
+        pageSize: pageSize,
+        search: searchTerm || undefined,
+        category: categoryFilter !== 'all' ? categoryFilter : undefined,
+    })
+    const { data: suppliersData } = useSuppliers()
+    const { data: categoriesData } = useCategories()
+    const suppliers = useMemo(() => suppliersData ?? [], [suppliersData])
+    const products = useMemo(() => {
+        if (!productsData?.items) return []
+        return productsData.items.map(adaptApiProduct)
+    }, [productsData])
+    const normalizedCategories = useMemo(() =>
+        (categoriesData ?? []).map(c => ({ id: String(c.id), name: String(c.name) })),
+        [categoriesData]
+    )
+
+    // Mutations
+    const createProductMutation = useCreateProduct()
+    const updateMutation = useUpdateProduct()
+    const deleteMutation = useDeleteProduct()
+    const adjustStockMutation = useAdjustStock()
+    const { mutateAsync: deleteMutateAsync, isPending: deleteIsLoading } = deleteMutation
+
+    // Form hook
+    const productForm = useProductForm()
 
     // Categories list
     const categories = useMemo(() => {
@@ -103,36 +113,16 @@ const ProductManagement = () => {
         if (Array.isArray(categoriesData) && categoriesData.length) {
             return base.concat(categoriesData.map(c => String(c.name)))
         }
-        if (products.length) {
-            const set = new Set<string>()
-            products.forEach(p => { if (p.category) set.add(String(p.category)) })
-            return base.concat(Array.from(set))
-        }
         return base.concat(['Whisky', 'Vinos', 'Cervezas', 'Rones', 'Vodkas', 'Tequilas', 'Ginebras'])
-    }, [categoriesData, products])
+    }, [categoriesData])
 
     // Reset page on filter change
-    useEffect(() => setCurrentPage(1), [searchTerm, categoryFilter, productsData])
+    useEffect(() => setCurrentPage(1), [searchTerm, categoryFilter, pageSize])
 
-    // Filtered products
-    const filteredProducts = useMemo(() => {
-        const term = searchTerm.toLowerCase()
-        return products.filter(product => {
-            const matchesSearch = product.name.toLowerCase().includes(term) ||
-                (product.brand || '').toLowerCase().includes(term) ||
-                (product.barcode || '').includes(searchTerm)
-            const matchesCategory = categoryFilter === 'all' || product.category === categoryFilter
-            return matchesSearch && matchesCategory
-        })
-    }, [products, searchTerm, categoryFilter])
-
-    // Pagination calculations
-    const totalPages = Math.max(1, Math.ceil(filteredProducts.length / pageSize))
-    const paginatedProducts = useMemo(() => {
-        const page = Math.min(currentPage, totalPages)
-        const start = (page - 1) * pageSize
-        return filteredProducts.slice(start, start + pageSize)
-    }, [filteredProducts, currentPage, pageSize, totalPages])
+    // Products are already filtered and paginated by the backend
+    const paginatedProducts = products
+    const totalPages = productsData?.totalPages || 1
+    const totalItems = productsData?.totalItems || 0
 
     // Export handler
     const handleExport = async () => {
@@ -226,6 +216,11 @@ const ProductManagement = () => {
             setIsDeleteDialogOpen(false)
             setDeleteTargetId(null)
             toast({ title: 'Producto eliminado', description: 'El producto fue eliminado correctamente' })
+            // Ajustar página si es necesario
+            const result = await refetchProducts()
+            if (result.data && result.data.items.length === 0 && result.data.page > 1) {
+                setCurrentPage(result.data.page - 1)
+            }
         } catch (err: unknown) {
             const message = (err as { message?: string })?.message || 'No se pudo eliminar el producto'
             toast({ title: 'Error', description: message, variant: 'destructive' })
@@ -376,7 +371,7 @@ const ProductManagement = () => {
             {/* Products Table */}
             <Card>
                 <CardHeader>
-                    <CardTitle>Productos ({filteredProducts.length})</CardTitle>
+                    <CardTitle>Productos ({totalItems})</CardTitle>
                 </CardHeader>
                 <CardContent>
                     {isLoading && <div className="p-6 text-muted-foreground">Cargando productos...</div>}
@@ -436,36 +431,16 @@ const ProductManagement = () => {
                             </table>
 
                             {/* Pagination */}
-                            <div className="flex flex-col md:flex-row items-center justify-between gap-3 mt-4">
-                                <div className="flex items-center space-x-2 text-sm text-muted-foreground">
-                                    <span>Mostrar</span>
-                                    <select
-                                        value={pageSize}
-                                        onChange={e => { setPageSize(Number(e.target.value)); setCurrentPage(1) }}
-                                        className="border rounded px-2 py-1 bg-background text-foreground"
-                                    >
-                                        {[5, 10, 20, 50].map(s => <option key={s} value={s}>{s}</option>)}
-                                    </select>
-                                    <span>de {filteredProducts.length} productos</span>
-                                </div>
-                                <div className="flex items-center space-x-2">
-                                    <button
-                                        className="p-2 rounded border bg-background hover:bg-muted disabled:opacity-50"
-                                        onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                                        disabled={currentPage === 1}
-                                    >
-                                        <ChevronLeft className="w-4 h-4" />
-                                    </button>
-                                    <span className="px-2 text-sm">Página {currentPage} de {totalPages}</span>
-                                    <button
-                                        className="p-2 rounded border bg-background hover:bg-muted disabled:opacity-50"
-                                        onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                                        disabled={currentPage >= totalPages}
-                                    >
-                                        <ChevronRight className="w-4 h-4" />
-                                    </button>
-                                </div>
-                            </div>
+                            {productsData && productsData.totalPages > 1 && (
+                                <Pagination
+                                    currentPage={productsData.page}
+                                    totalPages={productsData.totalPages}
+                                    onPageChange={setCurrentPage}
+                                    hasNextPage={productsData.nextPage !== null}
+                                    hasPrevPage={productsData.prevPage !== null}
+                                    loading={isLoading}
+                                />
+                            )}
                         </div>
                     )}
                 </CardContent>
