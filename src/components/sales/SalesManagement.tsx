@@ -21,7 +21,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { DialogTrigger, Dialog } from '@/components/ui/dialog'
 import { useToast } from '@/hooks/use-toast'
 import { Sale, SaleStatus } from '@/types'
-import { useProducts } from '@/hooks/useProducts'
+import { useAllProducts } from '@/hooks/useProducts'
 import { createSale } from '@/services/saleService'
 import { updateSaleStatus as apiUpdateSaleStatus } from '@/services/salesService'
 import { useRealtimeSales } from '@/hooks/useRealtimeSales'
@@ -60,7 +60,7 @@ const SalesManagement = ({ onSectionChange }: SalesManagementProps) => {
     // Data hooks
     const paymentMethodsQuery = usePaymentMethods()
     const paymentMethods = useMemo(() => paymentMethodsQuery.data ?? [], [paymentMethodsQuery.data])
-    const productsQuery = useProducts()
+    const productsQuery = useAllProducts()
     const availableProducts = useMemo(() => productsQuery.data ?? [], [productsQuery.data])
     const salesData = useSalesData()
     const cart = useCart({ availableProducts })
