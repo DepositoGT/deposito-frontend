@@ -10,16 +10,29 @@
 
 // filepath: /home/DiegoPatzan/Documents/CODE/deposito/guate-liquor-vault-13/src/hooks/useProducts.ts
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { fetchProducts } from "@/services/productService";
+import { fetchProducts, fetchAllProducts, type ProductsQueryParams, type ProductsResponse } from "@/services/productService";
 import { apiFetch } from "@/services/api";
 import type { Product } from "@/types";
+import { adaptApiProduct } from "@/services/productService";
 
 export const PRODUCTS_QUERY_KEY = ["products"] as const;
 
-export const useProducts = () => {
-  return useQuery({
-    queryKey: PRODUCTS_QUERY_KEY,
-    queryFn: fetchProducts,
+export const useProducts = (params?: ProductsQueryParams) => {
+  return useQuery<ProductsResponse, Error>({
+    queryKey: [...PRODUCTS_QUERY_KEY, params],
+    queryFn: () => fetchProducts(params),
+    staleTime: 60 * 1000, // 1 min
+  });
+};
+
+// Legacy hook for backward compatibility (returns all products as array)
+export const useAllProducts = () => {
+  return useQuery<Product[], Error>({
+    queryKey: [...PRODUCTS_QUERY_KEY, "all"],
+    queryFn: async () => {
+      const data = await fetchAllProducts();
+      return data;
+    },
     staleTime: 60 * 1000, // 1 min
   });
 };
