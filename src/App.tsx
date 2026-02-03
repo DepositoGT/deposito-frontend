@@ -22,6 +22,7 @@ import HomePage from "./pages/HomePage";
 import ImportPage from "./pages/ImportPage";
 import SupplierImportPage from "./pages/SupplierImportPage";
 import CatalogImportPage from "./pages/CatalogImportPage";
+import UserImportPage from "./pages/UserImportPage";
 import AuthProvider from "@/context/AuthProvider";
 
 // Layout
@@ -106,6 +107,7 @@ const App = () => (
 
                 {/* Users (Admin) */}
                 <Route path="/usuarios" element={<UserManagement />} />
+                <Route path="/usuarios/importar" element={<UserImportPage />} />
               </Route>
             </Route>
 

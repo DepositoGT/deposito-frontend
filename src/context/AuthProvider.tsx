@@ -60,8 +60,20 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       setIsAuthenticated(false);
       setUser(null);
     };
+    
+    const onUserUpdated = (event: CustomEvent) => {
+      const updatedUser = event.detail;
+      setUser(updatedUser);
+      localStorage.setItem(USER_KEY, JSON.stringify(updatedUser));
+    };
+    
     window.addEventListener("auth:unauthorized", onUnauthorized);
-    return () => window.removeEventListener("auth:unauthorized", onUnauthorized);
+    window.addEventListener("auth:userUpdated", onUserUpdated as EventListener);
+    
+    return () => {
+      window.removeEventListener("auth:unauthorized", onUnauthorized);
+      window.removeEventListener("auth:userUpdated", onUserUpdated as EventListener);
+    };
   }, []);
 
   const value = useMemo(
