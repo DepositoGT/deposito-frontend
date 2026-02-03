@@ -60,7 +60,7 @@ import { Checkbox } from './ui/checkbox'
 import { useToast } from '@/hooks/use-toast'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { apiFetch } from '@/services/api'
-import { fetchProducts, type ApiProduct } from '@/services/productService'
+import { fetchAllProducts, type ApiProduct } from '@/services/productService'
 import { generatePromotionTicketsPDF } from './promotions/generatePromotionTicketsPDF'
 import {
     Plus,
@@ -155,7 +155,7 @@ function usePromotions() {
 function useProducts() {
     return useQuery({
         queryKey: ['products-list'],
-        queryFn: fetchProducts,
+        queryFn: fetchAllProducts,
         staleTime: 5 * 60 * 1000 // Cache for 5 minutes
     })
 }

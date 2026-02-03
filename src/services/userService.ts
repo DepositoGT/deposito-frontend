@@ -19,6 +19,13 @@ export interface User {
     id: number;
     name: string;
   };
+  is_employee?: boolean;
+  photo_url?: string | null;
+  phone?: string | null;
+  address?: string | null;
+  hire_date?: string | null;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface Role {
@@ -31,6 +38,11 @@ export interface CreateUserPayload {
   email: string;
   password: string;
   role_id: number;
+  is_employee?: boolean;
+  photo_url?: string | null;
+  phone?: string | null;
+  address?: string | null;
+  hire_date?: string | null;
 }
 
 export interface UpdateUserPayload {
@@ -38,10 +50,39 @@ export interface UpdateUserPayload {
   email?: string;
   role_id?: number;
   password?: string;
+  is_employee?: boolean;
+  photo_url?: string | null;
+  phone?: string | null;
+  address?: string | null;
+  hire_date?: string | null;
 }
 
-export const getUsers = async (): Promise<User[]> => {
-  return apiFetch<User[]>("/api/auth/users", {
+export interface UsersQueryParams {
+  page?: number;
+  pageSize?: number;
+  role_id?: number;
+  search?: string;
+}
+
+export interface UsersResponse {
+  items: User[];
+  page: number;
+  pageSize: number;
+  totalPages: number;
+  totalItems: number;
+  nextPage: number | null;
+  prevPage: number | null;
+}
+
+export const getUsers = async (params?: UsersQueryParams): Promise<UsersResponse> => {
+  const search = new URLSearchParams();
+  if (params?.page) search.set("page", String(params.page));
+  if (params?.pageSize) search.set("pageSize", String(params.pageSize));
+  if (params?.role_id) search.set("role_id", String(params.role_id));
+  if (params?.search) search.set("search", params.search);
+
+  const url = `/api/auth/users${search.toString() ? `?${search.toString()}` : ""}`;
+  return apiFetch<UsersResponse>(url, {
     method: "GET",
   });
 };
@@ -76,4 +117,53 @@ export const getRoles = async (): Promise<Role[]> => {
   return apiFetch<Role[]>("/api/auth/roles", {
     method: "GET",
   });
+};
+
+export const uploadUserPhoto = async (id: string, file: File): Promise<User> => {
+  const formData = new FormData();
+  formData.append("file", file);
+  
+  const token = localStorage.getItem("auth:token");
+  const VITE_API_URL = import.meta.env.VITE_API_URL;
+  if (!VITE_API_URL) {
+    throw new Error('VITE_API_URL no está definida');
+  }
+  
+  // Limpiar el path para evitar duplicar /api
+  let cleanPath = `/auth/users/${id}/photo`;
+  if (cleanPath.startsWith('/api/')) {
+    cleanPath = cleanPath.substring(4); // Remove '/api'
+  } else if (!cleanPath.startsWith('/')) {
+    cleanPath = '/' + cleanPath;
+  }
+  
+  const res = await fetch(`${VITE_API_URL}${cleanPath}`, {
+    method: "POST",
+    headers: {
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      // No incluir Content-Type, el navegador lo establecerá automáticamente con el boundary
+    },
+    body: formData,
+  });
+
+  const text = await res.text();
+  let data;
+  try {
+    data = text ? JSON.parse(text) : undefined;
+  } catch (e) {
+    // Si no es JSON válido, usar el texto como mensaje de error
+    throw new Error(text || res.statusText || "Error al subir la foto");
+  }
+
+  if (!res.ok) {
+    if (res.status === 401) {
+      localStorage.removeItem("auth:token");
+      localStorage.setItem("auth:isAuthenticated", "false");
+      window.dispatchEvent(new Event("auth:unauthorized"));
+    }
+    const message = (data && (data.message || data.error)) || res.statusText || "Error";
+    throw new Error(String(message));
+  }
+
+  return data as User;
 };
