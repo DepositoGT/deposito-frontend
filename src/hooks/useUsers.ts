@@ -9,12 +9,12 @@
  */
 
 import { useQuery } from "@tanstack/react-query";
-import { getUsers } from "@/services/userService";
+import { getUsers, type UsersQueryParams } from "@/services/userService";
 
-export const useUsers = () => {
+export const useUsers = (params?: UsersQueryParams) => {
   return useQuery({
-    queryKey: ["users"],
-    queryFn: getUsers,
+    queryKey: ["users", params],
+    queryFn: () => getUsers(params),
     staleTime: 30000, // 30 segundos
   });
 };

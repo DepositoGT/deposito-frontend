@@ -20,6 +20,11 @@ export interface AuthUser {
     id: number;
     name: string;
   };
+  photo_url?: string | null;
+  is_employee?: boolean;
+  phone?: string | null;
+  address?: string | null;
+  hire_date?: string | null;
 }
 
 export type AuthContextType = {

@@ -8,7 +8,7 @@
  * For licensing inquiries: GitHub @dpatzan2
  */
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,9 +22,37 @@ import { useCreateUser } from "@/hooks/useCreateUser";
 import { useUpdateUser } from "@/hooks/useUpdateUser";
 import { useDeleteUser } from "@/hooks/useDeleteUser";
 import { useRoles } from "@/hooks/useRoles";
-import { UserPlus, Edit, Trash2, Shield, Mail, User as UserIcon, Search, X } from "lucide-react";
+import { UserPlus, Edit, Trash2, Shield, Mail, User as UserIcon, Search, X, Eye, LayoutGrid, List, FileUp } from "lucide-react";
+import UserImportDialog from "./users/UserImportDialog";
 import { useAuth } from "@/context/useAuth";
 import type { User } from "@/services/userService";
+import { UserDetailDialog } from "@/components/users/UserDetailDialog";
+import { Pagination } from "@/components/shared/Pagination";
+
+// Componente para mostrar avatar de usuario con fallback
+const UserAvatar = ({ user }: { user: User }) => {
+  const [imageError, setImageError] = useState(false);
+  const defaultPhoto = `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}&background=orange&color=fff&size=40`;
+
+  if (!user.photo_url || imageError) {
+    return (
+      <div className="w-10 h-10 rounded-full bg-liquor-amber/10 flex items-center justify-center flex-shrink-0">
+        <UserIcon className="w-5 h-5 text-liquor-amber" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="w-10 h-10 rounded-full overflow-hidden bg-muted flex items-center justify-center flex-shrink-0">
+      <img 
+        src={user.photo_url} 
+        alt={user.name}
+        className="w-full h-full object-cover"
+        onError={() => setImageError(true)}
+      />
+    </div>
+  );
+};
 
 const UserManagement = () => {
   const { toast } = useToast();
@@ -58,18 +86,11 @@ const UserManagement = () => {
     }
   }
 
-  // Queries
-  const { data: users = [], isLoading: usersLoading } = useUsers();
-  const { data: roles = [], isLoading: rolesLoading } = useRoles();
-
-  // Mutations
-  const createUserMutation = useCreateUser();
-  const updateUserMutation = useUpdateUser();
-  const deleteUserMutation = useDeleteUser();
-
   // Estados para modales
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
+  const [isViewOpen, setIsViewOpen] = useState(false);
+  const [isImportOpen, setIsImportOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
 
   // Estados para formularios
@@ -86,6 +107,27 @@ const UserManagement = () => {
   // Búsqueda y filtros
   const [searchTerm, setSearchTerm] = useState("");
   const [filterRole, setFilterRole] = useState<string>("all");
+  const [viewMode, setViewMode] = useState<"table" | "cards">("cards");
+  
+  // Paginación
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize] = useState(20);
+
+  // Queries
+  const { data: usersData, isLoading: usersLoading, refetch: refetchUsers } = useUsers({
+    page: currentPage,
+    pageSize,
+    role_id: filterRole !== "all" ? Number(filterRole) : undefined,
+    search: searchTerm || undefined,
+  });
+  
+  const users = usersData?.items || [];
+  const { data: roles = [], isLoading: rolesLoading } = useRoles();
+
+  // Mutations
+  const createUserMutation = useCreateUser();
+  const updateUserMutation = useUpdateUser();
+  const deleteUserMutation = useDeleteUser();
 
   // Estados de carga
   const [isCreating, setIsCreating] = useState(false);
@@ -173,6 +215,11 @@ const UserManagement = () => {
       });
       resetCreateForm();
       setIsCreateOpen(false);
+      // Refrescar la lista y volver a la última página para ver el nuevo usuario
+      const result = await refetchUsers();
+      if (result.data && result.data.totalPages > 0) {
+        setCurrentPage(result.data.totalPages);
+      }
     } catch (err: unknown) {
       let message = "No se pudo crear el usuario";
       if (err && typeof err === "object" && "message" in err) {
@@ -196,6 +243,12 @@ const UserManagement = () => {
     setEditPassword("");
     setEditRoleId(String(user.role_id));
     setIsEditOpen(true);
+  };
+
+  // Función para abrir modal de vista
+  const handleViewUser = (user: User) => {
+    setSelectedUser(user);
+    setIsViewOpen(true);
   };
 
   // Función para actualizar usuario
@@ -270,6 +323,8 @@ const UserManagement = () => {
       });
       setIsEditOpen(false);
       setSelectedUser(null);
+      // Refrescar la lista
+      await refetchUsers();
     } catch (err: unknown) {
       let message = "No se pudo actualizar el usuario";
       if (err && typeof err === "object" && "message" in err) {
@@ -304,6 +359,12 @@ const UserManagement = () => {
         title: "Usuario eliminado", 
         description: "El usuario ha sido eliminado correctamente" 
       });
+      // Refrescar la lista de usuarios
+      const result = await refetchUsers();
+      // Si la página actual queda vacía y hay páginas anteriores, ir a la anterior
+      if (result.data && result.data.items.length === 0 && result.data.page > 1) {
+        setCurrentPage(result.data.page - 1);
+      }
     } catch (err: unknown) {
       let message = "No se pudo eliminar el usuario";
       if (err && typeof err === "object" && "message" in err) {
@@ -319,16 +380,13 @@ const UserManagement = () => {
     }
   };
 
-  // Filtrar usuarios
-  const filteredUsers = users.filter((user: User) => {
-    const matchesSearch = 
-      user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.email.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    const matchesRole = filterRole === "all" || String(user.role_id) === filterRole;
+  // Resetear página cuando cambian los filtros
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, filterRole]);
 
-    return matchesSearch && matchesRole;
-  });
+  // Los usuarios ya vienen filtrados del backend
+  const filteredUsers = users;
 
   // Función para obtener el badge del rol
   const getRoleBadge = (roleName: string) => {
@@ -374,13 +432,22 @@ const UserManagement = () => {
             Administra usuarios, roles y permisos del sistema
           </p>
         </div>
-        <Button
-          className="bg-liquor-amber hover:bg-liquor-amber/90 text-white"
-          onClick={() => setIsCreateOpen(true)}
-        >
-          <UserPlus className="w-4 h-4 mr-2" />
-          Nuevo Usuario
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            onClick={() => setIsImportOpen(true)}
+          >
+            <FileUp className="w-4 h-4 mr-2" />
+            Importar
+          </Button>
+          <Button
+            className="bg-liquor-amber hover:bg-liquor-amber/90 text-white"
+            onClick={() => setIsCreateOpen(true)}
+          >
+            <UserPlus className="w-4 h-4 mr-2" />
+            Nuevo Usuario
+          </Button>
+        </div>
       </div>
 
       {/* Filtros */}
@@ -431,7 +498,7 @@ const UserManagement = () => {
             <UserIcon className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{users.length}</div>
+            <div className="text-2xl font-bold">{usersData?.totalItems || users.length}</div>
           </CardContent>
         </Card>
         <Card>
@@ -443,6 +510,9 @@ const UserManagement = () => {
             <div className="text-2xl font-bold">
               {users.filter((u: User) => u.role?.name?.toLowerCase() === 'admin').length}
             </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              En esta página
+            </p>
           </CardContent>
         </Card>
         <Card>
@@ -454,6 +524,9 @@ const UserManagement = () => {
             <div className="text-2xl font-bold">
               {users.filter((u: User) => ['seller', 'vendedor'].includes(u.role?.name?.toLowerCase() || '')).length}
             </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              En esta página
+            </p>
           </CardContent>
         </Card>
       </div>
@@ -461,10 +534,34 @@ const UserManagement = () => {
       {/* Tabla de usuarios */}
       <Card>
         <CardHeader>
-          <CardTitle>Usuarios del Sistema</CardTitle>
-          <CardDescription>
-            {filteredUsers.length} usuario{filteredUsers.length !== 1 ? 's' : ''} encontrado{filteredUsers.length !== 1 ? 's' : ''}
-          </CardDescription>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle>Usuarios del Sistema</CardTitle>
+              <CardDescription>
+                {filteredUsers.length} usuario{filteredUsers.length !== 1 ? 's' : ''} encontrado{filteredUsers.length !== 1 ? 's' : ''}
+              </CardDescription>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                variant={viewMode === "table" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setViewMode("table")}
+                className="h-9"
+              >
+                <List className="w-4 h-4 mr-2" />
+                Tabla
+              </Button>
+              <Button
+                variant={viewMode === "cards" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setViewMode("cards")}
+                className="h-9"
+              >
+                <LayoutGrid className="w-4 h-4 mr-2" />
+                Cards
+              </Button>
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
           {usersLoading ? (
@@ -473,7 +570,7 @@ const UserManagement = () => {
             <div className="text-center py-8 text-muted-foreground">
               No se encontraron usuarios
             </div>
-          ) : (
+          ) : viewMode === "table" ? (
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
@@ -489,9 +586,7 @@ const UserManagement = () => {
                     <tr key={user.id} className="border-b hover:bg-muted/50 transition-colors">
                       <td className="p-4">
                         <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-full bg-liquor-amber/10 flex items-center justify-center">
-                            <UserIcon className="w-5 h-5 text-liquor-amber" />
-                          </div>
+                          <UserAvatar user={user} />
                           <div>
                             <div className="font-medium">{user.name}</div>
                             {currentUser?.id === user.id && (
@@ -514,10 +609,10 @@ const UserManagement = () => {
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => handleEditUser(user)}
+                            onClick={() => handleViewUser(user)}
                           >
-                            <Edit className="w-4 h-4 mr-1" />
-                            Editar
+                            <Eye className="w-4 h-4 mr-1" />
+                            Ver
                           </Button>
                           <AlertDialog>
                             <AlertDialogTrigger asChild>
@@ -568,6 +663,96 @@ const UserManagement = () => {
                 </tbody>
               </table>
             </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+              {filteredUsers.map((user: User) => (
+                <div
+                  key={user.id}
+                  className="border rounded-lg p-4 hover:bg-muted/50 transition-colors cursor-pointer"
+                  onClick={() => handleViewUser(user)}
+                >
+                  <div className="flex items-center gap-3 mb-3">
+                    <UserAvatar user={user} />
+                    <div className="flex-1 min-w-0">
+                      <div className="font-medium truncate">{user.name}</div>
+                      {currentUser?.id === user.id && (
+                        <span className="text-xs text-muted-foreground">(Tú)</span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="mb-3">
+                    {getRoleBadge(user.role?.name || 'Sin rol')}
+                  </div>
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Mail className="w-3 h-3 flex-shrink-0" />
+                    <span className="truncate">{user.email}</span>
+                  </div>
+                  <div className="flex items-center justify-end gap-2 mt-3 pt-3 border-t">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleViewUser(user)
+                      }}
+                      className="flex-1"
+                    >
+                      <Eye className="w-4 h-4 mr-1" />
+                      Ver
+                    </Button>
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="text-destructive hover:text-destructive"
+                          disabled={currentUser?.id === user.id || deletingUserId === user.id}
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          {deletingUserId === user.id ? (
+                            <svg className="animate-spin w-4 h-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+                            </svg>
+                          ) : (
+                            <Trash2 className="w-4 h-4" />
+                          )}
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>¿Eliminar Usuario?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            Esta acción no se puede deshacer. Se eliminará permanentemente el usuario "{user.name}" del sistema.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                          <AlertDialogAction
+                            onClick={() => handleDeleteUser(user.id)}
+                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                          >
+                            Eliminar
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+          
+          {/* Paginación */}
+          {usersData && usersData.totalPages > 1 && (
+            <Pagination
+              currentPage={usersData.page}
+              totalPages={usersData.totalPages}
+              onPageChange={setCurrentPage}
+              hasNextPage={usersData.nextPage !== null}
+              hasPrevPage={usersData.prevPage !== null}
+              loading={usersLoading}
+            />
           )}
         </CardContent>
       </Card>
@@ -749,6 +934,50 @@ const UserManagement = () => {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Modal Ver Usuario */}
+      <UserDetailDialog
+        user={selectedUser}
+        open={isViewOpen}
+        onOpenChange={(open) => {
+          setIsViewOpen(open)
+          if (!open) {
+            setSelectedUser(null)
+          }
+        }}
+        onUpdate={async () => {
+          // Refrescar la lista de usuarios automáticamente
+          try {
+            const result = await refetchUsers()
+            // Actualizar el usuario seleccionado con los datos más recientes
+            if (result.data?.items && selectedUser) {
+              const updatedUser = result.data.items.find((u: User) => u.id === selectedUser.id)
+              if (updatedUser) {
+                setSelectedUser(updatedUser)
+              }
+            }
+            
+            // Si el usuario actualizado es el usuario logueado, actualizar localStorage y contexto
+            if (result.data?.items && currentUser) {
+              const updatedCurrentUser = result.data.items.find((u: User) => u.id === currentUser.id)
+              if (updatedCurrentUser) {
+                // Actualizar localStorage
+                localStorage.setItem('auth:user', JSON.stringify(updatedCurrentUser))
+                // Disparar evento para actualizar el contexto de autenticación
+                window.dispatchEvent(new CustomEvent('auth:userUpdated', { detail: updatedCurrentUser }))
+              }
+            }
+          } catch (error) {
+            console.error('Error al refrescar usuarios:', error)
+          }
+        }}
+      />
+
+      {/* Import Dialog */}
+      <UserImportDialog
+        open={isImportOpen}
+        onOpenChange={setIsImportOpen}
+      />
     </div>
   );
 };

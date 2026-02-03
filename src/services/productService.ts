@@ -90,10 +90,43 @@ export const adaptApiProduct = (p: ApiProduct): Product => {
   };
 };
 
-export const fetchProducts = async (): Promise<Product[]> => {
-  const data = await apiFetch<ApiProduct[]>("/api/products", { method: "GET" });
-  if (!Array.isArray(data)) return [];
-  return data.map(adaptApiProduct);
+export interface ProductsQueryParams {
+  page?: number;
+  pageSize?: number;
+  search?: string;
+  category?: string;
+  includeDeleted?: boolean;
+}
+
+export interface ProductsResponse {
+  items: ApiProduct[];
+  page: number;
+  pageSize: number;
+  totalPages: number;
+  totalItems: number;
+  nextPage: number | null;
+  prevPage: number | null;
+}
+
+export const fetchProducts = async (params?: ProductsQueryParams): Promise<ProductsResponse> => {
+  const search = new URLSearchParams();
+  if (params?.page) search.set("page", String(params.page));
+  if (params?.pageSize) search.set("pageSize", String(params.pageSize));
+  if (params?.search) search.set("search", params.search);
+  if (params?.category && params.category !== 'all') search.set("category", params.category);
+  if (params?.includeDeleted) search.set("includeDeleted", "true");
+
+  const url = `/api/products${search.toString() ? `?${search.toString()}` : ""}`;
+  const data = await apiFetch<ProductsResponse>(url, { method: "GET" });
+  return data;
+};
+
+// Legacy function for backward compatibility (returns all products)
+export const fetchAllProducts = async (): Promise<Product[]> => {
+  // Fetch all products with a large page size to get everything in one request
+  const data = await apiFetch<ProductsResponse>("/api/products?pageSize=10000", { method: "GET" });
+  if (!data || !data.items || !Array.isArray(data.items)) return [];
+  return data.items.map(adaptApiProduct);
 };
 
 export const fetchCriticalProducts = async (): Promise<Product[]> => {
