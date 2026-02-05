@@ -21,13 +21,36 @@ export interface ProductCategory {
   }
 }
 
-// Obtener todas las categorías
-export function useProductCategories(includeDeleted = false) {
-  return useQuery({
-    queryKey: ['productCategories', includeDeleted],
+export interface ProductCategoriesQueryParams {
+  page?: number
+  pageSize?: number
+  includeDeleted?: boolean
+}
+
+export interface ProductCategoriesResponse {
+  items: ProductCategory[]
+  page: number
+  pageSize: number
+  totalPages: number
+  totalItems: number
+  nextPage: number | null
+  prevPage: number | null
+}
+
+// Obtener categorías con paginación
+export function useProductCategories(params?: ProductCategoriesQueryParams) {
+  const { page = 1, pageSize = 10, includeDeleted = false } = params || {}
+  
+  return useQuery<ProductCategoriesResponse>({
+    queryKey: ['productCategories', page, pageSize, includeDeleted],
     queryFn: async () => {
-      const params = includeDeleted ? '?includeDeleted=true' : ''
-      return apiFetch<ProductCategory[]>(`/catalogs/product-categories${params}`)
+      const search = new URLSearchParams()
+      if (page) search.set('page', String(page))
+      if (pageSize) search.set('pageSize', String(pageSize))
+      if (includeDeleted) search.set('includeDeleted', 'true')
+      
+      const url = `/catalogs/product-categories${search.toString() ? `?${search.toString()}` : ''}`
+      return apiFetch<ProductCategoriesResponse>(url)
     },
   })
 }

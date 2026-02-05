@@ -46,7 +46,7 @@ const ReturnsManagement = () => {
   const { data: returnsData, isLoading, refetch } = useReturns({
     status: statusFilter !== 'all' ? statusFilter : undefined,
     page,
-    pageSize: 20
+    pageSize: 10
   })
 
   // Mutations

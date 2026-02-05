@@ -96,7 +96,7 @@ const App = () => (
                 <Route path="/alertas" element={<AlertsManagement />} />
 
                 {/* Scanner */}
-                <Route path="/scanner" element={<ScannerManagement />} />
+                {/*<Route path="/scanner" element={<ScannerManagement />} /> */}
 
                 {/* Promotions (Admin) */}
                 <Route path="/promociones" element={<PromotionsManagement />} />
