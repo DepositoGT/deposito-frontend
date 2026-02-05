@@ -119,14 +119,6 @@ export const appModules: AppModule[] = [
         iconColor: 'text-orange-600'
     },
     {
-        id: 'scanner',
-        label: 'Scanner',
-        path: '/scanner',
-        icon: ScannerIcon,
-        color: 'bg-orange-100',
-        iconColor: 'text-orange-600'
-    },
-    {
         id: 'promotions',
         label: 'Promociones',
         path: '/promociones',
