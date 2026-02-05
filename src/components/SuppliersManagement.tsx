@@ -22,7 +22,6 @@ import {
   Mail,
   MapPin,
   Building,
-  Star,
   Package,
   TrendingUp,
   Eye,
@@ -30,7 +29,9 @@ import {
   Trash2,
   Users,
   Printer,
-  FileUp
+  FileUp,
+  LayoutGrid,
+  List
 } from "lucide-react";
 import {
   Dialog,
@@ -68,24 +69,40 @@ import { useSupplier } from "@/hooks/useSupplier";
 import { useUpdateSupplier } from "@/hooks/useUpdateSupplier";
 import { useDeleteSupplier } from "@/hooks/useDeleteSupplier";
 import { SupplierImportDialog } from "@/components/suppliers/SupplierImportDialog";
+import { Pagination } from "@/components/shared/Pagination";
+import { generateSupplierPDF } from "@/components/suppliers/generateSupplierPDF";
 
 const SuppliersManagement = () => {
   const [searchTerm, setSearchTerm] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize] = useState(10);
+  const [viewMode, setViewMode] = useState<"table" | "cards">("cards");
   const [isNewSupplierOpen, setIsNewSupplierOpen] = useState(false);
   const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(null);
   const [isViewOpen, setIsViewOpen] = useState(false);
   const [isImportOpen, setIsImportOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
-  const printRef = useRef<HTMLDivElement | null>(null);
 
-  const { data: suppliersData, isLoading, isError } = useSuppliers();
-  const suppliers: Supplier[] = suppliersData ?? [];
+  const { data: suppliersData, isLoading, isError } = useSuppliers({
+    page: currentPage,
+    pageSize,
+    search: searchTerm || undefined,
+  });
+  
+  const suppliers: Supplier[] = suppliersData?.items ?? [];
+  const totalItems = suppliersData?.totalItems ?? 0;
+  const totalPages = suppliersData?.totalPages ?? 1;
   const { data: categoriesData } = useCategories();
   const { data: paymentTermsData } = usePaymentTerms();
   const { data: statusesData } = useStatuses();
 
   const categories = useMemo(() => categoriesData ?? [], [categoriesData]);
-  const paymentTerms = useMemo(() => paymentTermsData ?? [], [paymentTermsData]);
+  const paymentTerms = useMemo(() => {
+    if (Array.isArray(paymentTermsData)) {
+      return paymentTermsData;
+    }
+    return paymentTermsData?.items ?? [];
+  }, [paymentTermsData]);
   const statuses = useMemo(() => statusesData ?? [], [statusesData]);
 
   const { toast } = useToast();
@@ -95,16 +112,16 @@ const SuppliersManagement = () => {
   const parsedUser = storedUser ? JSON.parse(storedUser) : null;
   const isAdmin = parsedUser ? (parsedUser.role?.name === 'admin' || String(parsedUser.role_id) === '1') : false;
 
+  // Reset page when search term changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm]);
+
   const stats: SupplierStats = {
-    totalSuppliers: suppliers.length,
+    totalSuppliers: totalItems,
     activeSuppliers: suppliers.filter((s) => String(s.status) === "active").length,
     totalProducts: suppliers.reduce((sum, s) => sum + ((s.productsList?.length ?? s.products) || 0), 0),
-    avgRating: suppliers.length
-      ? (
-        suppliers.reduce((sum, s) => sum + (Number.isFinite(s.rating) ? s.rating : 0), 0) /
-        suppliers.length
-      ).toFixed(1)
-      : "0.0",
+    avgRating: "0.0",
   };
 
   // form state for new supplier
@@ -275,6 +292,11 @@ const SuppliersManagement = () => {
     try {
       await deleteMutateAsync(supplierId);
       toast({ title: "Proveedor eliminado", description: "El proveedor ha sido eliminado correctamente" });
+      
+      // If current page becomes empty after deletion, go to previous page
+      if (suppliers.length === 1 && currentPage > 1) {
+        setCurrentPage(currentPage - 1);
+      }
     } catch (err: unknown) {
       let message = "No se pudo eliminar el proveedor";
       if (err && typeof err === "object" && "message" in err) {
@@ -285,26 +307,12 @@ const SuppliersManagement = () => {
     }
   };
 
-  const getRatingStars = (rating: number) => {
-    return Array.from({ length: 5 }, (_, i) => (
-      <Star
-        key={i}
-        className={`w-4 h-4 ${i < rating ? 'text-liquor-gold fill-liquor-gold' : 'text-muted-foreground'}`}
-      />
-    ));
-  };
 
   const getStatusBadge = (status: string | undefined) => {
     return status === "active"
       ? <Badge className="bg-liquor-gold text-liquor-bronze">Activo</Badge>
       : <Badge variant="secondary">Inactivo</Badge>;
   };
-
-  const filteredSuppliers = suppliers.filter(supplier =>
-    supplier.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    supplier.contact.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    String(supplier.category).toLowerCase().includes(searchTerm.toLowerCase())
-  );
 
   return (
     <div className="p-6 space-y-6 animate-fade-in">
@@ -433,7 +441,7 @@ const SuppliersManagement = () => {
       </div>
 
       {/* Estadísticas */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <Card className="animate-slide-up">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
@@ -469,31 +477,41 @@ const SuppliersManagement = () => {
             </div>
           </CardContent>
         </Card>
-
-        <Card className="animate-slide-up" style={{ animationDelay: "300ms" }}>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Calificación Promedio</p>
-                <p className="text-2xl font-bold text-foreground">{stats.avgRating}</p>
-              </div>
-              <Star className="w-8 h-8 text-liquor-gold" />
-            </div>
-          </CardContent>
-        </Card>
       </div>
 
       {/* Filtros */}
       <Card>
         <CardContent className="p-4">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input
-              placeholder="Buscar por nombre, contacto o categoría..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10"
-            />
+          <div className="flex items-center gap-4">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                placeholder="Buscar por nombre, contacto o categoría..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                variant={viewMode === "table" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setViewMode("table")}
+                className="h-9"
+              >
+                <List className="w-4 h-4 mr-2" />
+                Tabla
+              </Button>
+              <Button
+                variant={viewMode === "cards" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setViewMode("cards")}
+                className="h-9"
+              >
+                <LayoutGrid className="w-4 h-4 mr-2" />
+                Cards
+              </Button>
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -506,97 +524,193 @@ const SuppliersManagement = () => {
         <div className="p-6 text-destructive">Error al cargar proveedores.</div>
       )}
       {!isLoading && !isError && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {filteredSuppliers.length === 0 ? (
-            <Card className="col-span-full">
+        <>
+          {suppliers.length === 0 ? (
+            <Card>
               <CardContent className="p-6 text-center text-muted-foreground">
                 No hay proveedores para mostrar.
               </CardContent>
             </Card>
+          ) : viewMode === "table" ? (
+            <Card>
+              <CardContent className="p-0">
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b">
+                        <th className="text-left p-4 font-medium">Proveedor</th>
+                        <th className="text-left p-4 font-medium">Categoría</th>
+                        <th className="text-left p-4 font-medium">Contacto</th>
+                        <th className="text-left p-4 font-medium">Teléfono</th>
+                        <th className="text-left p-4 font-medium">Email</th>
+                        <th className="text-left p-4 font-medium">Dirección</th>
+                        <th className="text-left p-4 font-medium">Estado</th>
+                        <th className="text-right p-4 font-medium">Acciones</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {suppliers.map((supplier) => (
+                        <tr key={supplier.id} className="border-b hover:bg-muted/50 transition-colors">
+                          <td className="p-4">
+                            <div className="font-medium">{supplier.name}</div>
+                          </td>
+                          <td className="p-4">
+                            <span className="text-sm text-muted-foreground">{String(supplier.category)}</span>
+                          </td>
+                          <td className="p-4">
+                            <div className="flex items-center gap-2 text-sm">
+                              <Users className="w-4 h-4 text-muted-foreground" />
+                              <span>{supplier.contact}</span>
+                            </div>
+                          </td>
+                          <td className="p-4">
+                            <div className="flex items-center gap-2 text-sm">
+                              <Phone className="w-4 h-4 text-muted-foreground" />
+                              <span>{supplier.phone}</span>
+                            </div>
+                          </td>
+                          <td className="p-4">
+                            <div className="flex items-center gap-2 text-sm">
+                              <Mail className="w-4 h-4 text-muted-foreground" />
+                              <span className="truncate max-w-[200px]">{supplier.email}</span>
+                            </div>
+                          </td>
+                          <td className="p-4">
+                            <div className="flex items-center gap-2 text-sm">
+                              <MapPin className="w-4 h-4 text-muted-foreground" />
+                              <span className="truncate max-w-[200px]">{supplier.address}</span>
+                            </div>
+                          </td>
+                          <td className="p-4">
+                            {getStatusBadge(String(supplier.status))}
+                          </td>
+                          <td className="p-4">
+                            <div className="flex items-center justify-end gap-2">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => viewSupplier(supplier)}
+                              >
+                                <Eye className="w-4 h-4 mr-1" />
+                                Ver
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => editSupplier(supplier)}
+                              >
+                                <Edit className="w-4 h-4 mr-1" />
+                                Editar
+                              </Button>
+                              <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                  <Button variant="outline" size="sm" className="text-destructive hover:text-destructive">
+                                    <Trash2 className="w-4 h-4 mr-1" />
+                                    Eliminar
+                                  </Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                  <AlertDialogHeader>
+                                    <AlertDialogTitle>¿Eliminar Proveedor?</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                      Esta acción no se puede deshacer. Se eliminará permanentemente el proveedor "{supplier.name}" y toda su información asociada.
+                                    </AlertDialogDescription>
+                                  </AlertDialogHeader>
+                                  <AlertDialogFooter>
+                                    <AlertDialogCancel disabled={deleteIsLoading}>Cancelar</AlertDialogCancel>
+                                    <AlertDialogAction
+                                      onClick={() => deleteSupplier(supplier.id)}
+                                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                      disabled={deleteIsLoading}
+                                    >
+                                      {deleteIsLoading ? (
+                                        <>
+                                          <svg className="animate-spin w-4 h-4 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+                                          </svg>
+                                          Eliminando...
+                                        </>
+                                      ) : (
+                                        "Eliminar"
+                                      )}
+                                    </AlertDialogAction>
+                                  </AlertDialogFooter>
+                                </AlertDialogContent>
+                              </AlertDialog>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </CardContent>
+            </Card>
           ) : (
-            filteredSuppliers.map((supplier, index) => (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              {suppliers.map((supplier, index) => (
               <Card
                 key={supplier.id}
                 className="animate-bounce-in hover:shadow-card transition-all duration-300"
                 style={{ animationDelay: `${index * 100}ms` }}
               >
-                <CardHeader className="pb-3">
+                <CardHeader className="pb-2">
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
-                      <CardTitle className="text-lg text-foreground">{supplier.name}</CardTitle>
-                      <p className="text-sm text-muted-foreground">{String(supplier.category)}</p>
+                      <CardTitle className="text-base text-foreground">{supplier.name}</CardTitle>
+                      <p className="text-xs text-muted-foreground mt-1">{String(supplier.category)}</p>
                     </div>
                     <div className="flex items-center space-x-2">
                       {getStatusBadge(String(supplier.status))}
                     </div>
                   </div>
                 </CardHeader>
-                <CardContent className="space-y-4">
+                <CardContent className="space-y-2 pt-2">
                   {/* Información de contacto */}
-                  <div className="space-y-2">
-                    <div className="flex items-center text-sm">
-                      <Users className="w-4 h-4 text-muted-foreground mr-2" />
-                      <span className="text-foreground">{supplier.contact}</span>
+                  <div className="space-y-1.5">
+                    <div className="flex items-center text-xs">
+                      <Users className="w-3.5 h-3.5 text-muted-foreground mr-2 flex-shrink-0" />
+                      <span className="text-foreground truncate">{supplier.contact}</span>
                     </div>
-                    <div className="flex items-center text-sm">
-                      <Phone className="w-4 h-4 text-muted-foreground mr-2" />
-                      <span className="text-foreground">{supplier.phone}</span>
+                    <div className="flex items-center text-xs">
+                      <Phone className="w-3.5 h-3.5 text-muted-foreground mr-2 flex-shrink-0" />
+                      <span className="text-foreground truncate">{supplier.phone}</span>
                     </div>
-                    <div className="flex items-center text-sm">
-                      <Mail className="w-4 h-4 text-muted-foreground mr-2" />
-                      <span className="text-foreground">{supplier.email}</span>
+                    <div className="flex items-center text-xs">
+                      <Mail className="w-3.5 h-3.5 text-muted-foreground mr-2 flex-shrink-0" />
+                      <span className="text-foreground truncate">{supplier.email}</span>
                     </div>
-                    <div className="flex items-center text-sm">
-                      <MapPin className="w-4 h-4 text-muted-foreground mr-2" />
-                      <span className="text-foreground">{supplier.address}</span>
-                    </div>
-                  </div>
-
-                  {/* Métricas */}
-                  <div className="grid grid-cols-2 gap-4 pt-2 border-t border-border">
-                    <div className="text-center">
-                      <p className="text-lg font-bold text-foreground">{supplier.productsList?.length ?? supplier.products}</p>
-                      <p className="text-xs text-muted-foreground">Productos</p>
-                    </div>
-                    <div className="text-center">
-                      <p className="text-lg font-bold text-foreground">Q {supplier.totalPurchases.toLocaleString()}</p>
-                      <p className="text-xs text-muted-foreground">Total Compras</p>
-                    </div>
-                  </div>
-
-                  {/* Calificación y términos */}
-                  <div className="flex items-center justify-between pt-2">
-                    <div className="flex items-center space-x-1">
-                      {getRatingStars(supplier.rating)}
-                    </div>
-                    <div className="text-right">
-                      <p className="text-sm text-foreground">Pago: {supplier.paymentTerms}</p>
-                      <p className="text-xs text-muted-foreground">Último pedido: {supplier.lastOrder}</p>
+                    <div className="flex items-center text-xs">
+                      <MapPin className="w-3.5 h-3.5 text-muted-foreground mr-2 flex-shrink-0" />
+                      <span className="text-foreground truncate">{supplier.address}</span>
                     </div>
                   </div>
 
                   {/* Acciones */}
-                  <div className="flex justify-end space-x-2 pt-2">
+                  <div className="flex justify-end space-x-2 pt-3 border-t border-border">
                     <Button
                       variant="outline"
                       size="sm"
                       onClick={() => viewSupplier(supplier)}
+                      className="h-7 text-xs"
                     >
-                      <Eye className="w-4 h-4 mr-1" />
+                      <Eye className="w-3 h-3 mr-1" />
                       Ver
                     </Button>
                     <Button
                       variant="outline"
                       size="sm"
                       onClick={() => editSupplier(supplier)}
+                      className="h-7 text-xs"
                     >
-                      <Edit className="w-4 h-4 mr-1" />
+                      <Edit className="w-3 h-3 mr-1" />
                       Editar
                     </Button>
                     <AlertDialog>
                       <AlertDialogTrigger asChild>
-                        <Button variant="outline" size="sm" className="text-destructive hover:text-destructive">
-                          <Trash2 className="w-4 h-4 mr-1" />
+                        <Button variant="outline" size="sm" className="text-destructive hover:text-destructive h-7 text-xs">
+                          <Trash2 className="w-3 h-3 mr-1" />
                           Eliminar
                         </Button>
                       </AlertDialogTrigger>
@@ -632,39 +746,33 @@ const SuppliersManagement = () => {
                   </div>
                 </CardContent>
               </Card>
-            ))
+              ))}
+            </div>
           )}
-        </div>
+          {totalPages > 0 && (
+            <Pagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              onPageChange={(page) => setCurrentPage(page)}
+              hasNextPage={suppliersData?.nextPage !== null}
+              hasPrevPage={suppliersData?.prevPage !== null}
+              loading={isLoading}
+            />
+          )}
+        </>
       )}
 
       {/* Modal Ver Proveedor */}
       <Dialog open={isViewOpen} onOpenChange={setIsViewOpen}>
-        <DialogContent className="max-w-3xl">
-          <DialogHeader>
-            <div className="flex items-center justify-between w-full">
-              <DialogTitle>Información del Proveedor</DialogTitle>
-              <div>
-                <Button variant="ghost" size="sm" onClick={() => {
-                  // print only the modal content referenced by printRef
-                  if (!printRef.current) return;
-                  const content = printRef.current.innerHTML;
-                  const w = window.open('', '_blank', 'width=800,height=600');
-                  if (!w) return;
-                  w.document.write(`<!doctype html><html><head><title>Imprimir Proveedor</title><style>body{font-family:Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial;} .text-foreground{color:#0f172a} .text-muted-foreground{color:#64748b}</style></head><body>${content}</body></html>`);
-                  w.document.close();
-                  w.focus();
-                  setTimeout(() => { w.print(); w.close(); }, 300);
-                }}>
-                  <Printer className="w-4 h-4" />
-                </Button>
-              </div>
-            </div>
+        <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col p-0">
+          <DialogHeader className="px-6 pt-6 pb-4 flex-shrink-0">
+            <DialogTitle>Información del Proveedor</DialogTitle>
           </DialogHeader>
-          <div ref={printRef}>
+          <div className="flex-1 overflow-y-auto px-6">
             {selectedSupplier && (
-              <div className="space-y-6">
+              <div className="space-y-6 pb-4">
                 {/* Información básica */}
-                <div className="grid grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-4">
                     <div>
                       <Label className="text-muted-foreground">Nombre de la Empresa</Label>
@@ -695,13 +803,6 @@ const SuppliersManagement = () => {
                     <div>
                       <Label className="text-muted-foreground">Términos de Pago</Label>
                       <p className="text-foreground font-medium">{selectedSupplier.paymentTerms}</p>
-                    </div>
-                    <div>
-                      <Label className="text-muted-foreground">Calificación</Label>
-                      <div className="flex items-center space-x-1 mt-1">
-                        {getRatingStars(selectedSupplier.rating)}
-                        <span className="text-muted-foreground ml-2">({selectedSupplier.rating}/5)</span>
-                      </div>
                     </div>
                   </div>
                 </div>
@@ -739,7 +840,7 @@ const SuppliersManagement = () => {
                 </div>
 
                 {/* Métricas */}
-                <div className="grid grid-cols-3 gap-4 pt-4 border-t border-border">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-4 border-t border-border">
                   <div className="text-center">
                     <p className="text-2xl font-bold text-foreground">{selectedSupplier.productsList?.length ?? selectedSupplier.products}</p>
                     <p className="text-sm text-muted-foreground">Productos</p>
@@ -756,6 +857,24 @@ const SuppliersManagement = () => {
               </div>
             )}
           </div>
+          {selectedSupplier && (
+            <div className="flex justify-end gap-2 px-6 pt-4 pb-6 border-t border-border flex-shrink-0">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  generateSupplierPDF(selectedSupplier);
+                  toast({
+                    title: "PDF Generado",
+                    description: `Reporte del proveedor "${selectedSupplier.name}" descargado correctamente`,
+                  });
+                }}
+                className="border-liquor-amber text-liquor-amber hover:bg-liquor-amber/10"
+              >
+                <Printer className="w-4 h-4 mr-2" />
+                Descargar PDF
+              </Button>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
 
