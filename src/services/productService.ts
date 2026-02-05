@@ -87,6 +87,8 @@ export const adaptApiProduct = (p: ApiProduct): Product => {
     barcode: p.barcode || "",
     description: (p.description ?? "") as string,
     status,
+    deleted: p.deleted === true || p.deleted === 1 || (p as { deleted?: boolean }).deleted === true,
+    deleted_at: (p as { deleted_at?: string | null }).deleted_at || null,
   };
 };
 

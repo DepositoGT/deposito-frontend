@@ -10,14 +10,23 @@
 
 // filepath: /home/DiegoPatzan/Documents/CODE/deposito/guate-liquor-vault-13/src/hooks/useSuppliers.ts
 import { useQuery } from "@tanstack/react-query";
-import { fetchSuppliers } from "@/services/supplierService";
+import { fetchSuppliers, fetchAllSuppliers, type SuppliersQueryParams, type SuppliersResponse } from "@/services/supplierService";
 
 export const SUPPLIERS_QUERY_KEY = ["suppliers"] as const;
 
-export const useSuppliers = () => {
+export const useSuppliers = (params?: SuppliersQueryParams) => {
+  return useQuery<SuppliersResponse>({
+    queryKey: [...SUPPLIERS_QUERY_KEY, params],
+    queryFn: () => fetchSuppliers(params),
+    staleTime: 60 * 1000,
+  });
+};
+
+// Hook para obtener todos los proveedores (sin paginación)
+export const useAllSuppliers = () => {
   return useQuery({
-    queryKey: SUPPLIERS_QUERY_KEY,
-    queryFn: fetchSuppliers,
+    queryKey: [...SUPPLIERS_QUERY_KEY, "all"],
+    queryFn: fetchAllSuppliers,
     staleTime: 60 * 1000,
   });
 };

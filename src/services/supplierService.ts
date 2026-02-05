@@ -112,10 +112,56 @@ export const adaptApiSupplier = (s: ApiSupplier): Supplier => {
   };
 };
 
-export const fetchSuppliers = async (): Promise<Supplier[]> => {
-  const data = await apiFetch<ApiSupplier[]>("/api/suppliers", { method: "GET" });
-  if (!Array.isArray(data)) return [];
-  return data.map(adaptApiSupplier);
+export interface SuppliersQueryParams {
+  page?: number;
+  pageSize?: number;
+  search?: string;
+  category_id?: number | string;
+}
+
+export interface SuppliersResponse {
+  items: Supplier[];
+  page: number;
+  pageSize: number;
+  totalPages: number;
+  totalItems: number;
+  nextPage: number | null;
+  prevPage: number | null;
+}
+
+export const fetchSuppliers = async (params?: SuppliersQueryParams): Promise<SuppliersResponse> => {
+  const queryParams = new URLSearchParams();
+  if (params?.page) queryParams.append("page", String(params.page));
+  if (params?.pageSize) queryParams.append("pageSize", String(params.pageSize));
+  if (params?.search) queryParams.append("search", params.search);
+  if (params?.category_id) queryParams.append("category_id", String(params.category_id));
+  
+  const url = `/api/suppliers${queryParams.toString() ? `?${queryParams.toString()}` : ""}`;
+  const data = await apiFetch<{
+    items: ApiSupplier[];
+    page: number;
+    pageSize: number;
+    totalPages: number;
+    totalItems: number;
+    nextPage: number | null;
+    prevPage: number | null;
+  }>(url, { method: "GET" });
+  
+  return {
+    items: Array.isArray(data.items) ? data.items.map(adaptApiSupplier) : [],
+    page: data.page ?? 1,
+    pageSize: data.pageSize ?? 20,
+    totalPages: data.totalPages ?? 1,
+    totalItems: data.totalItems ?? 0,
+    nextPage: data.nextPage ?? null,
+    prevPage: data.prevPage ?? null,
+  };
+};
+
+// Helper function to fetch all suppliers (for components that need the full list)
+export const fetchAllSuppliers = async (): Promise<Supplier[]> => {
+  const response = await fetchSuppliers({ page: 1, pageSize: 1000 });
+  return response.items;
 };
 
 export interface CreateSupplierPayload {

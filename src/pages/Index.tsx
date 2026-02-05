@@ -10,7 +10,6 @@
 
 import { useState } from "react";
 import Header from "@/components/Header";
-import Sidebar from "@/components/Sidebar";
 import Dashboard from "@/components/Dashboard";
 import ProductManagement from "@/components/ProductManagement";
 import Analytics from "@/components/Analytics";
@@ -62,8 +61,6 @@ const Index = () => {
         return isSeller ? <SalesManagement /> : <ReportsManagement />;
       case "alerts":
         return isSeller ? <SalesManagement /> : <AlertsManagement />;
-      case "scanner":
-        return isSeller ? <SalesManagement /> : <ScannerManagement />;
       case "catalogs":
         return isSeller ? <SalesManagement /> : <CatalogsManagement />;
       case "returns":
@@ -82,12 +79,9 @@ const Index = () => {
   return (
     <div className="min-h-screen bg-background flex flex-col">
       <Header />
-      <div className="flex flex-1 min-h-0">
-        <Sidebar activeSection={activeSection} onSectionChange={setActiveSection} />
-        <main className="flex-1 overflow-auto min-h-0">
-          {renderContent()}
-        </main>
-      </div>
+      <main className="flex-1 overflow-auto min-h-0">
+        {renderContent()}
+      </main>
     </div>
   );
 };
