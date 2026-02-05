@@ -25,18 +25,6 @@ export interface DashboardProps {
   onSectionChange?: (section: string) => void;
 }
 
-export interface SidebarProps {
-  activeSection?: string;
-  onSectionChange?: (section: string) => void;
-}
-
-// Tipos para elementos de menú
-export interface MenuItem {
-  id: string;
-  label: string;
-  icon: IconComponent; // Lucide icon component
-  adminOnly?: boolean; // Opción visible solo para administradores
-}
 
 // Tipos para reportes
 export interface Report {

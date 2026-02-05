@@ -73,7 +73,7 @@ const ReturnsManagementRefactored = () => {
   const { data: returnsData, isLoading, refetch } = useReturns({
     status: filters.status !== 'all' ? filters.status : undefined,
     page: filters.page,
-    pageSize: 20
+    pageSize: 10
   })
 
   const updateStatusMutation = useUpdateReturnStatus()

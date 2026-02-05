@@ -8,7 +8,7 @@
  * For licensing inquiries: GitHub @dpatzan2
  */
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs'
 import { Button } from './ui/button'
@@ -48,10 +48,12 @@ import {
   useRestoreProductCategory,
   ProductCategory,
 } from '../hooks/useProductCategories'
-import { useDeletedProducts, useRestoreProduct } from '../hooks/useProducts'
+import { useProducts, useRestoreProduct } from '../hooks/useProducts'
+import { adaptApiProduct } from '../services/productService'
 import type { Product } from '../types'
 import { Pencil, Trash2, Plus, RotateCcw, Loader2, FileUp } from 'lucide-react'
 import { CatalogImportDialog } from './catalogs/CatalogImportDialog'
+import { Pagination } from './shared/Pagination'
 
 // Tipos para los diálogos
 type PaymentTermDialogState = {
@@ -172,9 +174,25 @@ function PaymentTermsTab({
   onImportClick: () => void
 }) {
   const { toast } = useToast()
-  const { data: paymentTerms, isLoading } = usePaymentTerms(showDeleted)
+  const [currentPage, setCurrentPage] = useState(1)
+  const [pageSize] = useState(10)
+  
+  const { data: paymentTermsData, isLoading } = usePaymentTerms({
+    page: currentPage,
+    pageSize,
+    includeDeleted: showDeleted,
+  })
+  const paymentTerms = paymentTermsData?.items || []
+  
+  // Debug: verificar datos de paginación
+  console.log('PaymentTermsData:', paymentTermsData)
   const deleteMutation = useDeletePaymentTerm()
   const restoreMutation = useRestorePaymentTerm()
+  
+  // Reset page when showDeleted changes
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [showDeleted])
 
   const handleDelete = async (id: number) => {
     if (!confirm('¿Estás seguro de eliminar este término de pago?')) return
@@ -330,6 +348,18 @@ function PaymentTermsTab({
             </TableBody>
           </Table>
         )}
+        {paymentTermsData && paymentTermsData.totalPages > 0 && paymentTermsData.totalItems > 0 && (
+          <div className="mt-4">
+            <Pagination
+              currentPage={paymentTermsData.page}
+              totalPages={paymentTermsData.totalPages}
+              onPageChange={setCurrentPage}
+              hasNextPage={paymentTermsData.nextPage !== null}
+              hasPrevPage={paymentTermsData.prevPage !== null}
+              loading={isLoading}
+            />
+          </div>
+        )}
       </CardContent>
     </Card>
   )
@@ -350,9 +380,25 @@ function ProductCategoriesTab({
   onImportClick: () => void
 }) {
   const { toast } = useToast()
-  const { data: categories, isLoading } = useProductCategories(showDeleted)
+  const [currentPage, setCurrentPage] = useState(1)
+  const [pageSize] = useState(10)
+  
+  const { data: categoriesData, isLoading } = useProductCategories({
+    page: currentPage,
+    pageSize,
+    includeDeleted: showDeleted,
+  })
+  const categories = categoriesData?.items || []
+  
+  // Debug: verificar datos de paginación
+  console.log('CategoriesData:', categoriesData)
   const deleteMutation = useDeleteProductCategory()
   const restoreMutation = useRestoreProductCategory()
+  
+  // Reset page when showDeleted changes
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [showDeleted])
 
   const handleDelete = async (id: number) => {
     if (!confirm('¿Estás seguro de eliminar esta categoría?')) return
@@ -509,6 +555,18 @@ function ProductCategoriesTab({
               )}
             </TableBody>
           </Table>
+        )}
+        {categoriesData && categoriesData.totalPages > 0 && categoriesData.totalItems > 0 && (
+          <div className="mt-4">
+            <Pagination
+              currentPage={categoriesData.page}
+              totalPages={categoriesData.totalPages}
+              onPageChange={setCurrentPage}
+              hasNextPage={categoriesData.nextPage !== null}
+              hasPrevPage={categoriesData.prevPage !== null}
+              loading={isLoading}
+            />
+          </div>
         )}
       </CardContent>
     </Card>
@@ -747,8 +805,35 @@ function ProductCategoryDialog({
 
 function DeletedProductsTab() {
   const { toast } = useToast()
-  const { data: products = [], isLoading, error } = useDeletedProducts()
+  const [currentPage, setCurrentPage] = useState(1)
+  const [pageSize] = useState(20)
+  
+  // Fetch all products with includeDeleted=true, then filter deleted ones
+  // Use a large pageSize to get all deleted products, then paginate client-side
+  const { data: allProductsData, isLoading: isLoadingAll, error } = useProducts({
+    page: 1,
+    pageSize: 1000,
+    includeDeleted: true,
+  })
+  
+  // Filter only deleted products and paginate client-side
+  const allDeletedProducts = (allProductsData?.items || [])
+    .map(adaptApiProduct)
+    .filter((p) => p.deleted === true)
+  
+  const totalPages = Math.max(1, Math.ceil(allDeletedProducts.length / pageSize))
+  const startIndex = (currentPage - 1) * pageSize
+  const endIndex = startIndex + pageSize
+  const products = allDeletedProducts.slice(startIndex, endIndex)
+  
   const restoreMutation = useRestoreProduct()
+  
+  // Reset to page 1 if current page is out of bounds
+  useEffect(() => {
+    if (currentPage > totalPages && totalPages > 0) {
+      setCurrentPage(1)
+    }
+  }, [currentPage, totalPages])
 
   const handleRestore = async (product: Product) => {
     if (!confirm(`¿Restaurar el producto "${product.name}"?`)) return
@@ -788,7 +873,7 @@ function DeletedProductsTab() {
         </CardDescription>
       </CardHeader>
       <CardContent>
-        {isLoading ? (
+        {isLoadingAll ? (
           <div className="flex justify-center py-8">
             <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
           </div>
@@ -851,6 +936,16 @@ function DeletedProductsTab() {
               </TableBody>
             </Table>
           </div>
+        )}
+        {totalPages > 1 && (
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            onPageChange={setCurrentPage}
+            hasNextPage={currentPage < totalPages}
+            hasPrevPage={currentPage > 1}
+            loading={isLoadingAll}
+          />
         )}
       </CardContent>
     </Card>
