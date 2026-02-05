@@ -22,7 +22,6 @@ import {
   Filter,
   CheckCircle,
   XCircle,
-  Eye,
   Settings,
   Zap
 } from "lucide-react";
@@ -36,6 +35,7 @@ import {
 import { Alert, AlertStats, AlertType, AlertPriority, Status } from "@/types";
 import { apiFetch, reassignAlert, resolveAlert } from "@/services/api";
 import { useToast } from "@/hooks/use-toast";
+import { getUsers } from "@/services/userService";
 
 const AlertsManagement = () => {
   const [searchTerm, setSearchTerm] = useState("");
@@ -69,7 +69,7 @@ const AlertsManagement = () => {
           return 'active';
         };
 
-        const adapted: Alert[] = (data || []).map((raw) => {
+        const adapted: (Alert & { assignedToId?: string })[] = (data || []).map((raw) => {
           const a = raw as {
             id?: string | number
             type?: { name?: string } | null
@@ -81,7 +81,7 @@ const AlertsManagement = () => {
             min_stock?: number
             timestamp?: string
             status?: { name?: string } | null
-            assignedTo?: { name?: string } | null
+            assignedTo?: { id?: string | number; name?: string } | null
           }
           return {
             id: String(a.id ?? ''),
@@ -96,13 +96,17 @@ const AlertsManagement = () => {
             timestamp: a.timestamp || '',
             status: mapStatus(a.status?.name),
             assignedTo: a.assignedTo?.name || '',
+            assignedToId: a.assignedTo?.id ? String(a.assignedTo.id) : undefined,
           }
   });
         setAlerts(adapted);
       } catch (e) { /* noop */ }
       try {
-        const list = await apiFetch("/api/auth/users", { method: "GET" }) as Array<Record<string, unknown>>;
-        const adaptedUsers = (list || []).map((u) => ({ id: String((u as { id?: string | number }).id ?? ''), name: String((u as { name?: string }).name ?? '') }));
+        const usersResponse = await getUsers({ page: 1, pageSize: 1000 });
+        const adaptedUsers = (usersResponse.items || []).map((u) => ({ 
+          id: String(u.id), 
+          name: u.name 
+        }));
         setUsers(adaptedUsers);
       } catch (e) { /* noop */ }
     })();
@@ -355,14 +359,21 @@ const AlertsManagement = () => {
                       <div>
                         <span className="text-muted-foreground">Asignado a:</span>
                         <div className="font-medium text-foreground">
-                          <Select onValueChange={async (val) => {
-                            try {
-                              await reassignAlert(alert.id, val);
-                              setAlerts(prev => prev.map(a => a.id === alert.id ? { ...a, assignedTo: users.find(u => u.id === val)?.name || a.assignedTo } : a));
-                            } catch (e) { /* noop */ }
-                          }}>
+                          <Select 
+                            value={(alert as Alert & { assignedToId?: string }).assignedToId || ''} 
+                            onValueChange={async (val) => {
+                              try {
+                                await reassignAlert(alert.id, val);
+                                setAlerts(prev => prev.map(a => a.id === alert.id ? { 
+                                  ...a, 
+                                  assignedTo: users.find(u => u.id === val)?.name || a.assignedTo,
+                                  assignedToId: val
+                                } : a));
+                              } catch (e) { /* noop */ }
+                            }}
+                          >
                             <SelectTrigger className="w-56">
-                              <SelectValue placeholder={alert.assignedTo || 'Seleccionar'} />
+                              <SelectValue placeholder="Seleccionar" />
                             </SelectTrigger>
                             <SelectContent>
                               {users.map(u => (
@@ -379,10 +390,6 @@ const AlertsManagement = () => {
                         {alert.timestamp}
                       </span>
                       <div className="flex space-x-2">
-                        <Button variant="outline" size="sm">
-                          <Eye className="w-3 h-3 mr-1" />
-                          Ver Detalles
-                        </Button>
                         {alert.status === "active" && (
                           <Button 
                             size="sm" 
