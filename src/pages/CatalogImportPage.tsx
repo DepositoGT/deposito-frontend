@@ -274,7 +274,7 @@ export default function CatalogImportPage() {
         if (!workbook || !selectedSheet || !catalogType) return
 
         setStep('importing')
-        setImportProgress(20)
+        setImportProgress(10)
 
         try {
             const sheet = workbook.Sheets[selectedSheet]
@@ -283,19 +283,24 @@ export default function CatalogImportPage() {
                 defval: ''
             })
 
-            setImportProgress(40)
+            const total = data.length || 1
 
-            const mappedData = data.map(row => {
+            const mappedData: Record<string, unknown>[] = []
+            data.forEach((row, index) => {
                 const mapped: Record<string, unknown> = {}
                 columnMappings.forEach(mapping => {
                     if (mapping.systemField) {
                         mapped[mapping.systemField] = row[mapping.excelColumn]
                     }
                 })
-                return mapped
-            })
+                mappedData.push(mapped)
 
-            setImportProgress(60)
+                // 10% -> 60% según filas mapeadas
+                if (index % 10 === 0) {
+                    const progress = 10 + Math.round(((index + 1) / total) * 50)
+                    setImportProgress(progress)
+                }
+            })
 
             const token = localStorage.getItem('auth:token')
             const endpoint = catalogType === 'categories'
@@ -341,6 +346,30 @@ export default function CatalogImportPage() {
         let count = 0
         validationErrors.forEach(ve => { if (ve.fieldErrors[systemField]?.length) count++ })
         return count
+    }
+
+    // Hints de errores posibles por campo (para comentarios)
+    const getFieldHints = (systemField: string | null): string[] => {
+        if (!systemField) return []
+
+        switch (systemField) {
+            case 'name':
+                if (catalogType === 'categories') {
+                    return [
+                        'Requerido. El nombre de la categoría no debe estar vacío.',
+                        'Usa nombres claros y únicos (por ejemplo, "Vinos Tintos", "Cervezas Importadas").',
+                    ]
+                }
+                if (catalogType === 'payment-terms') {
+                    return [
+                        'Requerido. El nombre del término de pago no debe estar vacío.',
+                        'Ejemplos: "Contado", "15 días", "30 días fin de mes".',
+                    ]
+                }
+                return ['Requerido. El nombre no debe estar vacío.']
+            default:
+                return []
+        }
     }
 
     const itemName = catalogType === 'categories' ? 'categorías' : 'términos de pago'
@@ -419,7 +448,12 @@ export default function CatalogImportPage() {
                                     variant="default"
                                     size="sm"
                                     onClick={handleImport}
-                                    disabled={!requiredFieldsMapped || isTesting || (hasTestedOnce && validationErrors.length > 0)}
+                                    disabled={
+                                        !requiredFieldsMapped ||
+                                        isTesting ||
+                                        !hasTestedOnce ||
+                                        validationErrors.length > 0
+                                    }
                                 >
                                     <Upload className="h-4 w-4 mr-2" />
                                     Importar
@@ -577,12 +611,21 @@ export default function CatalogImportPage() {
                                                                 {field?.required && (
                                                                     <span className="text-xs text-muted-foreground">Requerido</span>
                                                                 )}
-                                                                {hasTestedOnce && errorCount > 0 && (
+                                                                {hasTestedOnce && mapping.systemField && errorCount > 0 && (
                                                                     <div className="space-y-1">
                                                                         {getFieldErrors(mapping.systemField).slice(0, 2).map((err, i) => (
                                                                             <p key={i} className="text-xs text-destructive">{err}</p>
                                                                         ))}
                                                                     </div>
+                                                                )}
+
+                                                                {/* Hints estáticos por campo */}
+                                                                {mapping.systemField && getFieldHints(mapping.systemField).length > 0 && (
+                                                                    <ul className="text-xs text-muted-foreground space-y-0.5">
+                                                                        {getFieldHints(mapping.systemField).map((hint, idx) => (
+                                                                            <li key={idx}>• {hint}</li>
+                                                                        ))}
+                                                                    </ul>
                                                                 )}
                                                             </div>
                                                         </TableCell>

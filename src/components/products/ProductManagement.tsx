@@ -87,15 +87,18 @@ const ProductManagement = () => {
     })
     const { data: suppliersData } = useSuppliers()
     const { data: categoriesData } = useCategories()
-    const suppliers = useMemo(() => suppliersData ?? [], [suppliersData])
+    const suppliers = useMemo(() => suppliersData?.items ?? [], [suppliersData])
     const products = useMemo(() => {
         if (!productsData?.items) return []
         return productsData.items.map(adaptApiProduct)
     }, [productsData])
-    const normalizedCategories = useMemo(() =>
-        (categoriesData ?? []).map(c => ({ id: String(c.id), name: String(c.name) })),
-        [categoriesData]
-    )
+    const normalizedCategories = useMemo(() => {
+        // Handle both paginated response and direct array
+        const categories = Array.isArray(categoriesData) 
+            ? categoriesData 
+            : (categoriesData as { items?: Array<{ id: string | number; name: string }> })?.items ?? []
+        return categories.map(c => ({ id: String(c.id), name: String(c.name) }))
+    }, [categoriesData])
 
     // Mutations
     const createProductMutation = useCreateProduct()
