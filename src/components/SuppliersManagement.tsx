@@ -96,7 +96,12 @@ const SuppliersManagement = () => {
   const { data: paymentTermsData } = usePaymentTerms();
   const { data: statusesData } = useStatuses();
 
-  const categories = useMemo(() => categoriesData ?? [], [categoriesData]);
+  const categories = useMemo(() => {
+    if (Array.isArray(categoriesData)) {
+      return categoriesData;
+    }
+    return categoriesData?.items ?? [];
+  }, [categoriesData]);
   const paymentTerms = useMemo(() => {
     if (Array.isArray(paymentTermsData)) {
       return paymentTermsData;

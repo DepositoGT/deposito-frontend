@@ -16,7 +16,12 @@ export interface ApiCategory {
 }
 
 export const fetchCategories = async (): Promise<ApiCategory[]> => {
-  const data = await apiFetch<ApiCategory[]>("/api/catalogs/product-categories", { method: "GET" });
-  if (!Array.isArray(data)) return [];
-  return data;
+  const data = await apiFetch<ApiCategory[] | { items: ApiCategory[] }>("/api/catalogs/product-categories?page=1&pageSize=1000", { method: "GET" });
+  // Handle paginated response
+  if (data && typeof data === 'object' && 'items' in data && Array.isArray(data.items)) {
+    return data.items;
+  }
+  // Handle direct array response (backward compatibility)
+  if (Array.isArray(data)) return data;
+  return [];
 };
