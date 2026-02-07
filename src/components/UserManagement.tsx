@@ -111,7 +111,9 @@ const UserManagement = () => {
   
   // Paginación
   const [currentPage, setCurrentPage] = useState(1);
+
   const [pageSize] = useState(10);
+
 
   // Queries
   const { data: usersData, isLoading: usersLoading, refetch: refetchUsers } = useUsers({
