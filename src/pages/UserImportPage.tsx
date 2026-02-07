@@ -51,7 +51,22 @@ import {
     AlertCircle,
     Loader2,
     RefreshCw,
+    ChevronsUpDown,
+    Check,
 } from 'lucide-react'
+import {
+    Popover,
+    PopoverContent,
+    PopoverTrigger,
+} from '@/components/ui/popover'
+import {
+    Command,
+    CommandEmpty,
+    CommandGroup,
+    CommandInput,
+    CommandItem,
+    CommandList,
+} from '@/components/ui/command'
 import { useToast } from '@/hooks/use-toast'
 import { cn } from '@/lib/utils'
 
@@ -106,6 +121,12 @@ export default function UserImportPage() {
     const [validRowCount, setValidRowCount] = useState(0)
     const [totalRowCount, setTotalRowCount] = useState(0)
 
+    // Catálogos auxiliares
+    const [roles, setRoles] = useState<{ id: number; name: string }[]>([])
+
+    // Overrides de valores inválidos -> valores válidos (por campo)
+    const [valueOverrides, setValueOverrides] = useState<Record<string, Record<string, string>>>({})
+
     // Check for file in sessionStorage on mount
     useEffect(() => {
         const storedFileName = sessionStorage.getItem('import:fileName')
@@ -137,6 +158,26 @@ export default function UserImportPage() {
             navigate('/usuarios')
         }
     }, [navigate])
+
+    // Cargar roles desde la API para sugerencias de equivalencias
+    useEffect(() => {
+        const fetchRoles = async () => {
+            try {
+                const token = localStorage.getItem('auth:token')
+                const response = await fetch(`${getApiBaseUrl()}/auth/roles`, {
+                    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+                })
+                const data = await response.json()
+                if (Array.isArray(data)) {
+                    setRoles(data)
+                }
+            } catch (err) {
+                console.error('Error fetching roles for import suggestions:', err)
+            }
+        }
+
+        fetchRoles()
+    }, [])
 
     // Parse selected sheet
     useEffect(() => {
@@ -235,7 +276,14 @@ export default function UserImportPage() {
                 const mapped: Record<string, unknown> = {}
                 columnMappings.forEach(mapping => {
                     if (mapping.systemField) {
-                        mapped[mapping.systemField] = row[mapping.excelColumn]
+                        let value = row[mapping.excelColumn]
+
+                        const overrides = valueOverrides[mapping.systemField]
+                        if (overrides && typeof value === 'string' && overrides[value]) {
+                            value = overrides[value]
+                        }
+
+                        mapped[mapping.systemField] = value
                     }
                 })
                 return mapped
@@ -256,11 +304,23 @@ export default function UserImportPage() {
                 const processed: ValidationError[] = result.invalidRows.map((row: { rowIndex: number; errors: string[] }) => {
                     const fieldErrors: Record<string, string[]> = {}
                     row.errors.forEach(error => {
-                        if (error.includes('nombre')) fieldErrors.name = [...(fieldErrors.name || []), error]
-                        else if (error.includes('email')) fieldErrors.email = [...(fieldErrors.email || []), error]
-                        else if (error.includes('password') || error.includes('contraseña')) fieldErrors.password = [...(fieldErrors.password || []), error]
-                        else if (error.includes('rol')) fieldErrors.role = [...(fieldErrors.role || []), error]
-                        else fieldErrors._general = [...(fieldErrors._general || []), error]
+                        const lower = error.toLowerCase()
+
+                        if (lower.includes('nombre')) {
+                            fieldErrors.name = [...(fieldErrors.name || []), error]
+                        } else if (lower.includes('email') || lower.includes('correo')) {
+                            fieldErrors.email = [...(fieldErrors.email || []), error]
+                        } else if (lower.includes('password') || lower.includes('contraseña') || lower.includes('contrasena')) {
+                            fieldErrors.password = [...(fieldErrors.password || []), error]
+                        } else if (lower.includes('rol')) {
+                            fieldErrors.role = [...(fieldErrors.role || []), error]
+                        } else if (lower.includes('empleado') || lower.includes('es_empleado')) {
+                            fieldErrors.is_employee = [...(fieldErrors.is_employee || []), error]
+                        } else if (lower.includes('fecha de contratación') || lower.includes('fecha de contratacion') || lower.includes('hire_date') || lower.includes('fecha de contratación inválida')) {
+                            fieldErrors.hire_date = [...(fieldErrors.hire_date || []), error]
+                        } else {
+                            fieldErrors._general = [...(fieldErrors._general || []), error]
+                        }
                     })
                     return { rowIndex: row.rowIndex, errors: row.errors, fieldErrors }
                 })
@@ -287,7 +347,7 @@ export default function UserImportPage() {
         if (!workbook || !selectedSheet) return
 
         setStep('importing')
-        setImportProgress(20)
+        setImportProgress(10)
 
         try {
             const sheet = workbook.Sheets[selectedSheet]
@@ -296,19 +356,31 @@ export default function UserImportPage() {
                 defval: ''
             })
 
-            setImportProgress(40)
+            const total = data.length || 1
 
-            const mappedData = data.map(row => {
+            const mappedData: Record<string, unknown>[] = []
+            data.forEach((row, index) => {
                 const mapped: Record<string, unknown> = {}
                 columnMappings.forEach(mapping => {
                     if (mapping.systemField) {
-                        mapped[mapping.systemField] = row[mapping.excelColumn]
+                        let value = row[mapping.excelColumn]
+
+                        const overrides = valueOverrides[mapping.systemField]
+                        if (overrides && typeof value === 'string' && overrides[value]) {
+                            value = overrides[value]
+                        }
+
+                        mapped[mapping.systemField] = value
                     }
                 })
-                return mapped
-            })
+                mappedData.push(mapped)
 
-            setImportProgress(60)
+                // 10% -> 60% basado en filas ya mapeadas
+                if (index % 10 === 0) {
+                    const progress = 10 + Math.round(((index + 1) / total) * 50)
+                    setImportProgress(progress)
+                }
+            })
 
             const token = localStorage.getItem('auth:token')
             const endpoint = `${getApiBaseUrl()}/auth/users/bulk-import-mapped`
@@ -351,6 +423,86 @@ export default function UserImportPage() {
         let count = 0
         validationErrors.forEach(ve => { if (ve.fieldErrors[systemField]?.length) count++ })
         return count
+    }
+
+    // ¿Tiene errores de tipo "no existe"?
+    const hasNotExistsError = (systemField: string | null): boolean => {
+        if (!systemField) return false
+        const errors = getFieldErrors(systemField)
+        return errors.some(e => e.toLowerCase().includes('no existe') || e.toLowerCase().includes('not exist'))
+    }
+
+    // Extraer valores inválidos desde los mensajes de error (entre comillas "")
+    const getInvalidValues = (systemField: string | null): string[] => {
+        if (!systemField) return []
+        const errors = getFieldErrors(systemField)
+        const values: string[] = []
+        errors.forEach(err => {
+            const match = err.match(/"([^"]+)"/)
+            if (match && match[1] && !values.includes(match[1])) {
+                values.push(match[1])
+            }
+        })
+        return values
+    }
+
+    const setValueOverride = (fieldName: string, originalValue: string, replacement: string) => {
+        setValueOverrides(prev => ({
+            ...prev,
+            [fieldName]: {
+                ...(prev[fieldName] || {}),
+                [originalValue]: replacement,
+            },
+        }))
+    }
+
+    // Hints / posibles errores por campo (para sección Comentarios)
+    const getFieldHints = (systemField: string | null): string[] => {
+        if (!systemField) return []
+
+        switch (systemField) {
+            case 'name':
+                return [
+                    'Requerido. Debe tener al menos 2 caracteres y no exceder 150.',
+                    'Usa el nombre completo del usuario tal como aparecerá en reportes.',
+                ]
+            case 'email':
+                return [
+                    'Requerido y con formato de email válido.',
+                    'No puede repetirse en otros usuarios (ni en el archivo ni en el sistema).',
+                ]
+            case 'password':
+                return [
+                    'Requerido y debe tener al menos 6 caracteres.',
+                    'Evita contraseñas triviales como "123456".',
+                ]
+            case 'role':
+                return [
+                    'Requerido. Debe coincidir exactamente con un rol existente.',
+                    'Si el valor no existe, usa "Asociar manualmente" para mapearlo a un rol real.',
+                ]
+            case 'is_employee':
+                return [
+                    'Opcional. Acepta valores como "Sí/No", "true/false", "1/0".',
+                    'Cualquier otro valor será marcado como error.',
+                ]
+            case 'phone':
+                return [
+                    'Opcional. Máximo 50 caracteres.',
+                    'Incluye código de país si aplica, usando solo dígitos, espacios y símbolos como + o -.',
+                ]
+            case 'address':
+                return [
+                    'Opcional. Útil para datos de contacto del empleado.',
+                ]
+            case 'hire_date':
+                return [
+                    'Opcional. Usa formato YYYY-MM-DD o una fecha válida.',
+                    'La fecha debe estar en un rango razonable (1900-2100).',
+                ]
+            default:
+                return []
+        }
     }
 
     // Render success state
@@ -426,7 +578,12 @@ export default function UserImportPage() {
                                     variant="default"
                                     size="sm"
                                     onClick={handleImport}
-                                    disabled={!requiredFieldsMapped || isTesting || (hasTestedOnce && validationErrors.length > 0)}
+                                    disabled={
+                                        !requiredFieldsMapped ||
+                                        isTesting ||
+                                        !hasTestedOnce ||
+                                        validationErrors.length > 0
+                                    }
                                 >
                                     <Upload className="h-4 w-4 mr-2" />
                                     Importar
@@ -584,12 +741,120 @@ export default function UserImportPage() {
                                                                 {field?.required && (
                                                                     <span className="text-xs text-muted-foreground">Requerido</span>
                                                                 )}
-                                                                {hasTestedOnce && errorCount > 0 && (
+
+                                                                {hasTestedOnce && mapping.systemField && errorCount > 0 && (
+                                                                    <Badge variant="destructive" className="text-xs font-medium">
+                                                                        {errorCount} error(es)
+                                                                    </Badge>
+                                                                )}
+
+                                                                {hasTestedOnce && mapping.systemField && getFieldErrors(mapping.systemField).length > 0 && (
                                                                     <div className="space-y-1">
                                                                         {getFieldErrors(mapping.systemField).slice(0, 2).map((err, i) => (
                                                                             <p key={i} className="text-xs text-destructive">{err}</p>
                                                                         ))}
+                                                                        {getFieldErrors(mapping.systemField).length > 2 && (
+                                                                            <p className="text-xs text-muted-foreground">
+                                                                                + {getFieldErrors(mapping.systemField).length - 2} error(es) más
+                                                                            </p>
+                                                                        )}
                                                                     </div>
+                                                                )}
+
+                                                                {/* Sugerencias de equivalencias para roles que "no existen" */}
+                                                                {hasTestedOnce &&
+                                                                    mapping.systemField === 'role' &&
+                                                                    hasNotExistsError('role') && (
+                                                                        <div className="space-y-2 pt-2 border-t mt-2">
+                                                                            <p className="text-xs font-medium text-orange-700">
+                                                                                Asociar manualmente:
+                                                                            </p>
+                                                                            {getInvalidValues('role').map((invalidValue) => {
+                                                                                const currentValue =
+                                                                                    valueOverrides.role?.[invalidValue] || ''
+
+                                                                                return (
+                                                                                    <div
+                                                                                        key={invalidValue}
+                                                                                        className="flex items-center gap-2"
+                                                                                    >
+                                                                                        <span className="text-xs text-muted-foreground whitespace-nowrap">
+                                                                                            "{invalidValue}" →
+                                                                                        </span>
+                                                                                        <Popover>
+                                                                                            <PopoverTrigger asChild>
+                                                                                                <Button
+                                                                                                    variant="outline"
+                                                                                                    role="combobox"
+                                                                                                    className="h-7 text-xs flex-1 justify-between min-w-[150px]"
+                                                                                                >
+                                                                                                    <span className="truncate">
+                                                                                                        {currentValue ||
+                                                                                                            'Buscar y seleccionar...'}
+                                                                                                    </span>
+                                                                                                    <ChevronsUpDown className="ml-2 h-3 w-3 shrink-0 opacity-50" />
+                                                                                                </Button>
+                                                                                            </PopoverTrigger>
+                                                                                            <PopoverContent
+                                                                                                className="w-[250px] p-0"
+                                                                                                align="start"
+                                                                                            >
+                                                                                                <Command>
+                                                                                                    <CommandInput
+                                                                                                        placeholder="Buscar rol..."
+                                                                                                        className="h-9"
+                                                                                                    />
+                                                                                                    <CommandList>
+                                                                                                        <CommandEmpty>
+                                                                                                            Sin resultados.
+                                                                                                        </CommandEmpty>
+                                                                                                        <CommandGroup>
+                                                                                                            {roles.map((role) => (
+                                                                                                                <CommandItem
+                                                                                                                    key={role.id}
+                                                                                                                    value={role.name}
+                                                                                                                    onSelect={() =>
+                                                                                                                        setValueOverride(
+                                                                                                                            'role',
+                                                                                                                            invalidValue,
+                                                                                                                            role.name,
+                                                                                                                        )
+                                                                                                                    }
+                                                                                                                >
+                                                                                                                    <Check
+                                                                                                                        className={cn(
+                                                                                                                            'mr-2 h-4 w-4',
+                                                                                                                            currentValue ===
+                                                                                                                                role.name
+                                                                                                                                ? 'opacity-100'
+                                                                                                                                : 'opacity-0',
+                                                                                                                        )}
+                                                                                                                    />
+                                                                                                                    {role.name}
+                                                                                                                </CommandItem>
+                                                                                                            ))}
+                                                                                                        </CommandGroup>
+                                                                                                    </CommandList>
+                                                                                                </Command>
+                                                                                            </PopoverContent>
+                                                                                        </Popover>
+                                                                                    </div>
+                                                                                )
+                                                                            })}
+                                                                        </div>
+                                                                    )}
+
+                                                                {/* Hints estáticos por campo */}
+                                                                {mapping.systemField && getFieldHints(mapping.systemField).length > 0 && (
+                                                                    <ul className="text-xs text-muted-foreground space-y-0.5">
+                                                                        {getFieldHints(mapping.systemField).map((hint, idx) => (
+                                                                            <li key={idx}>• {hint}</li>
+                                                                        ))}
+                                                                    </ul>
+                                                                )}
+
+                                                                {hasTestedOnce && mapping.systemField && errorCount === 0 && (
+                                                                    <p className="text-xs text-green-700">Sin errores</p>
                                                                 )}
                                                             </div>
                                                         </TableCell>
