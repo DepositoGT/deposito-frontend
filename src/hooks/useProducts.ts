@@ -38,11 +38,18 @@ export const useAllProducts = () => {
 };
 
 export const useDeletedProducts = () => {
-  return useQuery({
+  return useQuery<Product[], Error>({
     queryKey: ["products", "deleted"],
     queryFn: async () => {
-      const response = await apiFetch<Product[]>("/products?includeDeleted=true");
-      return response.filter((p) => p.deleted === true);
+      // Fetch all deleted products with a large page size
+      const response = await fetchProducts({ 
+        page: 1, 
+        pageSize: 1000, 
+        includeDeleted: true 
+      });
+      // Adapt and filter only deleted products from the response
+      const allProducts = response.items.map(adaptApiProduct);
+      return allProducts.filter((p) => p.deleted === true);
     },
     staleTime: 30 * 1000, // 30 seconds
   });

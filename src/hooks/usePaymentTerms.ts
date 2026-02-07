@@ -22,13 +22,36 @@ export interface PaymentTerm {
 
 export const PAYMENT_TERMS_QUERY_KEY = ["paymentTerms"] as const;
 
-// Obtener todos los términos de pago
-export function usePaymentTerms(includeDeleted = false) {
-  return useQuery({
-    queryKey: [...PAYMENT_TERMS_QUERY_KEY, includeDeleted],
+export interface PaymentTermsQueryParams {
+  page?: number
+  pageSize?: number
+  includeDeleted?: boolean
+}
+
+export interface PaymentTermsResponse {
+  items: PaymentTerm[]
+  page: number
+  pageSize: number
+  totalPages: number
+  totalItems: number
+  nextPage: number | null
+  prevPage: number | null
+}
+
+// Obtener términos de pago con paginación
+export function usePaymentTerms(params?: PaymentTermsQueryParams) {
+  const { page = 1, pageSize = 20, includeDeleted = false } = params || {}
+  
+  return useQuery<PaymentTermsResponse>({
+    queryKey: [...PAYMENT_TERMS_QUERY_KEY, page, pageSize, includeDeleted],
     queryFn: async () => {
-      const params = includeDeleted ? '?includeDeleted=true' : ''
-      return apiFetch<PaymentTerm[]>(`/catalogs/payment-terms${params}`)
+      const search = new URLSearchParams()
+      if (page) search.set('page', String(page))
+      if (pageSize) search.set('pageSize', String(pageSize))
+      if (includeDeleted) search.set('includeDeleted', 'true')
+      
+      const url = `/catalogs/payment-terms${search.toString() ? `?${search.toString()}` : ''}`
+      return apiFetch<PaymentTermsResponse>(url)
     },
     staleTime: 5 * 60 * 1000,
   })
