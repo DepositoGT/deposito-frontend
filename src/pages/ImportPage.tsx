@@ -179,22 +179,24 @@ export default function ImportPage() {
                 const headers = { 'Authorization': `Bearer ${token}` }
 
                 const [catRes, supRes] = await Promise.all([
-                    fetch('/api/catalogs/product-categories', { headers }),
-                    fetch('/api/suppliers', { headers })
+                    fetch('/api/catalogs/product-categories?page=1&pageSize=1000', { headers }),
+                    fetch('/api/suppliers?page=1&pageSize=1000', { headers })
                 ])
 
                 if (catRes.ok) {
                     const catData = await catRes.json()
                     console.log('Categories loaded:', catData)
-                    if (Array.isArray(catData)) {
-                        setCategories(catData.map((c: { id: number; name: string }) => ({ id: c.id, name: c.name })))
+                    const catItems = Array.isArray(catData) ? catData : (catData.items ?? [])
+                    if (Array.isArray(catItems)) {
+                        setCategories(catItems.map((c: { id: number; name: string }) => ({ id: c.id, name: c.name })))
                     }
                 }
                 if (supRes.ok) {
                     const supData = await supRes.json()
                     console.log('Suppliers loaded:', supData)
-                    if (Array.isArray(supData)) {
-                        setSuppliers(supData.map((s: { id: number; name: string }) => ({ id: s.id, name: s.name })))
+                    const supItems = Array.isArray(supData) ? supData : (supData.items ?? [])
+                    if (Array.isArray(supItems)) {
+                        setSuppliers(supItems.map((s: { id: number; name: string }) => ({ id: s.id, name: s.name })))
                     }
                 }
             } catch (err) {
@@ -307,10 +309,11 @@ export default function ImportPage() {
                 defval: ''
             })
 
-            setImportProgress(30)
+            const total = data.length || 1
 
-            // Transform data using mappings and apply value overrides
-            const mappedData = data.map(row => {
+            // Transform data using mappings and apply value overrides, actual progress based on rows
+            const mappedData: Record<string, unknown>[] = []
+            data.forEach((row, index) => {
                 const mapped: Record<string, unknown> = {}
                 columnMappings.forEach(mapping => {
                     if (mapping.systemField) {
@@ -325,11 +328,17 @@ export default function ImportPage() {
                         mapped[mapping.systemField] = value
                     }
                 })
-                return mapped
+                mappedData.push(mapped)
+
+                // 10% -> 60% while mapeamos filas
+                if (index % 10 === 0) {
+                    const progress = 10 + Math.round(((index + 1) / total) * 50)
+                    setImportProgress(progress)
+                }
             })
 
             setStep('importing')
-            setImportProgress(50)
+            setImportProgress(65)
 
             // Send to server for validation and import
             const token = localStorage.getItem('auth:token')
@@ -341,8 +350,6 @@ export default function ImportPage() {
                 },
                 body: JSON.stringify({ products: mappedData })
             })
-
-            setImportProgress(80)
 
             const result = await response.json()
 
@@ -499,6 +506,64 @@ export default function ImportPage() {
         return count
     }
 
+    // Possible error/hint messages per field (shown in comentarios)
+    const getFieldHints = (systemField: string | null): string[] => {
+        if (!systemField) return []
+
+        switch (systemField) {
+            case 'name':
+                return [
+                    'Debe estar lleno en todas las filas.',
+                    'Mínimo 2 caracteres, evita nombres genéricos como "Producto 1".',
+                ]
+            case 'category':
+                return [
+                    'Debe coincidir exactamente con una categoría existente.',
+                    'Usa los valores de la hoja "Catálogos" de la plantilla (acentos y mayúsculas importan).',
+                ]
+            case 'supplier':
+                return [
+                    'Debe coincidir exactamente con un proveedor existente.',
+                    'Si el proveedor no existe, créalo primero o asígnalo manualmente aquí.',
+                ]
+            case 'price':
+                return [
+                    'Requerido y debe ser un número mayor a 0.',
+                    'Usa punto como separador decimal (por ejemplo, 25.50).',
+                ]
+            case 'cost':
+                return [
+                    'Opcional, pero si se indica debe ser un número mayor o igual a 0.',
+                    'Útil para calcular márgenes y reportes de rentabilidad.',
+                ]
+            case 'stock':
+                return [
+                    'Opcional; si se deja vacío se tomará 0.',
+                    'Debe ser un número entero mayor o igual a 0 (sin decimales).',
+                ]
+            case 'min_stock':
+                return [
+                    'Opcional; si se deja vacío se tomará 0.',
+                    'Debe ser un número entero mayor o igual a 0. Se usa para alertas de stock bajo.',
+                ]
+            case 'brand':
+                return [
+                    'Opcional. Ideal para agrupar productos por marca en reportes y filtros.',
+                ]
+            case 'barcode':
+                return [
+                    'Opcional, pero si existe debe ser único en todo el sistema.',
+                    'No debe repetirse ni en el archivo ni en productos ya cargados.',
+                ]
+            case 'description':
+                return [
+                    'Opcional. Úsala para detalles adicionales que ayuden en la búsqueda.',
+                ]
+            default:
+                return []
+        }
+    }
+
     // Check if field has "not exists" error (category/supplier not found)
     const hasNotExistsError = (systemField: string | null): boolean => {
         if (!systemField) return false
@@ -557,7 +622,12 @@ export default function ImportPage() {
                                         variant="default"
                                         size="sm"
                                         onClick={handleImport}
-                                        disabled={!requiredFieldsMapped || isTesting}
+                                        disabled={
+                                            !requiredFieldsMapped ||
+                                            isTesting ||
+                                            !hasTestedOnce ||
+                                            validationErrors.length > 0
+                                        }
                                     >
                                         Importar
                                     </Button>
@@ -821,6 +891,15 @@ export default function ImportPage() {
                                                                         <p className="text-xs text-muted-foreground">
                                                                             Para múltiples valores, sepárelos con coma.
                                                                         </p>
+                                                                    )}
+
+                                                                    {/* Static hints about common errors per field */}
+                                                                    {mapping.systemField && getFieldHints(mapping.systemField).length > 0 && (
+                                                                        <ul className="text-xs text-muted-foreground space-y-0.5">
+                                                                            {getFieldHints(mapping.systemField).map((hint, idx) => (
+                                                                                <li key={idx}>• {hint}</li>
+                                                                            ))}
+                                                                        </ul>
                                                                     )}
 
                                                                     {/* Required badge */}
