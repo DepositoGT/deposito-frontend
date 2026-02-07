@@ -167,20 +167,22 @@ export default function SupplierImportPage() {
                 const headers = { 'Authorization': `Bearer ${token}` }
 
                 const [catRes, ptRes] = await Promise.all([
-                    fetch('/api/catalogs/product-categories', { headers }),
-                    fetch('/api/catalogs/payment-terms', { headers })
+                    fetch('/api/catalogs/product-categories?page=1&pageSize=1000', { headers }),
+                    fetch('/api/catalogs/payment-terms?page=1&pageSize=1000', { headers })
                 ])
 
                 if (catRes.ok) {
                     const catData = await catRes.json()
-                    if (Array.isArray(catData)) {
-                        setCategories(catData.map((c: { id: number; name: string }) => ({ id: c.id, name: c.name })))
+                    const catItems = Array.isArray(catData) ? catData : (catData.items ?? [])
+                    if (Array.isArray(catItems)) {
+                        setCategories(catItems.map((c: { id: number; name: string }) => ({ id: c.id, name: c.name })))
                     }
                 }
                 if (ptRes.ok) {
                     const ptData = await ptRes.json()
-                    if (Array.isArray(ptData)) {
-                        setPaymentTerms(ptData.map((p: { id: number; name: string }) => ({ id: p.id, name: p.name })))
+                    const ptItems = Array.isArray(ptData) ? ptData : (ptData.items ?? [])
+                    if (Array.isArray(ptItems)) {
+                        setPaymentTerms(ptItems.map((p: { id: number; name: string }) => ({ id: p.id, name: p.name })))
                     }
                 }
             } catch (err) {
@@ -344,7 +346,7 @@ export default function SupplierImportPage() {
         if (!workbook || !selectedSheet) return
 
         setStep('importing')
-        setImportProgress(20)
+        setImportProgress(10)
 
         try {
             const sheet = workbook.Sheets[selectedSheet]
@@ -353,9 +355,10 @@ export default function SupplierImportPage() {
                 defval: ''
             })
 
-            setImportProgress(40)
+            const total = data.length || 1
 
-            const mappedData = data.map(row => {
+            const mappedData: Record<string, unknown>[] = []
+            data.forEach((row, index) => {
                 const mapped: Record<string, unknown> = {}
                 columnMappings.forEach(mapping => {
                     if (mapping.systemField) {
@@ -367,10 +370,14 @@ export default function SupplierImportPage() {
                         mapped[mapping.systemField] = value
                     }
                 })
-                return mapped
-            })
+                mappedData.push(mapped)
 
-            setImportProgress(60)
+                // 10% -> 60% según filas mapeadas
+                if (index % 10 === 0) {
+                    const progress = 10 + Math.round(((index + 1) / total) * 50)
+                    setImportProgress(progress)
+                }
+            })
 
             const token = localStorage.getItem('auth:token')
             const response = await fetch(`${getApiBaseUrl()}/suppliers/bulk-import-mapped`, {
@@ -433,6 +440,56 @@ export default function SupplierImportPage() {
             ...prev,
             [fieldName]: { ...(prev[fieldName] || {}), [originalValue]: replacement }
         }))
+    }
+
+    // Hints / posibles errores por campo (para sección Comentarios)
+    const getFieldHints = (systemField: string | null): string[] => {
+        if (!systemField) return []
+
+        switch (systemField) {
+            case 'name':
+                return [
+                    'Debe estar lleno en todas las filas.',
+                    'Usa el nombre comercial del proveedor, no abreviaturas confusas.',
+                ]
+            case 'contact':
+                return [
+                    'Persona de contacto o área responsable (por ejemplo, Ventas, Compras).',
+                    'Evita dejarlo vacío para facilitar la comunicación.',
+                ]
+            case 'phone':
+                return [
+                    'Requerido. Incluye código de país si aplica.',
+                    'Usa solo números, espacios y signos como + o -, sin texto adicional.',
+                ]
+            case 'email':
+                return [
+                    'Requerido y debe tener formato de email válido.',
+                    'No puede repetirse en varios proveedores.',
+                ]
+            case 'address':
+                return [
+                    'Requerido. Incluye al menos ciudad y zona/barrio.',
+                    'Útil para rutas de reparto y reportes por ubicación.',
+                ]
+            case 'category':
+                return [
+                    'Debe coincidir exactamente con una categoría de proveedores existente.',
+                    'Puedes revisar las categorías válidas en el catálogo antes de importar.',
+                ]
+            case 'payment_terms':
+                return [
+                    'Opcional. Debe coincidir con un término de pago existente (por ejemplo, Contado, 15 días).',
+                    'Si no existe, créalo primero en catálogos o asígnalo manualmente aquí.',
+                ]
+            case 'rating':
+                return [
+                    'Opcional. Usa un número entre 1 y 5, sin texto.',
+                    'Se usa para priorizar proveedores en reportes y análisis.',
+                ]
+            default:
+                return []
+        }
     }
 
     // Render success state
@@ -508,7 +565,12 @@ export default function SupplierImportPage() {
                                     variant="default"
                                     size="sm"
                                     onClick={handleImport}
-                                    disabled={!requiredFieldsMapped || isTesting || (hasTestedOnce && validationErrors.length > 0)}
+                                    disabled={
+                                        !requiredFieldsMapped ||
+                                        isTesting ||
+                                        !hasTestedOnce ||
+                                        validationErrors.length > 0
+                                    }
                                 >
                                     <Upload className="h-4 w-4 mr-2" />
                                     Importar
@@ -677,7 +739,7 @@ export default function SupplierImportPage() {
                                                                 {field?.required && (
                                                                     <span className="text-xs text-muted-foreground">Requerido</span>
                                                                 )}
-                                                                {hasTestedOnce && errorCount > 0 && (
+                                                                {hasTestedOnce && mapping.systemField && errorCount > 0 && (
                                                                     <div className="space-y-1">
                                                                         {getFieldErrors(mapping.systemField).slice(0, 2).map((err, i) => (
                                                                             <p key={i} className="text-xs text-destructive">{err}</p>
@@ -725,6 +787,15 @@ export default function SupplierImportPage() {
                                                                             )
                                                                         })}
                                                                     </div>
+                                                                )}
+
+                                                                {/* Hints estáticos por campo */}
+                                                                {mapping.systemField && getFieldHints(mapping.systemField).length > 0 && (
+                                                                    <ul className="text-xs text-muted-foreground space-y-0.5">
+                                                                        {getFieldHints(mapping.systemField).map((hint, idx) => (
+                                                                            <li key={idx}>• {hint}</li>
+                                                                        ))}
+                                                                    </ul>
                                                                 )}
                                                             </div>
                                                         </TableCell>
