@@ -28,9 +28,17 @@ export interface User {
   updated_at?: string;
 }
 
+export interface Permission {
+  id: number;
+  code: string;
+  name: string;
+  description?: string | null;
+}
+
 export interface Role {
   id: number;
   name: string;
+  permissions?: Permission[];
 }
 
 export interface CreateUserPayload {
@@ -116,6 +124,66 @@ export const deleteUser = async (id: string): Promise<{ message: string; id: str
 export const getRoles = async (): Promise<Role[]> => {
   return apiFetch<Role[]>("/api/auth/roles", {
     method: "GET",
+  });
+};
+
+export interface RolesWithPermissionsResponse {
+  items: Role[];
+  page: number;
+  pageSize: number;
+  totalPages: number;
+  totalItems: number;
+  nextPage: number | null;
+  prevPage: number | null;
+}
+
+export const getRolesWithPermissions = async (
+  params?: { page?: number; pageSize?: number }
+): Promise<RolesWithPermissionsResponse> => {
+  const search = new URLSearchParams();
+  if (params?.page) search.set("page", String(params.page));
+  if (params?.pageSize) search.set("pageSize", String(params.pageSize));
+
+  const url = `/api/auth/roles/with-permissions${search.toString() ? `?${search.toString()}` : ""}`;
+  return apiFetch<RolesWithPermissionsResponse>(url, {
+    method: "GET",
+  });
+};
+
+export const getRoleWithPermissions = async (id: number): Promise<Role> => {
+  return apiFetch<Role>(`/api/auth/roles/${id}/with-permissions`, {
+    method: "GET",
+  });
+};
+
+export const getPermissions = async (): Promise<Permission[]> => {
+  return apiFetch<Permission[]>("/api/auth/permissions", {
+    method: "GET",
+  });
+};
+
+export const updateRole = async (
+  id: number,
+  payload: { name?: string; permissions?: string[] }
+): Promise<Role> => {
+  return apiFetch<Role>(`/api/auth/roles/${id}`, {
+    method: "PUT",
+    body: JSON.stringify(payload),
+  });
+};
+
+export const createRole = async (
+  payload: { name: string; permissions?: string[] }
+): Promise<Role> => {
+  return apiFetch<Role>("/api/auth/roles", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+};
+
+export const deleteRole = async (id: number): Promise<{ message: string; id: number }> => {
+  return apiFetch<{ message: string; id: number }>(`/api/auth/roles/${id}`, {
+    method: "DELETE",
   });
 };
 

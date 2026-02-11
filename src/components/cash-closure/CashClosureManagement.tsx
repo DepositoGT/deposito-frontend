@@ -22,6 +22,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Calculator, FileText, User } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { useAuth } from '@/context/useAuth'
+import { useAuthPermissions } from '@/hooks/useAuthPermissions'
 
 // Feature imports
 import { useCashClosureForm, useCashClosureAPI } from './hooks'
@@ -40,6 +41,7 @@ import type { CashClosure } from './types'
 const CashClosureManagement = () => {
     const { toast } = useToast()
     const { user } = useAuth()
+    const { hasPermission } = useAuthPermissions()
 
     // Hooks
     const form = useCashClosureForm()
@@ -132,6 +134,9 @@ const CashClosureManagement = () => {
         p => p.payment_method_name?.toLowerCase().includes('efectivo')
     )
 
+    const canCreateClosure = hasPermission('cashclosure.create')
+    const canViewHistory = hasPermission('cashclosure.view')
+
     return (
         <div className="space-y-6">
             <div className="flex items-center justify-between">
@@ -139,6 +144,7 @@ const CashClosureManagement = () => {
             </div>
 
             {/* New Closure Section */}
+            {canCreateClosure && (
             <Card>
                 <CardHeader>
                     <CardTitle className="flex items-center gap-2">
@@ -225,8 +231,10 @@ const CashClosureManagement = () => {
                     )}
                 </CardContent>
             </Card>
+            )}
 
             {/* Closures History */}
+            {canViewHistory && (
             <Card>
                 <CardHeader>
                     <CardTitle className="flex items-center gap-2">
@@ -248,6 +256,7 @@ const CashClosureManagement = () => {
                     </div>
                 </CardContent>
             </Card>
+            )}
 
             {/* Dialogs */}
             <ClosureDetailDialog

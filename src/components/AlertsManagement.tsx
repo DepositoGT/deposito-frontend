@@ -36,6 +36,7 @@ import { Alert, AlertStats, AlertType, AlertPriority, Status } from "@/types";
 import { apiFetch, reassignAlert, resolveAlert } from "@/services/api";
 import { useToast } from "@/hooks/use-toast";
 import { getUsers } from "@/services/userService";
+import { useAuthPermissions } from "@/hooks/useAuthPermissions";
 
 const AlertsManagement = () => {
   const [searchTerm, setSearchTerm] = useState("");
@@ -46,6 +47,9 @@ const AlertsManagement = () => {
   const [users, setUsers] = useState<{ id: string; name: string }[]>([]);
   const [resolvingAlertId, setResolvingAlertId] = useState<string | null>(null);
   const { toast } = useToast();
+  const { hasPermission } = useAuthPermissions();
+
+  const canManageAlerts = hasPermission("alerts.manage");
 
   useEffect(() => {
     (async () => {
@@ -162,6 +166,7 @@ const AlertsManagement = () => {
   };
 
   const handleResolveAlert = async (alertId: string) => {
+    if (!canManageAlerts) return;
     setResolvingAlertId(alertId);
     try {
       await resolveAlert(alertId);
@@ -199,14 +204,18 @@ const AlertsManagement = () => {
           <p className="text-muted-foreground">Monitoreo y gestión de alertas del sistema</p>
         </div>
         <div className="flex space-x-2">
-          <Button variant="outline">
-            <Settings className="w-4 h-4 mr-2" />
-            Configurar
-          </Button>
-          <Button className="bg-gradient-primary hover:opacity-90">
-            <Bell className="w-4 h-4 mr-2" />
-            Nueva Alerta
-          </Button>
+          {canManageAlerts && (
+            <>
+              <Button variant="outline">
+                <Settings className="w-4 h-4 mr-2" />
+                Configurar
+              </Button>
+              <Button className="bg-gradient-primary hover:opacity-90">
+                <Bell className="w-4 h-4 mr-2" />
+                Nueva Alerta
+              </Button>
+            </>
+          )}
         </div>
       </div>
 
