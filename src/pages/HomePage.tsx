@@ -19,6 +19,7 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { getVisibleModules, AppModule, getUserRole } from '@/config/appModules'
+import type { AuthUser } from '@/context/AuthContext'
 
 const AppCard = ({
     module,
@@ -54,7 +55,8 @@ const AppCard = ({
 export const HomePage = () => {
     const [search, setSearch] = useState('')
     const navigate = useNavigate()
-    const { user, isSeller } = getUserRole()
+    const { user: rawUser, isSeller, isAdmin } = getUserRole()
+    const user = rawUser as AuthUser | null
 
     const modules = useMemo(() => getVisibleModules(), [])
 
@@ -122,9 +124,32 @@ export const HomePage = () => {
             <div className='px-2 sm:px-4 pb-6 sm:pb-8 md:pb-12'>
                 <div className='max-w-5xl mx-auto'>
                     {filteredModules.length === 0 ? (
-                        <div className='text-center py-12 sm:py-16 text-gray-500'>
-                            <p className='text-base sm:text-lg'>No se encontraron módulos</p>
-                            <p className='text-xs sm:text-sm mt-1'>Intenta con otro término</p>
+                        <div className='text-center py-12 sm:py-16 text-gray-500 space-y-1'>
+                            {search.trim() ? (
+                                <>
+                                    <p className='text-base sm:text-lg'>No se encontraron módulos</p>
+                                    <p className='text-xs sm:text-sm mt-1'>Intenta con otro término</p>
+                                </>
+                            ) : Array.isArray(user?.permissions) &&
+                              !isAdmin &&
+                              user.permissions.length === 0 ? (
+                                <>
+                                    <p className='text-base sm:text-lg'>
+                                        No tienes módulos asignados todavía.
+                                    </p>
+                                    <p className='text-xs sm:text-sm mt-1'>
+                                        Contacta con un administrador para que revise y asigne tus
+                                        permisos.
+                                    </p>
+                                </>
+                            ) : (
+                                <>
+                                    <p className='text-base sm:text-lg'>No hay módulos disponibles</p>
+                                    <p className='text-xs sm:text-sm mt-1'>
+                                        Si crees que esto es un error, contacta con un administrador.
+                                    </p>
+                                </>
+                            )}
                         </div>
                     ) : (
                         <div className='grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-2 sm:gap-3 md:gap-4'>

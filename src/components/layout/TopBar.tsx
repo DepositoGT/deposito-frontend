@@ -30,6 +30,9 @@ import { appModules, getUserRole } from '@/config/appModules'
 import { useCriticalProducts } from '@/hooks/useCriticalProducts'
 import { useAuth } from '@/context/useAuth'
 import type { User as UserType } from '@/services/userService'
+import type { AuthUser } from '@/context/AuthContext'
+
+type CurrentUser = AuthUser | UserType | null
 
 export const TopBar = () => {
     const [launcherOpen, setLauncherOpen] = useState(false)
@@ -40,7 +43,7 @@ export const TopBar = () => {
     const { user: authUser, logout } = useAuth()
 
     // Obtener el usuario completo del contexto de autenticación
-    const currentUser = authUser || roleUser
+    const currentUser: CurrentUser = authUser || (roleUser as AuthUser | UserType | null)
 
     // Get critical products for notification badge
     const { data: criticalProducts = [] } = useCriticalProducts()
@@ -135,7 +138,7 @@ export const TopBar = () => {
                             <div className='flex flex-col'>
                                 <span>{currentUser?.name || 'Usuario'}</span>
                                 <span className='text-xs font-normal text-muted-foreground'>
-                                    {currentUser?.email || (currentUser as any)?.role?.name || 'Sin rol'}
+                                    {currentUser?.email || currentUser?.role?.name || 'Sin rol'}
                                 </span>
                             </div>
                         </DropdownMenuLabel>

@@ -13,7 +13,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { 
+import {
   Scan, 
   Camera,
   Search,
@@ -26,10 +26,32 @@ import {
   Upload
 } from "lucide-react";
 
+type ScannerProduct = {
+  barcode: string;
+  name: string;
+  brand: string;
+  category: string;
+  price: number;
+  stock: number;
+  minStock: number;
+};
+
+type ScanResult =
+  | {
+      success: true;
+      product: ScannerProduct;
+      message: string;
+    }
+  | {
+      success: false;
+      message: string;
+      code?: string;
+    };
+
 const ScannerManagement = () => {
   const [isScanning, setIsScanning] = useState(false);
   const [scannedCode, setScannedCode] = useState("");
-  const [scanResult, setScanResult] = useState<any>(null);
+  const [scanResult, setScanResult] = useState<ScanResult | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const recentScans = [
@@ -78,7 +100,7 @@ const ScannerManagement = () => {
     newProducts: 3
   };
 
-  const mockProducts = [
+  const mockProducts: ScannerProduct[] = [
     {
       barcode: "7501001234567",
       name: "Whisky Buchanans 18 Años",

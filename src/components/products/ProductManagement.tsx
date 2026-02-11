@@ -49,9 +49,11 @@ import { Pagination } from '@/components/shared/Pagination'
 import { useProductForm } from './hooks'
 import { ProductFormDialog, StockAdjustDialog, ProductDetailDialog, ImportDialog } from './components'
 import type { StockAdjustment } from './types'
+import { useAuthPermissions } from '@/hooks/useAuthPermissions'
 
 const ProductManagement = () => {
     const { toast } = useToast()
+    const { hasPermission } = useAuthPermissions()
 
     // Filter state
     const [searchTerm, setSearchTerm] = useState('')
@@ -127,8 +129,17 @@ const ProductManagement = () => {
     const totalPages = productsData?.totalPages || 1
     const totalItems = productsData?.totalItems || 0
 
+    // Permisos
+    const canExport = hasPermission('products.view', 'reports.view')
+    const canImport = hasPermission('products.import')
+    const canCreate = hasPermission('products.create')
+    const canEdit = hasPermission('products.edit')
+    const canDelete = hasPermission('products.delete')
+    const canAdjustStock = hasPermission('products.adjust_stock')
+
     // Export handler
     const handleExport = async () => {
+        if (!canExport) return
         try {
             const svc = await import('@/services/productService')
             await svc.exportProductsPdf()
@@ -299,12 +310,16 @@ const ProductManagement = () => {
                     <p className="text-xs sm:text-sm text-muted-foreground">Administra tu catálogo</p>
                 </div>
                 <div className="flex gap-2 overflow-x-auto pb-1 -mx-3 px-3 sm:mx-0 sm:px-0 sm:overflow-visible">
-                    <Button variant="outline" onClick={handleExport} size="sm" className="shrink-0">
-                        <Download className="w-4 h-4 sm:mr-2" /><span className="hidden sm:inline">Exportar</span>
-                    </Button>
-                    <Button variant="outline" onClick={() => setIsImportDialogOpen(true)} size="sm" className="shrink-0">
-                        <Upload className="w-4 h-4 sm:mr-2" /><span className="hidden sm:inline">Importar</span>
-                    </Button>
+                    {canExport && (
+                        <Button variant="outline" onClick={handleExport} size="sm" className="shrink-0">
+                            <Download className="w-4 h-4 sm:mr-2" /><span className="hidden sm:inline">Exportar</span>
+                        </Button>
+                    )}
+                    {canImport && (
+                        <Button variant="outline" onClick={() => setIsImportDialogOpen(true)} size="sm" className="shrink-0">
+                            <Upload className="w-4 h-4 sm:mr-2" /><span className="hidden sm:inline">Importar</span>
+                        </Button>
+                    )}
                     <Dialog open={isScannerOpen} onOpenChange={setIsScannerOpen}>
                         <DialogTrigger asChild>
                             <Button variant="outline" size="sm" className="shrink-0"><ScanLine className="w-4 h-4 sm:mr-2" /><span className="hidden sm:inline">Escanear</span></Button>
@@ -333,11 +348,16 @@ const ProductManagement = () => {
                             </div>
                         </DialogContent>
                     </Dialog>
-                    <Dialog open={isNewProductOpen} onOpenChange={setIsNewProductOpen}>
-                        <DialogTrigger asChild>
-                            <Button size="sm" className="shrink-0"><Plus className="w-4 h-4 sm:mr-2" /><span className="hidden sm:inline">Nuevo Producto</span></Button>
-                        </DialogTrigger>
-                    </Dialog>
+                    {canCreate && (
+                        <Dialog open={isNewProductOpen} onOpenChange={setIsNewProductOpen}>
+                            <DialogTrigger asChild>
+                                <Button size="sm" className="shrink-0">
+                                    <Plus className="w-4 h-4 sm:mr-2" />
+                                    <span className="hidden sm:inline">Nuevo Producto</span>
+                                </Button>
+                            </DialogTrigger>
+                        </Dialog>
+                    )}
                 </div>
             </div>
 
@@ -409,7 +429,9 @@ const ProductManagement = () => {
                                             </td>
                                             <td className="p-3 text-right">
                                                 <div className="font-medium text-foreground">Q {product.price.toFixed(2)}</div>
-                                                <div className="text-xs text-muted-foreground">Costo: Q {product.cost.toFixed(2)}</div>
+                                                {canCreate && (
+                                                    <div className="text-xs text-muted-foreground">Costo: Q {product.cost.toFixed(2)}</div>
+                                                )}
                                             </td>
                                             <td className="p-3 text-center">{getStatusBadge(product)}</td>
                                             <td className="p-3 text-center">
@@ -419,12 +441,25 @@ const ProductManagement = () => {
                                                     </DropdownMenuTrigger>
                                                     <DropdownMenuContent align="end" className="bg-popover border-border">
                                                         <DropdownMenuItem onClick={() => viewProduct(product)}><Eye className="w-4 h-4 mr-2" />Ver Detalles</DropdownMenuItem>
-                                                        <DropdownMenuItem onClick={() => editProduct(product)}><Edit className="w-4 h-4 mr-2" />Editar</DropdownMenuItem>
-                                                        <DropdownMenuItem onClick={() => openStockAdjust(product)}><PackagePlus className="w-4 h-4 mr-2" />Ajustar Stock</DropdownMenuItem>
+                                                        {canEdit && (
+                                                            <DropdownMenuItem onClick={() => editProduct(product)}>
+                                                                <Edit className="w-4 h-4 mr-2" />Editar
+                                                            </DropdownMenuItem>
+                                                        )}
+                                                        {canAdjustStock && (
+                                                            <DropdownMenuItem onClick={() => openStockAdjust(product)}>
+                                                                <PackagePlus className="w-4 h-4 mr-2" />Ajustar Stock
+                                                            </DropdownMenuItem>
+                                                        )}
                                                         <DropdownMenuItem onClick={() => viewProduct(product)}><ScanLine className="w-4 h-4 mr-2" />Ver Código</DropdownMenuItem>
-                                                        <DropdownMenuItem className="text-destructive" onClick={() => { setDeleteTargetId(product.id); setIsDeleteDialogOpen(true) }}>
-                                                            <Trash2 className="w-4 h-4 mr-2" />Eliminar
-                                                        </DropdownMenuItem>
+                                                        {canDelete && (
+                                                            <DropdownMenuItem
+                                                                className="text-destructive"
+                                                                onClick={() => { setDeleteTargetId(product.id); setIsDeleteDialogOpen(true) }}
+                                                            >
+                                                                <Trash2 className="w-4 h-4 mr-2" />Eliminar
+                                                            </DropdownMenuItem>
+                                                        )}
                                                     </DropdownMenuContent>
                                                 </DropdownMenu>
                                             </td>

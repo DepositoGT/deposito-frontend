@@ -54,6 +54,7 @@ import type { Product } from '../types'
 import { Pencil, Trash2, Plus, RotateCcw, Loader2, FileUp } from 'lucide-react'
 import { CatalogImportDialog } from './catalogs/CatalogImportDialog'
 import { Pagination } from './shared/Pagination'
+import { useAuthPermissions } from '../hooks/useAuthPermissions'
 
 // Tipos para los diálogos
 type PaymentTermDialogState = {
@@ -174,6 +175,8 @@ function PaymentTermsTab({
   onImportClick: () => void
 }) {
   const { toast } = useToast()
+  const { hasPermission } = useAuthPermissions()
+  const canManageCatalogs = hasPermission('catalogs.manage')
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize] = useState(10)
   
@@ -246,23 +249,27 @@ function PaymentTermsTab({
             >
               {showDeleted ? 'Ocultar' : 'Ver eliminados'}
             </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={onImportClick}
-              className="text-xs sm:text-sm"
-            >
-              <FileUp className="w-4 h-4 sm:mr-2" />
-              <span className="hidden sm:inline">Importar</span>
-            </Button>
-            <Button
-              size="sm"
-              onClick={() => setDialog({ open: true, mode: 'create' })}
-              className="text-xs sm:text-sm"
-            >
-              <Plus className="w-4 h-4 sm:mr-2" />
-              <span className="hidden sm:inline">Nuevo</span>
-            </Button>
+            {canManageCatalogs && (
+              <>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={onImportClick}
+                  className="text-xs sm:text-sm"
+                >
+                  <FileUp className="w-4 h-4 sm:mr-2" />
+                  <span className="hidden sm:inline">Importar</span>
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={() => setDialog({ open: true, mode: 'create' })}
+                  className="text-xs sm:text-sm"
+                >
+                  <Plus className="w-4 h-4 sm:mr-2" />
+                  <span className="hidden sm:inline">Nuevo</span>
+                </Button>
+              </>
+            )}
           </div>
         </div>
       </CardHeader>
@@ -303,44 +310,46 @@ function PaymentTermsTab({
                       )}
                     </TableCell>
                     <TableCell className="text-right">
-                      <div className="flex justify-end gap-2">
-                        {term.deleted ? (
-                          <Button
-                            variant="outline"
-                            size="icon"
-                            onClick={() => handleRestore(term.id)}
-                            disabled={restoreMutation.isPending}
-                          >
-                            {restoreMutation.isPending ? (
-                              <Loader2 className="w-4 h-4 animate-spin" />
-                            ) : (
-                              <RotateCcw className="w-4 h-4" />
-                            )}
-                          </Button>
-                        ) : (
-                          <>
+                      {canManageCatalogs && (
+                        <div className="flex justify-end gap-2">
+                          {term.deleted ? (
                             <Button
                               variant="outline"
                               size="icon"
-                              onClick={() => setDialog({ open: true, mode: 'edit', item: term })}
+                              onClick={() => handleRestore(term.id)}
+                              disabled={restoreMutation.isPending}
                             >
-                              <Pencil className="w-4 h-4" />
-                            </Button>
-                            <Button
-                              variant="destructive"
-                              size="icon"
-                              onClick={() => handleDelete(term.id)}
-                              disabled={deleteMutation.isPending}
-                            >
-                              {deleteMutation.isPending ? (
+                              {restoreMutation.isPending ? (
                                 <Loader2 className="w-4 h-4 animate-spin" />
                               ) : (
-                                <Trash2 className="w-4 h-4" />
+                                <RotateCcw className="w-4 h-4" />
                               )}
                             </Button>
-                          </>
-                        )}
-                      </div>
+                          ) : (
+                            <>
+                              <Button
+                                variant="outline"
+                                size="icon"
+                                onClick={() => setDialog({ open: true, mode: 'edit', item: term })}
+                              >
+                                <Pencil className="w-4 h-4" />
+                              </Button>
+                              <Button
+                                variant="destructive"
+                                size="icon"
+                                onClick={() => handleDelete(term.id)}
+                                disabled={deleteMutation.isPending}
+                              >
+                                {deleteMutation.isPending ? (
+                                  <Loader2 className="w-4 h-4 animate-spin" />
+                                ) : (
+                                  <Trash2 className="w-4 h-4" />
+                                )}
+                              </Button>
+                            </>
+                          )}
+                        </div>
+                      )}
                     </TableCell>
                   </TableRow>
                 ))
@@ -380,6 +389,8 @@ function ProductCategoriesTab({
   onImportClick: () => void
 }) {
   const { toast } = useToast()
+  const { hasPermission } = useAuthPermissions()
+  const canManageCatalogs = hasPermission('catalogs.manage')
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize] = useState(10)
   
@@ -452,23 +463,27 @@ function ProductCategoriesTab({
             >
               {showDeleted ? 'Ocultar' : 'Ver eliminados'}
             </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={onImportClick}
-              className="text-xs sm:text-sm"
-            >
-              <FileUp className="w-4 h-4 sm:mr-2" />
-              <span className="hidden sm:inline">Importar</span>
-            </Button>
-            <Button
-              size="sm"
-              onClick={() => setDialog({ open: true, mode: 'create' })}
-              className="text-xs sm:text-sm"
-            >
-              <Plus className="w-4 h-4 sm:mr-2" />
-              <span className="hidden sm:inline">Nueva</span>
-            </Button>
+            {canManageCatalogs && (
+              <>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={onImportClick}
+                  className="text-xs sm:text-sm"
+                >
+                  <FileUp className="w-4 h-4 sm:mr-2" />
+                  <span className="hidden sm:inline">Importar</span>
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={() => setDialog({ open: true, mode: 'create' })}
+                  className="text-xs sm:text-sm"
+                >
+                  <Plus className="w-4 h-4 sm:mr-2" />
+                  <span className="hidden sm:inline">Nueva</span>
+                </Button>
+              </>
+            )}
           </div>
         </div>
       </CardHeader>
@@ -511,44 +526,46 @@ function ProductCategoriesTab({
                       )}
                     </TableCell>
                     <TableCell className="text-right">
-                      <div className="flex justify-end gap-2">
-                        {category.deleted ? (
-                          <Button
-                            variant="outline"
-                            size="icon"
-                            onClick={() => handleRestore(category.id)}
-                            disabled={restoreMutation.isPending}
-                          >
-                            {restoreMutation.isPending ? (
-                              <Loader2 className="w-4 h-4 animate-spin" />
-                            ) : (
-                              <RotateCcw className="w-4 h-4" />
-                            )}
-                          </Button>
-                        ) : (
-                          <>
+                      {canManageCatalogs && (
+                        <div className="flex justify-end gap-2">
+                          {category.deleted ? (
                             <Button
                               variant="outline"
                               size="icon"
-                              onClick={() => setDialog({ open: true, mode: 'edit', item: category })}
+                              onClick={() => handleRestore(category.id)}
+                              disabled={restoreMutation.isPending}
                             >
-                              <Pencil className="w-4 h-4" />
-                            </Button>
-                            <Button
-                              variant="destructive"
-                              size="icon"
-                              onClick={() => handleDelete(category.id)}
-                              disabled={deleteMutation.isPending}
-                            >
-                              {deleteMutation.isPending ? (
+                              {restoreMutation.isPending ? (
                                 <Loader2 className="w-4 h-4 animate-spin" />
                               ) : (
-                                <Trash2 className="w-4 h-4" />
+                                <RotateCcw className="w-4 h-4" />
                               )}
                             </Button>
-                          </>
-                        )}
-                      </div>
+                          ) : (
+                            <>
+                              <Button
+                                variant="outline"
+                                size="icon"
+                                onClick={() => setDialog({ open: true, mode: 'edit', item: category })}
+                              >
+                                <Pencil className="w-4 h-4" />
+                              </Button>
+                              <Button
+                                variant="destructive"
+                                size="icon"
+                                onClick={() => handleDelete(category.id)}
+                                disabled={deleteMutation.isPending}
+                              >
+                                {deleteMutation.isPending ? (
+                                  <Loader2 className="w-4 h-4 animate-spin" />
+                                ) : (
+                                  <Trash2 className="w-4 h-4" />
+                                )}
+                              </Button>
+                            </>
+                          )}
+                        </div>
+                      )}
                     </TableCell>
                   </TableRow>
                 ))
