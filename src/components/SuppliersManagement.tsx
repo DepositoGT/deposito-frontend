@@ -71,6 +71,7 @@ import { useDeleteSupplier } from "@/hooks/useDeleteSupplier";
 import { SupplierImportDialog } from "@/components/suppliers/SupplierImportDialog";
 import { Pagination } from "@/components/shared/Pagination";
 import { generateSupplierPDF } from "@/components/suppliers/generateSupplierPDF";
+import { useAuthPermissions } from "@/hooks/useAuthPermissions";
 
 const SuppliersManagement = () => {
   const [searchTerm, setSearchTerm] = useState("");
@@ -111,11 +112,12 @@ const SuppliersManagement = () => {
   const statuses = useMemo(() => statusesData ?? [], [statusesData]);
 
   const { toast } = useToast();
+  const { hasPermission } = useAuthPermissions();
 
-  // determine if current user is admin (support returning full role or only role_id)
-  const storedUser = typeof window !== 'undefined' ? localStorage.getItem('auth:user') : null;
-  const parsedUser = storedUser ? JSON.parse(storedUser) : null;
-  const isAdmin = parsedUser ? (parsedUser.role?.name === 'admin' || String(parsedUser.role_id) === '1') : false;
+  const canCreate = hasPermission("suppliers.create");
+  const canEdit = hasPermission("suppliers.edit");
+  const canDelete = hasPermission("suppliers.delete");
+  const canImport = hasPermission("suppliers.import");
 
   // Reset page when search term changes
   useEffect(() => {
@@ -329,23 +331,27 @@ const SuppliersManagement = () => {
         </div>
 
         <div className="flex gap-2">
-          <Button
-            variant="outline"
-            onClick={() => setIsImportOpen(true)}
-            disabled={!isAdmin}
-          >
-            <FileUp className="w-4 h-4 mr-2" />
-            Importar
-          </Button>
-          <SupplierImportDialog open={isImportOpen} onOpenChange={setIsImportOpen} />
-          <Dialog open={isNewSupplierOpen} onOpenChange={setIsNewSupplierOpen}>
-            <DialogTrigger asChild>
-              <Button className="bg-liquor-amber hover:bg-liquor-amber/90 text-white" disabled={!isAdmin}>
-                <Plus className="w-4 h-4 mr-2" />
-                Nuevo Proveedor
+          {canImport && (
+            <>
+              <Button
+                variant="outline"
+                onClick={() => setIsImportOpen(true)}
+              >
+                <FileUp className="w-4 h-4 mr-2" />
+                Importar
               </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-2xl">
+              <SupplierImportDialog open={isImportOpen} onOpenChange={setIsImportOpen} />
+            </>
+          )}
+          {canCreate && (
+            <Dialog open={isNewSupplierOpen} onOpenChange={setIsNewSupplierOpen}>
+              <DialogTrigger asChild>
+                <Button className="bg-liquor-amber hover:bg-liquor-amber/90 text-white">
+                  <Plus className="w-4 h-4 mr-2" />
+                  Nuevo Proveedor
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-2xl">
               <DialogHeader>
                 <DialogTitle>Agregar Nuevo Proveedor</DialogTitle>
               </DialogHeader>
@@ -428,7 +434,11 @@ const SuppliersManagement = () => {
                 <Button variant="outline" onClick={() => setIsNewSupplierOpen(false)} disabled={createIsLoading}>
                   Cancelar
                 </Button>
-                <Button className="bg-liquor-amber hover:bg-liquor-amber/90 text-white" disabled={!isAdmin || createIsLoading} onClick={handleCreateSupplier}>
+                <Button
+                  className="bg-liquor-amber hover:bg-liquor-amber/90 text-white"
+                  disabled={createIsLoading}
+                  onClick={handleCreateSupplier}
+                >
                   {createIsLoading ? (
                     <svg className="animate-spin w-4 h-4 mr-2 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
@@ -442,6 +452,7 @@ const SuppliersManagement = () => {
               </div>
             </DialogContent>
           </Dialog>
+          )}
         </div>
       </div>
 

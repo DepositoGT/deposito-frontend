@@ -402,3 +402,34 @@ export const UsuariosIcon = forwardRef<SVGSVGElement, IconProps>(
     )
 )
 UsuariosIcon.displayName = 'UsuariosIcon'
+
+// Mercancía - Truck/package with arrow icon
+export const MercanciaIcon = forwardRef<SVGSVGElement, IconProps>(
+    ({ className, ...props }, ref) => (
+        <svg
+            ref={ref}
+            xmlns="http://www.w3.org/2000/svg"
+            width="24"
+            height="24"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className={className}
+            {...props}
+        >
+            {/* Truck body */}
+            <path d="M2 17H4V19H2V17Z" />
+            <path d="M20 17H22V19H20V17Z" />
+            <path d="M4 17H20V13H4V17Z" />
+            <path d="M4 13L2 11V7H4V13Z" />
+            <path d="M20 13V7H22V11L20 13Z" />
+            {/* Arrow pointing in */}
+            <path d="M12 5L10 7H14L12 5Z" />
+            <path d="M12 5V9" />
+        </svg>
+    )
+)
+MercanciaIcon.displayName = 'MercanciaIcon'

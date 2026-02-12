@@ -25,6 +25,7 @@ import heroImage from "@/assets/hero-liquor.jpg";
 import { DashboardStat, RecentProduct } from "@/types";
 import useCriticalProducts from "@/hooks/useCriticalProducts";
 import useDashboardStats from "@/hooks/useDashboardStats";
+import { useAuthPermissions } from "@/hooks/useAuthPermissions";
 
 interface DashboardProps {
   onSectionChange?: (section: string) => void;
@@ -33,6 +34,13 @@ interface DashboardProps {
 const Dashboard = ({ onSectionChange }: DashboardProps) => {
   const navigate = useNavigate();
   const { data: statsData, isLoading: statsLoading } = useDashboardStats();
+  const { hasPermission } = useAuthPermissions();
+
+  const canViewAnalytics = hasPermission("analytics.view");
+  const canViewReports = hasPermission("reports.view");
+  const canManageProducts = hasPermission("products.create", "products.edit");
+  const canCreateSales = hasPermission("sales.create");
+  const canViewAlerts = hasPermission("alerts.view", "alerts.manage");
 
   // Formatear estadísticas desde la API
   const stats: DashboardStat[] = [
@@ -90,6 +98,28 @@ const Dashboard = ({ onSectionChange }: DashboardProps) => {
     return `hace ${diffHours} horas`;
   };
 
+  // Si el usuario no tiene permiso de analíticas, mostrar mensaje de acceso restringido
+  if (!canViewAnalytics) {
+    return (
+      <div className="p-6 flex items-center justify-center min-h-[60vh]">
+        <Card className="max-w-md w-full">
+          <CardHeader>
+            <CardTitle>Sin acceso al Dashboard</CardTitle>
+            <CardDescription>
+              No tienes permisos para ver las analíticas del sistema.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground">
+              Si consideras que deberías tener acceso a esta vista, por favor contacta con un
+              administrador para que revise tus permisos.
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="p-6 space-y-6 animate-fade-in">
       {/* Hero Section */}
@@ -116,15 +146,17 @@ const Dashboard = ({ onSectionChange }: DashboardProps) => {
               </span>
             </div>
           </div>
-          <Button
-            variant="secondary"
-            size="lg"
-            className="shadow-glow"
-            onClick={() => navigate('/reportes')}
-          >
-            <Eye className="w-4 h-4 mr-2" />
-            Ver Reportes
-          </Button>
+          {canViewReports && (
+            <Button
+              variant="secondary"
+              size="lg"
+              className="shadow-glow"
+              onClick={() => navigate('/reportes')}
+            >
+              <Eye className="w-4 h-4 mr-2" />
+              Ver Reportes
+            </Button>
+          )}
         </div>
       </div>
 
@@ -211,37 +243,45 @@ const Dashboard = ({ onSectionChange }: DashboardProps) => {
             <CardTitle>Acciones Rápidas</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            <Button
-              className="w-full bg-primary hover:bg-primary/90 transition-colors"
-              onClick={() => navigate('/productos')}
-            >
-              <Package className="w-4 h-4 mr-2" />
-              Agregar Producto
-            </Button>
-            <Button
-              variant="outline"
-              className="w-full"
-              onClick={() => navigate('/ventas')}
-            >
-              <TrendingUp className="w-4 h-4 mr-2" />
-              Registrar Venta
-            </Button>
-            <Button
-              variant="outline"
-              className="w-full"
-              onClick={() => navigate('/alertas')}
-            >
-              <AlertTriangle className="w-4 h-4 mr-2" />
-              Ver Alertas
-            </Button>
-            <Button
-              variant="outline"
-              className="w-full"
-              onClick={() => navigate('/reportes')}
-            >
-              <DollarSign className="w-4 h-4 mr-2" />
-              Generar Reporte
-            </Button>
+            {canManageProducts && (
+              <Button
+                className="w-full bg-primary hover:bg-primary/90 transition-colors"
+                onClick={() => navigate('/productos')}
+              >
+                <Package className="w-4 h-4 mr-2" />
+                Agregar Producto
+              </Button>
+            )}
+            {canCreateSales && (
+              <Button
+                variant="outline"
+                className="w-full"
+                onClick={() => navigate('/ventas')}
+              >
+                <TrendingUp className="w-4 h-4 mr-2" />
+                Registrar Venta
+              </Button>
+            )}
+            {canViewAlerts && (
+              <Button
+                variant="outline"
+                className="w-full"
+                onClick={() => navigate('/alertas')}
+              >
+                <AlertTriangle className="w-4 h-4 mr-2" />
+                Ver Alertas
+              </Button>
+            )}
+            {canViewReports && (
+              <Button
+                variant="outline"
+                className="w-full"
+                onClick={() => navigate('/reportes')}
+              >
+                <DollarSign className="w-4 h-4 mr-2" />
+                Generar Reporte
+              </Button>
+            )}
           </CardContent>
         </Card>
       </div>

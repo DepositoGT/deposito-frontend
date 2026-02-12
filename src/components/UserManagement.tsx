@@ -22,12 +22,26 @@ import { useCreateUser } from "@/hooks/useCreateUser";
 import { useUpdateUser } from "@/hooks/useUpdateUser";
 import { useDeleteUser } from "@/hooks/useDeleteUser";
 import { useRoles } from "@/hooks/useRoles";
-import { UserPlus, Edit, Trash2, Shield, Mail, User as UserIcon, Search, X, Eye, LayoutGrid, List, FileUp } from "lucide-react";
+import {
+  UserPlus,
+  Edit,
+  Trash2,
+  Shield,
+  Mail,
+  User as UserIcon,
+  Search,
+  X,
+  Eye,
+  LayoutGrid,
+  List,
+  FileUp,
+} from "lucide-react";
 import UserImportDialog from "./users/UserImportDialog";
 import { useAuth } from "@/context/useAuth";
 import type { User } from "@/services/userService";
 import { UserDetailDialog } from "@/components/users/UserDetailDialog";
 import { Pagination } from "@/components/shared/Pagination";
+import { useNavigate } from "react-router-dom";
 
 // Componente para mostrar avatar de usuario con fallback
 const UserAvatar = ({ user }: { user: User }) => {
@@ -57,6 +71,7 @@ const UserAvatar = ({ user }: { user: User }) => {
 const UserManagement = () => {
   const { toast } = useToast();
   const { user: currentUser } = useAuth();
+  const navigate = useNavigate();
   
   // Verificar admin de múltiples formas para mayor robustez
   let isAdmin = false;
@@ -431,10 +446,16 @@ const UserManagement = () => {
         <div>
           <h2 className="text-3xl font-bold tracking-tight">Gestión de Usuarios</h2>
           <p className="text-muted-foreground">
-            Administra usuarios, roles y permisos del sistema
+            Administra usuarios del sistema
           </p>
         </div>
         <div className="flex gap-2">
+          <Button
+            variant="outline"
+            onClick={() => navigate("/usuarios/roles-permisos")}
+          >
+            Roles y Permisos
+          </Button>
           <Button
             variant="outline"
             onClick={() => setIsImportOpen(true)}

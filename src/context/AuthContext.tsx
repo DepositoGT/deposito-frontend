@@ -25,6 +25,8 @@ export interface AuthUser {
   phone?: string | null;
   address?: string | null;
   hire_date?: string | null;
+  // Códigos de permisos asignados al usuario (derivados de su rol)
+  permissions?: string[];
 }
 
 export type AuthContextType = {

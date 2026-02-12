@@ -11,14 +11,17 @@
 /**
  * ProductFormDialog - Shared dialog for creating and editing products
  */
+import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Package, QrCode, DollarSign } from 'lucide-react'
+import { Package, QrCode, DollarSign, Image as ImageIcon } from 'lucide-react'
 import type { ProductFormData } from '../types'
+import { useToast } from '@/hooks/use-toast'
+import { getApiBaseUrl, getAuthToken } from '@/services/api'
 
 interface Category {
     id: string | number
@@ -57,7 +60,90 @@ export const ProductFormDialog = ({
     isLoading,
     submitLabel = 'Guardar'
 }: ProductFormDialogProps) => {
+    const { toast } = useToast()
+    const [isUploadingImage, setIsUploadingImage] = useState(false)
     const categoriesAreObjects = categories.length > 0 && typeof categories[0] === 'object'
+
+    const handleImageChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0]
+        if (!file) {
+            onFormChange('imageUrl', '')
+            return
+        }
+
+        try {
+            setIsUploadingImage(true)
+
+            // Validar tamaño (máx 5MB)
+            if (file.size > 5 * 1024 * 1024) {
+                toast({
+                    title: 'Error',
+                    description: 'La imagen no debe exceder 5MB',
+                    variant: 'destructive'
+                })
+                return
+            }
+
+            // Validar tipo
+            if (!file.type.startsWith('image/')) {
+                toast({
+                    title: 'Error',
+                    description: 'Solo se permiten archivos de imagen',
+                    variant: 'destructive'
+                })
+                return
+            }
+
+            // Crear FormData para enviar el archivo
+            const formData = new FormData()
+            formData.append('image', file)
+
+            // Obtener token de autenticación
+            const token = getAuthToken()
+            if (!token) {
+                toast({
+                    title: 'Error de autenticación',
+                    description: 'No estás autenticado. Por favor, inicia sesión.',
+                    variant: 'destructive'
+                })
+                return
+            }
+
+            // Subir imagen al backend
+            const response = await fetch(`${getApiBaseUrl()}/products/upload-image`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                },
+                body: formData
+            })
+
+            const data = await response.json()
+
+            if (!response.ok) {
+                throw new Error(data.message || 'Error al subir la imagen')
+            }
+
+            if (!data.imageUrl) {
+                throw new Error('No se recibió la URL de la imagen')
+            }
+
+            onFormChange('imageUrl', data.imageUrl)
+            toast({
+                title: 'Imagen subida',
+                description: 'La imagen del producto se subió correctamente.'
+            })
+        } catch (err: unknown) {
+            const message = (err as { message?: string })?.message || 'No se pudo subir la imagen'
+            toast({
+                title: 'Error al subir imagen',
+                description: message,
+                variant: 'destructive'
+            })
+        } finally {
+            setIsUploadingImage(false)
+        }
+    }
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
@@ -217,14 +303,49 @@ export const ProductFormDialog = ({
                             onChange={(e) => onFormChange('description', e.target.value)}
                         />
                     </div>
+                    <div className="space-y-2">
+                        <Label>Imagen del producto</Label>
+                        <div className="flex items-center gap-4">
+                            <div className="flex-1">
+                                <Input
+                                    id="product-image"
+                                    type="file"
+                                    accept="image/*"
+                                    onChange={handleImageChange}
+                                    disabled={isUploadingImage || isLoading}
+                                />
+                            </div>
+                            {formData.imageUrl && (
+                                <div className="w-16 h-16 rounded-md overflow-hidden border border-border flex items-center justify-center bg-muted">
+                                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                                    <img
+                                        src={formData.imageUrl}
+                                        alt={formData.name || 'Imagen del producto'}
+                                        className="w-full h-full object-cover"
+                                        onError={(e) => {
+                                            (e.currentTarget as HTMLImageElement).style.display = 'none'
+                                        }}
+                                    />
+                                </div>
+                            )}
+                            {!formData.imageUrl && (
+                                <div className="w-16 h-16 rounded-md border border-dashed border-border flex items-center justify-center text-muted-foreground">
+                                    <ImageIcon className="w-6 h-6" />
+                                </div>
+                            )}
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                            Opcional. Se almacenará en el bucket <span className="font-semibold">productos</span> de Supabase.
+                        </p>
+                    </div>
                     <div className="flex space-x-2">
-                        <Button variant="outline" className="flex-1" onClick={() => onOpenChange(false)} disabled={isLoading}>
+                        <Button variant="outline" className="flex-1" onClick={() => onOpenChange(false)} disabled={isLoading || isUploadingImage}>
                             Cancelar
                         </Button>
                         <Button
                             className="flex-1 bg-liquor-amber hover:bg-liquor-amber/90 text-white"
                             onClick={onSubmit}
-                            disabled={isLoading}
+                            disabled={isLoading || isUploadingImage}
                         >
                             {isLoading ? (
                                 <>

@@ -27,6 +27,7 @@ interface SalesStatusTableProps {
     isLoading: boolean
     updatingSaleIds: Set<string>
     onPageChange: (page: number) => void
+    canChangeStatus: boolean
     onStatusChange: (saleId: string, newStatus: SaleStatus) => void
     onViewSale: (sale: Sale) => void
     onDeleteSale: (saleId: string) => void
@@ -49,6 +50,7 @@ export const SalesStatusTable = ({
     isLoading,
     updatingSaleIds,
     onPageChange,
+    canChangeStatus,
     onStatusChange,
     onViewSale,
     onDeleteSale
@@ -138,10 +140,12 @@ export const SalesStatusTable = ({
                                             <Select
                                                 value={sale.status}
                                                 onValueChange={(v: SaleStatus) => onStatusChange(sale.id, v)}
-                                                disabled={updatingSaleIds.has(sale.id)}
+                                                disabled={updatingSaleIds.has(sale.id) || !canChangeStatus}
                                             >
                                                 <SelectTrigger className='w-32'>
-                                                    {updatingSaleIds.has(sale.id) ? '...' : getStatusBadge(sale.status)}
+                                                    {updatingSaleIds.has(sale.id)
+                                                        ? '...'
+                                                        : getStatusBadge(sale.status)}
                                                 </SelectTrigger>
                                                 <SelectContent>
                                                     <SelectItem value='pending'>Pendiente</SelectItem>

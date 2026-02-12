@@ -26,6 +26,7 @@ import { createSale } from '@/services/saleService'
 import { updateSaleStatus as apiUpdateSaleStatus } from '@/services/salesService'
 import { useRealtimeSales } from '@/hooks/useRealtimeSales'
 import { useAuth } from '@/context/useAuth'
+import { useAuthPermissions } from '@/hooks/useAuthPermissions'
 import { usePaymentMethods, PaymentMethod as PaymentMethodType } from '@/hooks/usePaymentMethods'
 
 // Feature imports
@@ -56,6 +57,7 @@ const SalesManagement = ({ onSectionChange }: SalesManagementProps) => {
     const navigate = useNavigate()
     const { isAuthenticated } = useAuth()
     const { toast } = useToast()
+    const { hasPermission } = useAuthPermissions()
 
     // Data hooks
     const paymentMethodsQuery = usePaymentMethods()
@@ -94,6 +96,11 @@ const SalesManagement = ({ onSectionChange }: SalesManagementProps) => {
     const [isValidatingClosure, setIsValidatingClosure] = useState(false)
     const [negativeStockDialog, setNegativeStockDialog] = useState<NegativeStockDialogState>({ open: false, products: [] })
 
+    // Permission-based capabilities
+    const canCreateSale = hasPermission('sales.create')
+    const canChangeSaleStatus = hasPermission('sales.cancel', 'sales.create')
+    const canAccessCashClosure = hasPermission('cashclosure.view', 'cashclosure.create')
+
     // Realtime updates
     useRealtimeSales((newSale: { id: string; customer?: string | null; total?: number | string }) => {
         if (!isAuthenticated) return
@@ -116,6 +123,10 @@ const SalesManagement = ({ onSectionChange }: SalesManagementProps) => {
 
     // Process sale
     const processSale = async () => {
+        if (!canCreateSale) {
+            toast({ title: 'Sin permiso para crear ventas', variant: 'destructive' })
+            return
+        }
         if (!paymentMethod) {
             toast({ title: 'Selecciona un método de pago', variant: 'destructive' })
             return
@@ -151,6 +162,10 @@ const SalesManagement = ({ onSectionChange }: SalesManagementProps) => {
 
     // Status update
     const updateSaleStatus = async (saleId: string, newStatus: SaleStatus) => {
+        if (!canChangeSaleStatus) {
+            toast({ title: 'Sin permiso para cambiar estado de ventas', variant: 'destructive' })
+            return
+        }
         setUpdatingSaleIds(prev => new Set(prev).add(saleId))
         try {
             await apiUpdateSaleStatus(saleId, { status_name: STATUS_DB_NAMES[newStatus as SaleStatusKey] })
@@ -199,14 +214,29 @@ const SalesManagement = ({ onSectionChange }: SalesManagementProps) => {
                             <SelectItem value='month'>Mes</SelectItem>
                         </SelectContent>
                     </Select>
-                    <Button variant='outline' onClick={handleCashClosure} disabled={isValidatingClosure} className='border-green-600 text-green-600 whitespace-nowrap shrink-0 text-xs sm:text-sm'>
-                        <Calculator className='w-4 h-4 sm:mr-2' /><span className='hidden sm:inline'>{isValidatingClosure ? 'Validando...' : 'Cierre de Caja'}</span>
-                    </Button>
-                    <Dialog open={isNewSaleOpen} onOpenChange={setIsNewSaleOpen}>
-                        <DialogTrigger asChild>
-                            <Button className='bg-primary hover:bg-primary/90 whitespace-nowrap shrink-0 text-xs sm:text-sm'><Plus className='w-4 h-4 sm:mr-2' /><span className='hidden sm:inline'>Nueva Venta</span></Button>
-                        </DialogTrigger>
-                    </Dialog>
+                    {canAccessCashClosure && (
+                        <Button
+                            variant='outline'
+                            onClick={handleCashClosure}
+                            disabled={isValidatingClosure}
+                            className='border-green-600 text-green-600 whitespace-nowrap shrink-0 text-xs sm:text-sm'
+                        >
+                            <Calculator className='w-4 h-4 sm:mr-2' />
+                            <span className='hidden sm:inline'>
+                                {isValidatingClosure ? 'Validando...' : 'Cierre de Caja'}
+                            </span>
+                        </Button>
+                    )}
+                    {canCreateSale && (
+                        <Dialog open={isNewSaleOpen} onOpenChange={setIsNewSaleOpen}>
+                            <DialogTrigger asChild>
+                                <Button className='bg-primary hover:bg-primary/90 whitespace-nowrap shrink-0 text-xs sm:text-sm'>
+                                    <Plus className='w-4 h-4 sm:mr-2' />
+                                    <span className='hidden sm:inline'>Nueva Venta</span>
+                                </Button>
+                            </DialogTrigger>
+                        </Dialog>
+                    )}
                 </div>
             </div>
 
@@ -239,6 +269,7 @@ const SalesManagement = ({ onSectionChange }: SalesManagementProps) => {
                         isLoading={salesData.isLoadingByStatus[key]}
                         updatingSaleIds={updatingSaleIds}
                         onPageChange={(page) => salesData.setPageFor(key, page)}
+                        canChangeStatus={canChangeSaleStatus}
                         onStatusChange={updateSaleStatus}
                         onViewSale={(sale) => { setSelectedSale(sale); setIsViewSaleOpen(true) }}
                         onDeleteSale={() => toast({ title: 'Funcionalidad en progreso' })}

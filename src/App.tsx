@@ -16,6 +16,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import NotFound from "./pages/NotFound";
 import PublicRoute from "@/routes/PublicRoute";
 import PrivateRoute from "@/routes/PrivateRoute";
+import PermissionRoute from "@/routes/PermissionRoute";
 import Login from "@/pages/Login";
 import NewReturn from "./pages/NewReturn";
 import HomePage from "./pages/HomePage";
@@ -23,6 +24,7 @@ import ImportPage from "./pages/ImportPage";
 import SupplierImportPage from "./pages/SupplierImportPage";
 import CatalogImportPage from "./pages/CatalogImportPage";
 import UserImportPage from "./pages/UserImportPage";
+import { RegisterIncomingMerchandise } from "./pages/RegisterIncomingMerchandise";
 import AuthProvider from "@/context/AuthProvider";
 
 // Layout
@@ -38,10 +40,14 @@ import ReportsManagement from "@/components/ReportsManagement";
 import AlertsManagement from "@/components/AlertsManagement";
 import ScannerManagement from "@/components/ScannerManagement";
 import UserManagement from "@/components/UserManagement";
+import RolesPermissionsManagement from "@/components/users/RolesPermissionsManagement";
+import RolePermissionsDetail from "@/components/users/RolePermissionsDetail";
+import RoleCreatePage from "@/components/users/RoleCreatePage";
 import { CatalogsManagement } from "@/components/CatalogsManagement";
 import ReturnsManagement from "@/components/ReturnsManagement";
 import CashClosureManagement from "@/components/CashClosureManagement";
 import PromotionsManagement from "@/components/PromotionsManagement";
+import IncomingMerchandiseManagement from "@/components/IncomingMerchandiseManagement";
 
 const queryClient = new QueryClient();
 
@@ -58,56 +64,234 @@ const App = () => (
               <Route path="/login" element={<Login />} />
             </Route>
 
+            {/* Global 404 route (sin layout) */}
+            <Route path="/404" element={<NotFound />} />
+
             {/* Private routes with MainLayout */}
             <Route element={<PrivateRoute />}>
               <Route element={<MainLayout />}>
-                {/* Home - App Grid */}
+                {/* Home - App Grid (siempre accesible tras login) */}
                 <Route path="/" element={<HomePage />} />
 
-                {/* Dashboard */}
-                <Route path="/dashboard" element={<Dashboard />} />
+                {/* Dashboard - requiere ver analíticas */}
+                <Route
+                  path="/dashboard"
+                  element={
+                    <PermissionRoute any={["analytics.view"]}>
+                      <Dashboard />
+                    </PermissionRoute>
+                  }
+                />
 
                 {/* Sales */}
-                <Route path="/ventas" element={<SalesManagement />} />
+                <Route
+                  path="/ventas"
+                  element={
+                    <PermissionRoute any={["sales.view", "sales.create"]}>
+                      <SalesManagement />
+                    </PermissionRoute>
+                  }
+                />
 
                 {/* Products & Inventory */}
-                <Route path="/productos" element={<ProductManagement />} />
-                <Route path="/inventario" element={<ProductManagement />} />
-                <Route path="/inventario/importar" element={<ImportPage />} />
+                <Route
+                  path="/productos"
+                  element={
+                    <PermissionRoute any={["products.view"]}>
+                      <ProductManagement />
+                    </PermissionRoute>
+                  }
+                />
+                <Route
+                  path="/inventario"
+                  element={
+                    <PermissionRoute any={["products.view"]}>
+                      <ProductManagement />
+                    </PermissionRoute>
+                  }
+                />
+                <Route
+                  path="/inventario/importar"
+                  element={
+                    <PermissionRoute any={["products.import"]}>
+                      <ImportPage />
+                    </PermissionRoute>
+                  }
+                />
+                <Route
+                  path="/inventario/registrar-ingreso"
+                  element={
+                    <PermissionRoute any={["products.register_incoming"]}>
+                      <RegisterIncomingMerchandise />
+                    </PermissionRoute>
+                  }
+                />
 
                 {/* Returns */}
-                <Route path="/devoluciones" element={<ReturnsManagement />} />
-                <Route path="/returns/new" element={<NewReturn />} />
+                <Route
+                  path="/devoluciones"
+                  element={
+                    <PermissionRoute any={["returns.view"]}>
+                      <ReturnsManagement />
+                    </PermissionRoute>
+                  }
+                />
+                <Route
+                  path="/returns/new"
+                  element={
+                    <PermissionRoute any={["returns.manage"]}>
+                      <NewReturn />
+                    </PermissionRoute>
+                  }
+                />
 
                 {/* Cash Closure */}
-                <Route path="/cierre-caja" element={<CashClosureManagement />} />
+                <Route
+                  path="/cierre-caja"
+                  element={
+                    <PermissionRoute any={["cashclosure.view", "cashclosure.create"]}>
+                      <CashClosureManagement />
+                    </PermissionRoute>
+                  }
+                />
 
                 {/* Suppliers */}
-                <Route path="/proveedores" element={<SuppliersManagement />} />
-                <Route path="/proveedores/importar" element={<SupplierImportPage />} />
+                <Route
+                  path="/proveedores"
+                  element={
+                    <PermissionRoute any={["suppliers.view"]}>
+                      <SuppliersManagement />
+                    </PermissionRoute>
+                  }
+                />
+                <Route
+                  path="/proveedores/importar"
+                  element={
+                    <PermissionRoute any={["suppliers.import"]}>
+                      <SupplierImportPage />
+                    </PermissionRoute>
+                  }
+                />
+
+                {/* Incoming Merchandise */}
+                <Route
+                  path="/mercancia"
+                  element={
+                    <PermissionRoute any={["merchandise.view"]}>
+                      <IncomingMerchandiseManagement />
+                    </PermissionRoute>
+                  }
+                />
 
                 {/* Analytics */}
-                <Route path="/analisis" element={<Analytics />} />
+                <Route
+                  path="/analisis"
+                  element={
+                    <PermissionRoute any={["analytics.view"]}>
+                      <Analytics />
+                    </PermissionRoute>
+                  }
+                />
 
                 {/* Reports */}
-                <Route path="/reportes" element={<ReportsManagement />} />
+                <Route
+                  path="/reportes"
+                  element={
+                    <PermissionRoute any={["reports.view"]}>
+                      <ReportsManagement />
+                    </PermissionRoute>
+                  }
+                />
 
                 {/* Alerts */}
-                <Route path="/alertas" element={<AlertsManagement />} />
+                <Route
+                  path="/alertas"
+                  element={
+                    <PermissionRoute any={["alerts.view", "alerts.manage"]}>
+                      <AlertsManagement />
+                    </PermissionRoute>
+                  }
+                />
 
-                {/* Scanner */}
-                {/*<Route path="/scanner" element={<ScannerManagement />} /> */}
+                {/* Scanner (si se habilita en el futuro, envolver también en PermissionRoute) */}
+                {/* <Route
+                  path="/scanner"
+                  element={
+                    <PermissionRoute any={["scanner.view"]}>
+                      <ScannerManagement />
+                    </PermissionRoute>
+                  }
+                /> */}
 
-                {/* Promotions (Admin) */}
-                <Route path="/promociones" element={<PromotionsManagement />} />
+                {/* Promotions (Admin / permisos de promociones) */}
+                <Route
+                  path="/promociones"
+                  element={
+                    <PermissionRoute any={["promotions.view", "promotions.manage"]}>
+                      <PromotionsManagement />
+                    </PermissionRoute>
+                  }
+                />
 
                 {/* Catalogs (Admin) */}
-                <Route path="/catalogos" element={<CatalogsManagement />} />
-                <Route path="/catalogos/importar" element={<CatalogImportPage />} />
+                <Route
+                  path="/catalogos"
+                  element={
+                    <PermissionRoute any={["catalogs.view", "catalogs.manage"]}>
+                      <CatalogsManagement />
+                    </PermissionRoute>
+                  }
+                />
+                <Route
+                  path="/catalogos/importar"
+                  element={
+                    <PermissionRoute any={["catalogs.manage"]}>
+                      <CatalogImportPage />
+                    </PermissionRoute>
+                  }
+                />
 
                 {/* Users (Admin) */}
-                <Route path="/usuarios" element={<UserManagement />} />
-                <Route path="/usuarios/importar" element={<UserImportPage />} />
+                <Route
+                  path="/usuarios"
+                  element={
+                    <PermissionRoute any={["users.view", "roles.manage"]}>
+                      <UserManagement />
+                    </PermissionRoute>
+                  }
+                />
+                <Route
+                  path="/usuarios/importar"
+                  element={
+                    <PermissionRoute any={["users.view", "roles.manage"]}>
+                      <UserImportPage />
+                    </PermissionRoute>
+                  }
+                />
+                <Route
+                  path="/usuarios/roles-permisos"
+                  element={
+                    <PermissionRoute any={["roles.manage"]}>
+                      <RolesPermissionsManagement />
+                    </PermissionRoute>
+                  }
+                />
+                <Route
+                  path="/usuarios/roles-permisos/nuevo"
+                  element={
+                    <PermissionRoute any={["roles.manage"]}>
+                      <RoleCreatePage />
+                    </PermissionRoute>
+                  }
+                />
+                <Route
+                  path="/usuarios/roles-permisos/:id"
+                  element={
+                    <PermissionRoute any={["roles.manage"]}>
+                      <RolePermissionsDetail />
+                    </PermissionRoute>
+                  }
+                />
               </Route>
             </Route>
 

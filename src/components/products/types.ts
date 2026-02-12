@@ -25,12 +25,7 @@ export interface ProductFormData {
     supplier: string
     barcode: string
     description: string
-}
-
-export interface StockAdjustment {
-    amount: string
-    reason: string
-    type: 'add' | 'remove'
+    imageUrl: string
 }
 
 export interface ProductFilters {
@@ -44,7 +39,6 @@ export interface DialogStates {
     editProduct: boolean
     deleteConfirm: boolean
     scanner: boolean
-    stockAdjust: boolean
 }
 
 export const EMPTY_PRODUCT_FORM: ProductFormData = {
@@ -58,7 +52,8 @@ export const EMPTY_PRODUCT_FORM: ProductFormData = {
     minStock: '',
     supplier: '',
     barcode: '',
-    description: ''
+    description: '',
+    imageUrl: ''
 }
 
 export const getProductStatusBadge = (product: Product) => {
