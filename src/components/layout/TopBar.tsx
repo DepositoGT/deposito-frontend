@@ -44,6 +44,7 @@ export const TopBar = () => {
 
     // Obtener el usuario completo del contexto de autenticación
     const currentUser: CurrentUser = authUser || (roleUser as AuthUser | UserType | null)
+    const roleName = currentUser?.role?.name ?? null
 
     // Get critical products for notification badge
     const { data: criticalProducts = [] } = useCriticalProducts()
@@ -138,7 +139,10 @@ export const TopBar = () => {
                             <div className='flex flex-col'>
                                 <span>{currentUser?.name || 'Usuario'}</span>
                                 <span className='text-xs font-normal text-muted-foreground'>
-                                    {currentUser?.email || currentUser?.role?.name || 'Sin rol'}
+                                    {currentUser?.email || 'Sin correo'}
+                                </span>
+                                <span className='text-xs font-normal text-muted-foreground'>
+                                    Cargo: {roleName || 'Sin rol'}
                                 </span>
                             </div>
                         </DropdownMenuLabel>
