@@ -306,6 +306,18 @@ export default function SupplierImportPage() {
                 body: JSON.stringify({ suppliers: mappedData })
             })
 
+            if (!response.ok) {
+                const errorText = await response.text()
+                let errorMessage = 'Error al validar proveedores'
+                try {
+                    const errorJson = JSON.parse(errorText)
+                    errorMessage = errorJson.message || errorMessage
+                } catch {
+                    errorMessage = errorText || `Error ${response.status}: ${response.statusText}`
+                }
+                throw new Error(errorMessage)
+            }
+
             const result = await response.json()
 
             if (result.invalidRows && result.invalidRows.length > 0) {
@@ -335,7 +347,19 @@ export default function SupplierImportPage() {
             setHasTestedOnce(true)
             setStep('mapping')
         } catch (err) {
-            toast({ title: 'Error de validación', description: err instanceof Error ? err.message : 'Error al validar', variant: 'destructive' })
+            const errorMessage = err instanceof Error ? err.message : 'Error al validar proveedores'
+            toast({ 
+                title: 'Error de validación', 
+                description: errorMessage, 
+                variant: 'destructive' 
+            })
+            // Set a general error to display in the UI
+            setValidationErrors([{
+                rowIndex: -1,
+                errors: [errorMessage],
+                fieldErrors: { _general: [errorMessage] }
+            }])
+            setValidRowCount(0)
             setStep('mapping')
         } finally {
             setIsTesting(false)
@@ -387,11 +411,20 @@ export default function SupplierImportPage() {
             })
 
             setImportProgress(80)
-            const result = await response.json()
-
+            
             if (!response.ok) {
-                throw new Error(result.message || 'Error en importación')
+                const errorText = await response.text()
+                let errorMessage = 'Error en importación'
+                try {
+                    const errorJson = JSON.parse(errorText)
+                    errorMessage = errorJson.message || errorMessage
+                } catch {
+                    errorMessage = errorText || `Error ${response.status}: ${response.statusText}`
+                }
+                throw new Error(errorMessage)
             }
+
+            const result = await response.json()
 
             setImportProgress(100)
             setImportResult(result)
