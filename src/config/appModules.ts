@@ -25,7 +25,8 @@ import {
     ScannerIcon,
     PromocionesIcon,
     CatalogosIcon,
-    UsuariosIcon
+    UsuariosIcon,
+    MercanciaIcon
 } from '@/components/icons/CustomIcons'
 import { ForwardRefExoticComponent, RefAttributes, SVGProps } from 'react'
 
@@ -103,6 +104,15 @@ export const appModules: AppModule[] = [
         color: 'bg-orange-100',
         iconColor: 'text-orange-600',
         permissions: ['suppliers.view']
+    },
+    {
+        id: 'merchandise',
+        label: 'Mercancía',
+        path: '/mercancia',
+        icon: MercanciaIcon,
+        color: 'bg-orange-100',
+        iconColor: 'text-orange-600',
+        permissions: ['merchandise.view']
     },
     {
         id: 'analytics',

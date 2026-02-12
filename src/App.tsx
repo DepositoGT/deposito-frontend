@@ -24,6 +24,7 @@ import ImportPage from "./pages/ImportPage";
 import SupplierImportPage from "./pages/SupplierImportPage";
 import CatalogImportPage from "./pages/CatalogImportPage";
 import UserImportPage from "./pages/UserImportPage";
+import { RegisterIncomingMerchandise } from "./pages/RegisterIncomingMerchandise";
 import AuthProvider from "@/context/AuthProvider";
 
 // Layout
@@ -46,6 +47,7 @@ import { CatalogsManagement } from "@/components/CatalogsManagement";
 import ReturnsManagement from "@/components/ReturnsManagement";
 import CashClosureManagement from "@/components/CashClosureManagement";
 import PromotionsManagement from "@/components/PromotionsManagement";
+import IncomingMerchandiseManagement from "@/components/IncomingMerchandiseManagement";
 
 const queryClient = new QueryClient();
 
@@ -116,6 +118,14 @@ const App = () => (
                     </PermissionRoute>
                   }
                 />
+                <Route
+                  path="/inventario/registrar-ingreso"
+                  element={
+                    <PermissionRoute any={["products.register_incoming"]}>
+                      <RegisterIncomingMerchandise />
+                    </PermissionRoute>
+                  }
+                />
 
                 {/* Returns */}
                 <Route
@@ -159,6 +169,16 @@ const App = () => (
                   element={
                     <PermissionRoute any={["suppliers.import"]}>
                       <SupplierImportPage />
+                    </PermissionRoute>
+                  }
+                />
+
+                {/* Incoming Merchandise */}
+                <Route
+                  path="/mercancia"
+                  element={
+                    <PermissionRoute any={["merchandise.view"]}>
+                      <IncomingMerchandiseManagement />
                     </PermissionRoute>
                   }
                 />

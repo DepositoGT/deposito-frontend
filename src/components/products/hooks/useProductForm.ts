@@ -105,17 +105,32 @@ export const useProductForm = (): UseProductFormReturn => {
         suppliers: Array<{ id: string | number; name: string }>,
         categories: Array<{ id: string | number; name: string }>
     ) => {
-        let supplierValue = String(product.supplier ?? '')
-        const matchSupplier = suppliers.find(s =>
-            String(s.name).toLowerCase() === String(product.supplier ?? '').toLowerCase()
-        )
-        if (matchSupplier) supplierValue = String(matchSupplier.id)
+        // Obtener supplier_id: primero intentar usar supplierId si está disponible
+        let supplierValue = ''
+        if (product.supplierId) {
+            supplierValue = String(product.supplierId)
+        } else {
+            // Si no hay supplierId, buscar por nombre
+            const supplierName = String(product.supplier ?? '')
+            const matchSupplier = suppliers.find(s =>
+                String(s.name).toLowerCase() === supplierName.toLowerCase()
+            )
+            if (matchSupplier) {
+                supplierValue = String(matchSupplier.id)
+            } else {
+                // Si no se encuentra, usar el nombre como fallback (el backend lo manejará)
+                supplierValue = supplierName
+            }
+        }
 
+        // Obtener category_id: buscar por nombre si es necesario
         let categoryValue = String(product.category ?? '')
         const matchCategory = categories.find(c =>
             String(c.name).toLowerCase() === String(product.category ?? '').toLowerCase()
         )
-        if (matchCategory) categoryValue = String(matchCategory.id)
+        if (matchCategory) {
+            categoryValue = String(matchCategory.id)
+        }
 
         setFormData({
             name: product.name,
@@ -128,7 +143,8 @@ export const useProductForm = (): UseProductFormReturn => {
             minStock: product.minStock.toString(),
             supplier: supplierValue,
             barcode: product.barcode,
-            description: product.description || ''
+            description: product.description || '',
+            imageUrl: product.imageUrl || ''
         })
     }, [])
 

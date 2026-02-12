@@ -434,7 +434,11 @@ const SuppliersManagement = () => {
                 <Button variant="outline" onClick={() => setIsNewSupplierOpen(false)} disabled={createIsLoading}>
                   Cancelar
                 </Button>
-                <Button className="bg-liquor-amber hover:bg-liquor-amber/90 text-white" disabled={!isAdmin || createIsLoading} onClick={handleCreateSupplier}>
+                <Button
+                  className="bg-liquor-amber hover:bg-liquor-amber/90 text-white"
+                  disabled={createIsLoading}
+                  onClick={handleCreateSupplier}
+                >
                   {createIsLoading ? (
                     <svg className="animate-spin w-4 h-4 mr-2 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>

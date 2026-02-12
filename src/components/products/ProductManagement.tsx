@@ -22,7 +22,7 @@ import { Badge } from '@/components/ui/badge'
 import { Label } from '@/components/ui/label'
 import {
     Plus, Search, Filter, Edit, Trash2, Eye, ScanLine, Download, MoreVertical,
-    QrCode, PackagePlus, ChevronLeft, ChevronRight, Upload
+    QrCode, PackagePlus, ChevronLeft, ChevronRight, Upload, LayoutGrid, List, Package
 } from 'lucide-react'
 import {
     DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger
@@ -41,17 +41,17 @@ import { useCategories } from '@/hooks/useCategories'
 import { useCreateProduct } from '@/hooks/useCreateProduct'
 import { useDeleteProduct } from '@/hooks/useDeleteProduct'
 import useUpdateProduct from '@/hooks/useUpdateProduct'
-import useAdjustStock from '@/hooks/useAdjustStock'
 import { adaptApiProduct } from '@/services/productService'
 import { Pagination } from '@/components/shared/Pagination'
 
 // Feature imports
 import { useProductForm } from './hooks'
-import { ProductFormDialog, StockAdjustDialog, ProductDetailDialog, ImportDialog } from './components'
-import type { StockAdjustment } from './types'
+import { ProductFormDialog, ProductDetailDialog, ImportDialog } from './components'
 import { useAuthPermissions } from '@/hooks/useAuthPermissions'
+import { useNavigate } from 'react-router-dom'
 
 const ProductManagement = () => {
+    const navigate = useNavigate()
     const { toast } = useToast()
     const { hasPermission } = useAuthPermissions()
 
@@ -68,17 +68,14 @@ const ProductManagement = () => {
     const [isViewProductOpen, setIsViewProductOpen] = useState(false)
     const [isEditProductOpen, setIsEditProductOpen] = useState(false)
     const [isScannerOpen, setIsScannerOpen] = useState(false)
-    const [isStockAdjustOpen, setIsStockAdjustOpen] = useState(false)
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
     const [isImportDialogOpen, setIsImportDialogOpen] = useState(false)
+    const [viewMode, setViewMode] = useState<'table' | 'cards'>('cards')
 
     // Selected product
     const [selectedProduct, setSelectedProduct] = useState<Product | null>(null)
     const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null)
     const [scannedCode, setScannedCode] = useState('')
-    const [stockAdjustment, setStockAdjustment] = useState<StockAdjustment>({
-        amount: '', reason: '', type: 'add'
-    })
 
     // Data hooks
     const { data: productsData, isLoading, isError, refetch: refetchProducts } = useProducts({
@@ -106,7 +103,6 @@ const ProductManagement = () => {
     const createProductMutation = useCreateProduct()
     const updateMutation = useUpdateProduct()
     const deleteMutation = useDeleteProduct()
-    const adjustStockMutation = useAdjustStock()
     const { mutateAsync: deleteMutateAsync, isPending: deleteIsLoading } = deleteMutation
 
     // Form hook
@@ -130,12 +126,12 @@ const ProductManagement = () => {
     const totalItems = productsData?.totalItems || 0
 
     // Permisos
-    const canExport = hasPermission('products.view', 'reports.view')
     const canImport = hasPermission('products.import')
+    const canExport = canImport && hasPermission('products.view', 'reports.view')
     const canCreate = hasPermission('products.create')
     const canEdit = hasPermission('products.edit')
     const canDelete = hasPermission('products.delete')
-    const canAdjustStock = hasPermission('products.adjust_stock')
+    const canRegisterIncoming = hasPermission('products.register_incoming')
 
     // Export handler
     const handleExport = async () => {
@@ -173,6 +169,7 @@ const ProductManagement = () => {
             min_stock: productForm.formData.minStock ? Number(productForm.formData.minStock) : 0,
             price: Number(productForm.formData.price),
             cost: productForm.formData.cost ? Number(productForm.formData.cost) : 0,
+            image_url: productForm.formData.imageUrl || undefined,
             supplier_id: productForm.formData.supplier,
             barcode: productForm.formData.barcode?.trim() || undefined,
             description: productForm.formData.description?.trim() || undefined,
@@ -206,6 +203,7 @@ const ProductManagement = () => {
                 min_stock: productForm.formData.minStock ? Number(productForm.formData.minStock) : 0,
                 price: Number(productForm.formData.price),
                 cost: productForm.formData.cost ? Number(productForm.formData.cost) : 0,
+                image_url: productForm.formData.imageUrl || undefined,
                 supplier_id: productForm.formData.supplier,
                 barcode: productForm.formData.barcode?.trim() || undefined,
                 description: productForm.formData.description?.trim() || undefined,
@@ -241,35 +239,6 @@ const ProductManagement = () => {
         }
     }
 
-    const handleAdjustStock = () => {
-        if (!selectedProduct || !stockAdjustment.amount || !stockAdjustment.reason) {
-            toast({ title: 'Error', description: 'Complete todos los campos', variant: 'destructive' })
-            return
-        }
-
-        const payload: { type: 'add' | 'remove'; amount: number; reason: string; supplier_id?: string; cost?: number } = {
-            type: stockAdjustment.type,
-            amount: parseInt(stockAdjustment.amount),
-            reason: stockAdjustment.reason
-        }
-
-        if (stockAdjustment.type === 'add') {
-            if (productForm.formData.supplier) payload.supplier_id = productForm.formData.supplier
-            if (productForm.formData.cost) payload.cost = Number(productForm.formData.cost) || undefined
-        }
-
-        adjustStockMutation.mutate({ id: selectedProduct.id, payload }, {
-            onSuccess: () => {
-                toast({ title: 'Ajuste realizado', description: 'El stock fue ajustado correctamente' })
-                setIsStockAdjustOpen(false)
-                setStockAdjustment({ amount: '', reason: '', type: 'add' })
-            },
-            onError: (err: unknown) => {
-                const message = (err as { message?: string })?.message || 'No se pudo ajustar el stock'
-                toast({ title: 'Error', description: message, variant: 'destructive' })
-            }
-        })
-    }
 
     // View/Edit handlers
     const viewProduct = (product: Product) => {
@@ -283,11 +252,6 @@ const ProductManagement = () => {
         setIsEditProductOpen(true)
     }
 
-    const openStockAdjust = (product: Product) => {
-        setSelectedProduct(product)
-        setStockAdjustment({ amount: '', reason: '', type: 'add' })
-        setIsStockAdjustOpen(true)
-    }
 
     const searchByBarcode = () => {
         if (!scannedCode) return
@@ -318,6 +282,16 @@ const ProductManagement = () => {
                     {canImport && (
                         <Button variant="outline" onClick={() => setIsImportDialogOpen(true)} size="sm" className="shrink-0">
                             <Upload className="w-4 h-4 sm:mr-2" /><span className="hidden sm:inline">Importar</span>
+                        </Button>
+                    )}
+                    {canRegisterIncoming && (
+                        <Button
+                            variant="outline"
+                            onClick={() => navigate('/inventario/registrar-ingreso')}
+                            size="sm"
+                            className="shrink-0"
+                        >
+                            <Package className="w-4 h-4 sm:mr-2" /><span className="hidden sm:inline">Registrar Ingreso</span>
                         </Button>
                     )}
                     <Dialog open={isScannerOpen} onOpenChange={setIsScannerOpen}>
@@ -391,82 +365,181 @@ const ProductManagement = () => {
                 </CardContent>
             </Card>
 
-            {/* Products Table */}
+            {/* Products View (table or cards) */}
             <Card>
-                <CardHeader>
+                <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                     <CardTitle>Productos ({totalItems})</CardTitle>
+                    {/* View mode toggle (Tabla / Cuadros) */}
+                    <div className="flex items-center gap-2">
+                        <Button
+                            type="button"
+                            variant={viewMode === 'table' ? 'default' : 'outline'}
+                            size="sm"
+                            onClick={() => setViewMode('table')}
+                        >
+                            <List className="w-4 h-4 mr-2" />
+                            Tabla
+                        </Button>
+                        <Button
+                            type="button"
+                            variant={viewMode === 'cards' ? 'default' : 'outline'}
+                            size="sm"
+                            onClick={() => setViewMode('cards')}
+                        >
+                            <LayoutGrid className="w-4 h-4 mr-2" />
+                            Cuadros
+                        </Button>
+                    </div>
                 </CardHeader>
                 <CardContent>
                     {isLoading && <div className="p-6 text-muted-foreground">Cargando productos...</div>}
                     {isError && !isLoading && <div className="p-6 text-destructive">Error al cargar productos.</div>}
                     {!isLoading && !isError && (
-                        <div className="overflow-x-auto">
-                            <table className="w-full">
-                                <thead>
-                                    <tr className="border-b border-border">
-                                        <th className="text-left p-3 font-medium text-muted-foreground">Producto</th>
-                                        <th className="text-left p-3 font-medium text-muted-foreground">Categoría</th>
-                                        <th className="text-center p-3 font-medium text-muted-foreground">Stock</th>
-                                        <th className="text-right p-3 font-medium text-muted-foreground">Precio</th>
-                                        <th className="text-center p-3 font-medium text-muted-foreground">Estado</th>
-                                        <th className="text-center p-3 font-medium text-muted-foreground">Acciones</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {paginatedProducts.length === 0 ? (
-                                        <tr><td colSpan={6} className="p-6 text-center text-muted-foreground">No hay productos para mostrar.</td></tr>
-                                    ) : paginatedProducts.map((product, index) => (
-                                        <tr key={product.id} className="border-b border-border hover:bg-muted transition-colors animate-slide-up" style={{ animationDelay: `${index * 50}ms` }}>
-                                            <td className="p-3">
-                                                <div className="font-medium text-foreground">{product.name}</div>
-                                                <div className="text-sm text-muted-foreground">{product.brand} • {product.size}</div>
-                                                <div className="text-xs text-muted-foreground">Código: {product.id}</div>
-                                            </td>
-                                            <td className="p-3"><Badge variant="outline">{String(product.category)}</Badge></td>
-                                            <td className="p-3 text-center">
-                                                <div className="font-medium text-foreground">{product.stock}</div>
-                                                <div className="text-xs text-muted-foreground">Min: {product.minStock}</div>
-                                            </td>
-                                            <td className="p-3 text-right">
-                                                <div className="font-medium text-foreground">Q {product.price.toFixed(2)}</div>
-                                                {canCreate && (
-                                                    <div className="text-xs text-muted-foreground">Costo: Q {product.cost.toFixed(2)}</div>
+                        <div className="space-y-4">
+                            {paginatedProducts.length === 0 ? (
+                                <div className="p-6 text-center text-muted-foreground">
+                                    No hay productos para mostrar.
+                                </div>
+                            ) : viewMode === 'table' ? (
+                                // Vista de lista (tabla)
+                                <div className="overflow-x-auto">
+                                    <table className="w-full">
+                                        <thead>
+                                            <tr className="border-b border-border">
+                                                <th className="text-left p-3 font-medium text-muted-foreground">Producto</th>
+                                                <th className="text-left p-3 font-medium text-muted-foreground">Categoría</th>
+                                                <th className="text-center p-3 font-medium text-muted-foreground">Stock</th>
+                                                <th className="text-right p-3 font-medium text-muted-foreground">Precio</th>
+                                                <th className="text-center p-3 font-medium text-muted-foreground">Estado</th>
+                                                <th className="text-center p-3 font-medium text-muted-foreground">Acciones</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {paginatedProducts.map((product, index) => (
+                                                <tr key={product.id} className="border-b border-border hover:bg-muted transition-colors animate-slide-up" style={{ animationDelay: `${index * 50}ms` }}>
+                                                    <td className="p-3">
+                                                        <div className="font-medium text-foreground">{product.name}</div>
+                                                        <div className="text-sm text-muted-foreground">{product.brand} • {product.size}</div>
+                                                        <div className="text-xs text-muted-foreground">Código: {product.id}</div>
+                                                    </td>
+                                                    <td className="p-3"><Badge variant="outline">{String(product.category)}</Badge></td>
+                                                    <td className="p-3 text-center">
+                                                        <div className="font-medium text-foreground">{product.stock}</div>
+                                                        <div className="text-xs text-muted-foreground">Min: {product.minStock}</div>
+                                                    </td>
+                                                    <td className="p-3 text-right">
+                                                        <div className="font-medium text-foreground">Q {product.price.toFixed(2)}</div>
+                                                        {canCreate && (
+                                                            <div className="text-xs text-muted-foreground">Costo: Q {product.cost.toFixed(2)}</div>
+                                                        )}
+                                                    </td>
+                                                    <td className="p-3 text-center">{getStatusBadge(product)}</td>
+                                                    <td className="p-3 text-center">
+                                                        <DropdownMenu>
+                                                            <DropdownMenuTrigger asChild>
+                                                                <Button variant="ghost" size="sm"><MoreVertical className="w-4 h-4" /></Button>
+                                                            </DropdownMenuTrigger>
+                                                            <DropdownMenuContent align="end" className="bg-popover border-border">
+                                                                <DropdownMenuItem onClick={() => viewProduct(product)}><Eye className="w-4 h-4 mr-2" />Ver Detalles</DropdownMenuItem>
+                                                                {canEdit && (
+                                                                    <DropdownMenuItem onClick={() => editProduct(product)}>
+                                                                        <Edit className="w-4 h-4 mr-2" />Editar
+                                                                    </DropdownMenuItem>
+                                                                )}
+                                                                <DropdownMenuItem onClick={() => viewProduct(product)}><ScanLine className="w-4 h-4 mr-2" />Ver Código</DropdownMenuItem>
+                                                                {canDelete && (
+                                                                    <DropdownMenuItem
+                                                                        className="text-destructive"
+                                                                        onClick={() => { setDeleteTargetId(product.id); setIsDeleteDialogOpen(true) }}
+                                                                    >
+                                                                        <Trash2 className="w-4 h-4 mr-2" />Eliminar
+                                                                    </DropdownMenuItem>
+                                                                )}
+                                                            </DropdownMenuContent>
+                                                        </DropdownMenu>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            ) : (
+                                // Vista de cuadros (cards)
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                                    {paginatedProducts.map((product, index) => (
+                                        <div
+                                            key={product.id}
+                                            className="border border-border rounded-lg p-4 bg-card shadow-sm hover:shadow-md transition-shadow animate-slide-up"
+                                            style={{ animationDelay: `${index * 50}ms` }}
+                                        >
+                                            <div className="flex items-start gap-3">
+                                                <div className="w-16 h-16 rounded-md overflow-hidden bg-muted flex items-center justify-center border border-border">
+                                                    {product.imageUrl ? (
+                                                        <img
+                                                            src={product.imageUrl}
+                                                            alt={product.name}
+                                                            className="w-full h-full object-cover"
+                                                        />
+                                                    ) : (
+                                                        <span className="text-xs text-muted-foreground text-center px-1">
+                                                            Sin imagen
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="flex items-center justify-between gap-2">
+                                                        <h3 className="font-semibold text-foreground truncate">{product.name}</h3>
+                                                        {getStatusBadge(product)}
+                                                    </div>
+                                                    <p className="text-xs text-muted-foreground truncate">
+                                                        {product.brand} • {product.size}
+                                                    </p>
+                                                    <p className="text-xs text-muted-foreground">
+                                                        Categoría: <span className="font-medium">{String(product.category)}</span>
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            <div className="mt-3 flex items-center justify-between text-sm">
+                                                <div>
+                                                    <div className="text-xs text-muted-foreground">Precio</div>
+                                                    <div className="font-semibold text-primary">Q {product.price.toFixed(2)}</div>
+                                                    {canCreate && (
+                                                        <div className="text-[11px] text-muted-foreground">
+                                                            Costo: Q {product.cost.toFixed(2)}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                                <div className="text-right">
+                                                    <div className="text-xs text-muted-foreground">Stock</div>
+                                                    <div className="font-semibold">{product.stock}</div>
+                                                    <div className="text-[11px] text-muted-foreground">
+                                                        Min: {product.minStock}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div className="mt-3 flex flex-wrap gap-2">
+                                                <Button size="sm" variant="outline" onClick={() => viewProduct(product)}>
+                                                    <Eye className="w-3 h-3 mr-1" /> Detalles
+                                                </Button>
+                                                {canEdit && (
+                                                    <Button size="sm" variant="outline" onClick={() => editProduct(product)}>
+                                                        <Edit className="w-3 h-3 mr-1" /> Editar
+                                                    </Button>
                                                 )}
-                                            </td>
-                                            <td className="p-3 text-center">{getStatusBadge(product)}</td>
-                                            <td className="p-3 text-center">
-                                                <DropdownMenu>
-                                                    <DropdownMenuTrigger asChild>
-                                                        <Button variant="ghost" size="sm"><MoreVertical className="w-4 h-4" /></Button>
-                                                    </DropdownMenuTrigger>
-                                                    <DropdownMenuContent align="end" className="bg-popover border-border">
-                                                        <DropdownMenuItem onClick={() => viewProduct(product)}><Eye className="w-4 h-4 mr-2" />Ver Detalles</DropdownMenuItem>
-                                                        {canEdit && (
-                                                            <DropdownMenuItem onClick={() => editProduct(product)}>
-                                                                <Edit className="w-4 h-4 mr-2" />Editar
-                                                            </DropdownMenuItem>
-                                                        )}
-                                                        {canAdjustStock && (
-                                                            <DropdownMenuItem onClick={() => openStockAdjust(product)}>
-                                                                <PackagePlus className="w-4 h-4 mr-2" />Ajustar Stock
-                                                            </DropdownMenuItem>
-                                                        )}
-                                                        <DropdownMenuItem onClick={() => viewProduct(product)}><ScanLine className="w-4 h-4 mr-2" />Ver Código</DropdownMenuItem>
-                                                        {canDelete && (
-                                                            <DropdownMenuItem
-                                                                className="text-destructive"
-                                                                onClick={() => { setDeleteTargetId(product.id); setIsDeleteDialogOpen(true) }}
-                                                            >
-                                                                <Trash2 className="w-4 h-4 mr-2" />Eliminar
-                                                            </DropdownMenuItem>
-                                                        )}
-                                                    </DropdownMenuContent>
-                                                </DropdownMenu>
-                                            </td>
-                                        </tr>
+                                                {canDelete && (
+                                                    <Button
+                                                        size="sm"
+                                                        variant="destructive"
+                                                        onClick={() => { setDeleteTargetId(product.id); setIsDeleteDialogOpen(true) }}
+                                                    >
+                                                        <Trash2 className="w-3 h-3 mr-1" /> Eliminar
+                                                    </Button>
+                                                )}
+                                            </div>
+                                        </div>
                                     ))}
-                                </tbody>
-                            </table>
+                                </div>
+                            )}
 
                             {/* Pagination */}
                             {productsData && productsData.totalPages > 1 && (
@@ -519,15 +592,6 @@ const ProductManagement = () => {
                 product={selectedProduct}
             />
 
-            <StockAdjustDialog
-                open={isStockAdjustOpen}
-                onOpenChange={setIsStockAdjustOpen}
-                product={selectedProduct}
-                adjustment={stockAdjustment}
-                onAdjustmentChange={(field, value) => setStockAdjustment(prev => ({ ...prev, [field]: value }))}
-                onConfirm={handleAdjustStock}
-                isLoading={adjustStockMutation.isPending}
-            />
 
             {/* Delete Confirmation */}
             <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
