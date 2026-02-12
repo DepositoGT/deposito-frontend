@@ -18,7 +18,7 @@
  * - Real-time validation feedback
  */
 import { useState, useEffect, useMemo } from 'react'
-import { getApiBaseUrl } from '@/services/api'
+import { apiFetch } from '@/services/api'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import * as XLSX from 'xlsx'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -175,26 +175,26 @@ export default function ImportPage() {
     useEffect(() => {
         const fetchCatalogs = async () => {
             try {
-                const token = localStorage.getItem('auth:token')
-                const headers = { 'Authorization': `Bearer ${token}` }
-
-                const [catRes, supRes] = await Promise.all([
-                    fetch('/api/catalogs/product-categories?page=1&pageSize=1000', { headers }),
-                    fetch('/api/suppliers?page=1&pageSize=1000', { headers })
+                const [catData, supData] = await Promise.all([
+                    apiFetch<unknown>('/api/catalogs/product-categories?page=1&pageSize=1000'),
+                    apiFetch<unknown>('/api/suppliers?page=1&pageSize=1000')
                 ])
 
-                if (catRes.ok) {
-                    const catData = await catRes.json()
+                if (catData) {
                     console.log('Categories loaded:', catData)
-                    const catItems = Array.isArray(catData) ? catData : (catData.items ?? [])
+                    const catItems = Array.isArray(catData)
+                        ? catData
+                        : (catData as { items?: Array<{ id: number; name: string }> }).items ?? []
                     if (Array.isArray(catItems)) {
                         setCategories(catItems.map((c: { id: number; name: string }) => ({ id: c.id, name: c.name })))
                     }
                 }
-                if (supRes.ok) {
-                    const supData = await supRes.json()
+
+                if (supData) {
                     console.log('Suppliers loaded:', supData)
-                    const supItems = Array.isArray(supData) ? supData : (supData.items ?? [])
+                    const supItems = Array.isArray(supData)
+                        ? supData
+                        : (supData as { items?: Array<{ id: number; name: string }> }).items ?? []
                     if (Array.isArray(supItems)) {
                         setSuppliers(supItems.map((s: { id: number; name: string }) => ({ id: s.id, name: s.name })))
                     }
@@ -341,21 +341,10 @@ export default function ImportPage() {
             setImportProgress(65)
 
             // Send to server for validation and import
-            const token = localStorage.getItem('auth:token')
-            const response = await fetch(`${getApiBaseUrl()}/products/bulk-import-mapped`, {
+            const result = await apiFetch<{ created: number; skipped?: number }>('/products/bulk-import-mapped', {
                 method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json'
-                },
                 body: JSON.stringify({ products: mappedData })
             })
-
-            const result = await response.json()
-
-            if (!response.ok) {
-                throw new Error(result.message || 'Error en importación')
-            }
 
             setImportProgress(100)
             setImportResult(result)
@@ -409,17 +398,13 @@ export default function ImportPage() {
             })
 
             // Send to server for validation only
-            const token = localStorage.getItem('auth:token')
-            const response = await fetch(`${getApiBaseUrl()}/products/validate-import-mapped`, {
+            const result = await apiFetch<{
+                invalidRows?: Array<{ rowIndex: number; errors: string[] }>
+                totals?: { valid: number }
+            }>('/products/validate-import-mapped', {
                 method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json'
-                },
                 body: JSON.stringify({ products: mappedData })
             })
-
-            const result = await response.json()
 
             if (result.invalidRows && result.invalidRows.length > 0) {
                 // Process errors and extract field-specific errors

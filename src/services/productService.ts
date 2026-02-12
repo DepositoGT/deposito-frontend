@@ -73,6 +73,12 @@ export const adaptApiProduct = (p: ApiProduct): Product => {
 
   const status = mapStatus(statusRaw);
 
+  // Extraer supplier_id si está disponible (para uso interno)
+  const supplierId = 
+    (typeof p.supplier === "object" && (p.supplier as { id?: string | number }).id)
+      ? String((p.supplier as { id: string | number }).id)
+      : (p.supplier_id != null ? String(p.supplier_id) : undefined);
+
   return {
     id: String(p.id),
     name: p.name,
@@ -84,8 +90,10 @@ export const adaptApiProduct = (p: ApiProduct): Product => {
     price: toNumber(p.price, 0),
     cost: toNumber(p.cost, 0),
     supplier: supplier || "",
+    supplierId: supplierId, // Agregar supplierId para uso interno
     barcode: p.barcode || "",
     description: (p.description ?? "") as string,
+    imageUrl: (p.image_url ?? undefined) as string | undefined,
     status,
     deleted: p.deleted === true || p.deleted === 1 || (p as { deleted?: boolean }).deleted === true,
     deleted_at: (p as { deleted_at?: string | null }).deleted_at || null,
@@ -97,6 +105,7 @@ export interface ProductsQueryParams {
   pageSize?: number;
   search?: string;
   category?: string;
+  supplier?: string;
   includeDeleted?: boolean;
 }
 
@@ -116,6 +125,7 @@ export const fetchProducts = async (params?: ProductsQueryParams): Promise<Produ
   if (params?.pageSize) search.set("pageSize", String(params.pageSize));
   if (params?.search) search.set("search", params.search);
   if (params?.category && params.category !== 'all') search.set("category", params.category);
+  if (params?.supplier) search.set("supplier", params.supplier);
   if (params?.includeDeleted) search.set("includeDeleted", "true");
 
   const url = `/api/products${search.toString() ? `?${search.toString()}` : ""}`;
@@ -209,21 +219,3 @@ export const updateProduct = async (id: string, payload: UpdateProductPayload): 
   return data;
 };
 
-export interface StockAdjustPayload {
-  type: "add" | "remove";
-  amount: number;
-  reason: string;
-  supplier_id?: string;
-  cost?: number;
-}
-
-export const adjustProductStock = async (
-  id: string,
-  payload: StockAdjustPayload
-): Promise<{ updated?: boolean } | Record<string, unknown> | undefined> => {
-  const data = await apiFetch<Record<string, unknown> | { updated?: boolean } | undefined>(`/api/products/${id}/stock-adjust`, {
-    method: "POST",
-    body: JSON.stringify(payload),
-  });
-  return data;
-};
