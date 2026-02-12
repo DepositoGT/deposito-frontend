@@ -21,8 +21,10 @@ export interface Product extends BaseEntity {
   price: number;
   cost: number;
   supplier: string;
+  supplierId?: string; // ID del proveedor (para uso interno)
   barcode: string;
   description: string;
+  imageUrl?: string;
   status: StockStatus | string; // Permitir string para flexibilidad
   deleted?: boolean; // Campo para soft delete
   deleted_at?: string | null; // Fecha de eliminación
@@ -88,6 +90,7 @@ export interface ApiProduct {
   min_stock?: number | string;
   price?: number | string;
   cost?: number | string;
+   image_url?: string | null;
   supplier?: string | { id: string | number; name: string };
   supplier_id?: string | number;
   supplier_name?: string;
@@ -108,6 +111,7 @@ export interface CreateProductPayload {
   min_stock?: number;
   price?: number;
   cost?: number;
+  image_url?: string;
   supplier_id?: string;
   barcode?: string;
   description?: string;

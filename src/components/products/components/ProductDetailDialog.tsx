@@ -16,6 +16,7 @@ import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { QrCode } from 'lucide-react'
 import type { Product } from '@/types/product'
+import { useAuthPermissions } from '@/hooks/useAuthPermissions'
 
 interface ProductDetailDialogProps {
     open: boolean
@@ -38,15 +39,29 @@ export const ProductDetailDialog = ({
     onOpenChange,
     product
 }: ProductDetailDialogProps) => {
+    const { hasPermission } = useAuthPermissions()
+    const canCreateProducts = hasPermission('products.create')
+
     if (!product) return null
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-2xl">
+            {/* max-h y overflow para que en móvil/escritorio el contenido no empuje la X fuera de la pantalla */}
+            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
                     <DialogTitle>Detalle del Producto</DialogTitle>
                 </DialogHeader>
                 <div className="space-y-4">
+                    {product.imageUrl && (
+                        <div className="w-full rounded-md overflow-hidden border border-border bg-muted flex items-center justify-center">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                                src={product.imageUrl}
+                                alt={product.name}
+                                className="w-full max-h-64 object-contain"
+                            />
+                        </div>
+                    )}
                     <div className="grid grid-cols-2 gap-4">
                         <div>
                             <Label>Nombre</Label>
@@ -68,10 +83,12 @@ export const ProductDetailDialog = ({
                             <Label>Precio de Venta</Label>
                             <div className="font-medium text-primary">Q {product.price.toFixed(2)}</div>
                         </div>
-                        <div>
-                            <Label>Costo</Label>
-                            <div className="font-medium">Q {product.cost.toFixed(2)}</div>
-                        </div>
+                        {canCreateProducts && (
+                            <div>
+                                <Label>Costo</Label>
+                                <div className="font-medium">Q {product.cost.toFixed(2)}</div>
+                            </div>
+                        )}
                         <div>
                             <Label>Stock Actual</Label>
                             <div className="font-medium">{product.stock} unidades</div>
@@ -107,21 +124,23 @@ export const ProductDetailDialog = ({
                         <div>{getStatusBadge(product)}</div>
                     </div>
 
-                    <div className="bg-muted/50 p-4 rounded-lg">
-                        <div className="grid grid-cols-2 gap-4 text-sm">
-                            <div>
-                                <span className="text-muted-foreground">Margen de Ganancia:</span>
-                                <div className="font-medium">
-                                    Q {(product.price - product.cost).toFixed(2)} (
-                                    {(((product.price - product.cost) / product.price) * 100).toFixed(1)}%)
+                    {canCreateProducts && (
+                        <div className="bg-muted/50 p-4 rounded-lg">
+                            <div className="grid grid-cols-2 gap-4 text-sm">
+                                <div>
+                                    <span className="text-muted-foreground">Margen de Ganancia:</span>
+                                    <div className="font-medium">
+                                        Q {(product.price - product.cost).toFixed(2)} (
+                                        {(((product.price - product.cost) / product.price) * 100).toFixed(1)}%)
+                                    </div>
+                                </div>
+                                <div>
+                                    <span className="text-muted-foreground">Valor de Inventario:</span>
+                                    <div className="font-medium">Q {(product.stock * product.cost).toFixed(2)}</div>
                                 </div>
                             </div>
-                            <div>
-                                <span className="text-muted-foreground">Valor de Inventario:</span>
-                                <div className="font-medium">Q {(product.stock * product.cost).toFixed(2)}</div>
-                            </div>
                         </div>
-                    </div>
+                    )}
                 </div>
             </DialogContent>
         </Dialog>
