@@ -289,7 +289,7 @@ const App = () => (
                 <Route
                   path="/usuarios/roles-permisos"
                   element={
-                    <PermissionRoute any={["roles.manage"]}>
+                    <PermissionRoute any={["roles.manage", "roles.view"]}>
                       <RolesPermissionsManagement />
                     </PermissionRoute>
                   }
