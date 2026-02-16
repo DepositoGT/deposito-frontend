@@ -15,12 +15,59 @@ import jsPDF from 'jspdf'
 import autoTable, { type jsPDFDocument } from 'jspdf-autotable'
 import type { Supplier } from '@/types'
 
+export interface SupplierPDFOptions {
+  includeBasic?: boolean
+  includeMetrics?: boolean
+  includeProducts?: boolean
+  includeMerchandiseEntries?: boolean
+}
+
+/** Entrada de mercancía para incluir en el PDF (resumen por registro) */
+export interface SupplierPDFMerchandiseEntry {
+  date: string
+  registeredBy: { name: string }
+  itemsCount: number
+  totalValue: number
+}
+
+const defaultOptions: Required<Omit<SupplierPDFOptions, 'includeMerchandiseEntries'>> & Pick<SupplierPDFOptions, 'includeMerchandiseEntries'> = {
+  includeBasic: true,
+  includeMetrics: true,
+  includeProducts: true,
+  includeMerchandiseEntries: false,
+}
+
+/** Color naranja/ámbar de la plataforma para encabezados en PDF (RGB) */
+const PDF_HEADER_COLOR: [number, number, number] = [217, 119, 6] // amber-600 / liquor-amber
+
 const formatCurrency = (value: number | string | null | undefined): string => {
   const num = typeof value === 'number' ? value : typeof value === 'string' ? parseFloat(value) || 0 : 0
   return `Q ${num.toLocaleString('es-GT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 }
 
-export const generateSupplierPDF = (supplier: Supplier) => {
+const formatDateForPDF = (dateStr: string): string => {
+  try {
+    const d = new Date(dateStr)
+    if (isNaN(d.getTime())) return dateStr
+    return new Intl.DateTimeFormat('es-GT', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    }).format(d)
+  } catch {
+    return dateStr
+  }
+}
+
+export const generateSupplierPDF = (
+  supplier: Supplier,
+  options?: SupplierPDFOptions,
+  merchandiseEntries?: SupplierPDFMerchandiseEntry[]
+) => {
+  const opts = { ...defaultOptions, ...options }
   const doc = new jsPDF() as jsPDFDocument
   const pageWidth = doc.internal.pageSize.getWidth()
   const margin = 15
@@ -45,116 +92,115 @@ export const generateSupplierPDF = (supplier: Supplier) => {
   yPos += 15
 
   // Información Básica
-  doc.setFontSize(14)
-  doc.setFont('helvetica', 'bold')
-  doc.text('INFORMACIÓN BÁSICA', margin, yPos)
-  yPos += 10
+  if (opts.includeBasic) {
+    doc.setFontSize(14)
+    doc.setFont('helvetica', 'bold')
+    doc.text('INFORMACIÓN BÁSICA', margin, yPos)
+    yPos += 10
 
-  doc.setFontSize(10)
-  doc.setFont('helvetica', 'bold')
-  
-  // Columna izquierda
-  const leftCol = margin
-  const rightCol = pageWidth / 2 + 10
-  let leftY = yPos
-  let rightY = yPos
+    doc.setFontSize(10)
+    doc.setFont('helvetica', 'bold')
+    
+    const leftCol = margin
+    const rightCol = pageWidth / 2 + 10
+    let leftY = yPos
+    let rightY = yPos
 
-  // Nombre de la Empresa
-  doc.setFont('helvetica', 'bold')
-  doc.text('Nombre de la Empresa:', leftCol, leftY)
-  doc.setFont('helvetica', 'normal')
-  doc.text(supplier.name || 'N/A', leftCol + 50, leftY)
-  leftY += 7
+    doc.setFont('helvetica', 'bold')
+    doc.text('Nombre de la Empresa:', leftCol, leftY)
+    doc.setFont('helvetica', 'normal')
+    doc.text(supplier.name || 'N/A', leftCol + 50, leftY)
+    leftY += 7
 
-  // Persona de Contacto
-  doc.setFont('helvetica', 'bold')
-  doc.text('Persona de Contacto:', leftCol, leftY)
-  doc.setFont('helvetica', 'normal')
-  doc.text(supplier.contact || 'N/A', leftCol + 50, leftY)
-  leftY += 7
+    doc.setFont('helvetica', 'bold')
+    doc.text('Persona de Contacto:', leftCol, leftY)
+    doc.setFont('helvetica', 'normal')
+    doc.text(supplier.contact || 'N/A', leftCol + 50, leftY)
+    leftY += 7
 
-  // Teléfono
-  doc.setFont('helvetica', 'bold')
-  doc.text('Teléfono:', leftCol, leftY)
-  doc.setFont('helvetica', 'normal')
-  doc.text(supplier.phone || 'N/A', leftCol + 50, leftY)
-  leftY += 7
+    doc.setFont('helvetica', 'bold')
+    doc.text('Teléfono:', leftCol, leftY)
+    doc.setFont('helvetica', 'normal')
+    doc.text(supplier.phone || 'N/A', leftCol + 50, leftY)
+    leftY += 7
 
-  // Email
-  doc.setFont('helvetica', 'bold')
-  doc.text('Email:', leftCol, leftY)
-  doc.setFont('helvetica', 'normal')
-  doc.text(supplier.email || 'N/A', leftCol + 50, leftY)
-  leftY += 7
+    doc.setFont('helvetica', 'bold')
+    doc.text('Email:', leftCol, leftY)
+    doc.setFont('helvetica', 'normal')
+    doc.text(supplier.email || 'N/A', leftCol + 50, leftY)
+    leftY += 7
 
-  // Dirección
-  doc.setFont('helvetica', 'bold')
-  doc.text('Dirección:', leftCol, leftY)
-  doc.setFont('helvetica', 'normal')
-  const addressLines = doc.splitTextToSize(supplier.address || 'N/A', pageWidth / 2 - margin - 10)
-  doc.text(addressLines, leftCol + 50, leftY)
-  leftY += addressLines.length * 5 + 3
+    doc.setFont('helvetica', 'bold')
+    doc.text('Dirección:', leftCol, leftY)
+    doc.setFont('helvetica', 'normal')
+    const addressLines = doc.splitTextToSize(supplier.address || 'N/A', pageWidth / 2 - margin - 10)
+    doc.text(addressLines, leftCol + 50, leftY)
+    leftY += addressLines.length * 5 + 3
 
-  // Columna derecha
-  // Categoría
-  doc.setFont('helvetica', 'bold')
-  doc.text('Categoría:', rightCol, rightY)
-  doc.setFont('helvetica', 'normal')
-  doc.text(String(supplier.category || 'N/A'), rightCol + 30, rightY)
-  rightY += 7
+    doc.setFont('helvetica', 'bold')
+    doc.text('Categorías:', rightCol, rightY)
+    doc.setFont('helvetica', 'normal')
+    const categoriesLabel = supplier.categoriesLabel || String(supplier.category || 'N/A')
+    const categoriesMaxWidth = pageWidth - (rightCol + 30) - margin
+    const categoriesLines = doc.splitTextToSize(categoriesLabel, categoriesMaxWidth > 0 ? categoriesMaxWidth : 80)
+    doc.text(categoriesLines, rightCol + 30, rightY)
+    rightY += categoriesLines.length * 5 + 3
 
-  // Estado
-  doc.setFont('helvetica', 'bold')
-  doc.text('Estado:', rightCol, rightY)
-  doc.setFont('helvetica', 'normal')
-  const status = String(supplier.status || 'N/A')
-  doc.text(status.charAt(0).toUpperCase() + status.slice(1), rightCol + 30, rightY)
-  rightY += 7
+    doc.setFont('helvetica', 'bold')
+    doc.text('Estado:', rightCol, rightY)
+    doc.setFont('helvetica', 'normal')
+    const status = String(supplier.status || 'N/A')
+    doc.text(status.charAt(0).toUpperCase() + status.slice(1), rightCol + 30, rightY)
+    rightY += 7
 
-  // Términos de Pago
-  doc.setFont('helvetica', 'bold')
-  doc.text('Términos de Pago:', rightCol, rightY)
-  doc.setFont('helvetica', 'normal')
-  doc.text(supplier.paymentTerms || 'N/A', rightCol + 30, rightY)
-  rightY += 7
+    doc.setFont('helvetica', 'bold')
+    doc.text('Términos de Pago:', rightCol, rightY)
+    doc.setFont('helvetica', 'normal')
+    doc.text(supplier.paymentTerms || 'N/A', rightCol + 30, rightY)
+    rightY += 7
 
-  // Último Pedido
-  doc.setFont('helvetica', 'bold')
-  doc.text('Último Pedido:', rightCol, rightY)
-  doc.setFont('helvetica', 'normal')
-  doc.text(supplier.lastOrder || 'N/A', rightCol + 30, rightY)
+    doc.setFont('helvetica', 'bold')
+    doc.text('Último Pedido:', rightCol, rightY)
+    doc.setFont('helvetica', 'normal')
+    doc.text(supplier.lastOrder || 'N/A', rightCol + 30, rightY)
 
-  // Usar la posición más baja de las dos columnas
-  yPos = Math.max(leftY, rightY) + 15
+    yPos = Math.max(leftY, rightY) + 15
+  }
 
   // Métricas
-  doc.setFontSize(14)
-  doc.setFont('helvetica', 'bold')
-  doc.text('MÉTRICAS', margin, yPos)
-  yPos += 10
-
-  const metricsData = [
-    ['Total de Productos', ((supplier.productsList?.length ?? supplier.products) ?? 0).toString()],
-    ['Total de Compras', formatCurrency(supplier.totalPurchases ?? 0)],
-    ['Último Pedido', supplier.lastOrder ?? 'N/A']
-  ]
-
-  autoTable(doc, {
-    startY: yPos,
-    head: [['Concepto', 'Valor']],
-    body: metricsData,
-    theme: 'grid',
-    headStyles: { fillColor: [41, 128, 185], textColor: 255, fontStyle: 'bold' },
-    columnStyles: {
-      0: { cellWidth: 100, fontStyle: 'bold' },
-      1: { cellWidth: 'auto', halign: 'left' }
+  if (opts.includeMetrics) {
+    if (yPos > 240) {
+      doc.addPage()
+      yPos = 20
     }
-  })
+    doc.setFontSize(14)
+    doc.setFont('helvetica', 'bold')
+    doc.text('MÉTRICAS', margin, yPos)
+    yPos += 10
 
-  yPos = doc.lastAutoTable.finalY + 15
+    const metricsData = [
+      ['Total de Productos', ((supplier.productsList?.length ?? supplier.products) ?? 0).toString()],
+      ['Total de Compras', formatCurrency(supplier.totalPurchases ?? 0)],
+      ['Último Pedido', supplier.lastOrder ?? 'N/A']
+    ]
+
+    autoTable(doc, {
+      startY: yPos,
+      head: [['Concepto', 'Valor']],
+      body: metricsData,
+      theme: 'grid',
+      headStyles: { fillColor: PDF_HEADER_COLOR, textColor: 255, fontStyle: 'bold' },
+      columnStyles: {
+        0: { cellWidth: 100, fontStyle: 'bold' },
+        1: { cellWidth: 'auto', halign: 'left' }
+      }
+    })
+
+    yPos = doc.lastAutoTable.finalY + 15
+  }
 
   // Productos que Suministra
-  if (supplier.productsList && supplier.productsList.length > 0) {
+  if (opts.includeProducts && supplier.productsList && supplier.productsList.length > 0) {
     if (yPos > 230) {
       doc.addPage()
       yPos = 20
@@ -176,7 +222,7 @@ export const generateSupplierPDF = (supplier: Supplier) => {
       head: [['Producto', 'Stock', 'Precio']],
       body: productsData,
       theme: 'grid',
-      headStyles: { fillColor: [41, 128, 185], textColor: 255, fontStyle: 'bold' },
+      headStyles: { fillColor: PDF_HEADER_COLOR, textColor: 255, fontStyle: 'bold' },
       columnStyles: {
         0: { cellWidth: 'auto' },
         1: { cellWidth: 40, halign: 'center' },
@@ -185,7 +231,7 @@ export const generateSupplierPDF = (supplier: Supplier) => {
     })
 
     yPos = doc.lastAutoTable.finalY + 10
-  } else {
+  } else if (opts.includeProducts) {
     if (yPos > 240) {
       doc.addPage()
       yPos = 20
@@ -194,6 +240,51 @@ export const generateSupplierPDF = (supplier: Supplier) => {
     doc.setFontSize(12)
     doc.setFont('helvetica', 'normal')
     doc.text('No hay productos asociados a este proveedor.', margin, yPos)
+    yPos += 10
+  }
+
+  // Entradas de mercancía
+  if (opts.includeMerchandiseEntries && merchandiseEntries && merchandiseEntries.length > 0) {
+    if (yPos > 230) {
+      doc.addPage()
+      yPos = 20
+    }
+
+    doc.setFontSize(14)
+    doc.setFont('helvetica', 'bold')
+    doc.text('ENTRADAS DE MERCANCÍA', margin, yPos)
+    yPos += 10
+
+    const merchData = merchandiseEntries.map((entry) => [
+      formatDateForPDF(entry.date),
+      entry.registeredBy?.name ?? 'N/A',
+      entry.itemsCount.toString(),
+      formatCurrency(entry.totalValue),
+    ])
+
+    autoTable(doc, {
+      startY: yPos,
+      head: [['Fecha', 'Registrado por', 'Productos', 'Total']],
+      body: merchData,
+      theme: 'grid',
+      headStyles: { fillColor: PDF_HEADER_COLOR, textColor: 255, fontStyle: 'bold' },
+      columnStyles: {
+        0: { cellWidth: 45 },
+        1: { cellWidth: 'auto' },
+        2: { cellWidth: 35, halign: 'center' },
+        3: { cellWidth: 45, halign: 'right' },
+      },
+    })
+
+    yPos = doc.lastAutoTable.finalY + 10
+  } else if (opts.includeMerchandiseEntries) {
+    if (yPos > 240) {
+      doc.addPage()
+      yPos = 20
+    }
+    doc.setFontSize(12)
+    doc.setFont('helvetica', 'normal')
+    doc.text('No hay entradas de mercancía para este proveedor.', margin, yPos)
     yPos += 10
   }
 

@@ -18,7 +18,12 @@ export interface Supplier extends BaseEntity {
   phone: string;
   email: string;
   address: string;
-  category: ProductCategory | string; // permitir string desde API
+  // Etiqueta principal (por compatibilidad). Para múltiples categorías se usará categories / categoriesLabel
+  category: ProductCategory | string;
+  // Nuevos campos para múltiples categorías
+  categories?: ProductCategory[];
+  /** Nombres de categorías separados por coma para mostrar en UI */
+  categoriesLabel?: string;
   products: number;
   lastOrder: string;
   totalPurchases: number;

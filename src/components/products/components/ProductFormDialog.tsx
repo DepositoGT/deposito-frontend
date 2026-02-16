@@ -216,7 +216,7 @@ export const ProductFormDialog = ({
                         <div>
                             <Label htmlFor="cost">Costo</Label>
                             <div className="relative">
-                                <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">Q</span>
                                 <Input
                                     id="cost"
                                     type="number"
@@ -317,7 +317,6 @@ export const ProductFormDialog = ({
                             </div>
                             {formData.imageUrl && (
                                 <div className="w-16 h-16 rounded-md overflow-hidden border border-border flex items-center justify-center bg-muted">
-                                    {/* eslint-disable-next-line @next/next/no-img-element */}
                                     <img
                                         src={formData.imageUrl}
                                         alt={formData.name || 'Imagen del producto'}

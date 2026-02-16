@@ -16,10 +16,12 @@ import {
 } from '@/services/incomingMerchandiseService'
 
 export const useIncomingMerchandise = (params?: IncomingMerchandiseQueryParams) => {
+  const { enabled = true, ...fetchParams } = params ?? {}
   return useQuery({
-    queryKey: ['incoming-merchandise', params],
-    queryFn: () => fetchIncomingMerchandise(params),
+    queryKey: ['incoming-merchandise', fetchParams],
+    queryFn: () => fetchIncomingMerchandise(fetchParams),
     staleTime: 30 * 1000, // 30 seconds
+    enabled,
   })
 }
 
