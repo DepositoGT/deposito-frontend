@@ -86,29 +86,27 @@ export const ClosuresHistoryList = ({
                 ))}
             </div>
 
-            {/* Pagination */}
+            {/* Pagination - mismo estilo que otras vistas (derecha, solo flechas) */}
             {!isSeller && totalPages > 1 && (
-                <div className="flex items-center justify-center gap-4 pt-4 border-t">
+                <div className="flex justify-end items-center gap-2 pt-4 border-t">
+                    <span className="text-sm text-muted-foreground mr-2">
+                        Página {currentPage} de {totalPages}
+                    </span>
                     <Button
                         variant="outline"
                         size="sm"
                         onClick={() => onPageChange(currentPage - 1)}
                         disabled={currentPage === 1}
                     >
-                        <ChevronLeft className="h-4 w-4 mr-1" />
-                        Anterior
+                        <ChevronLeft className="w-4 h-4" />
                     </Button>
-                    <span className="text-sm text-muted-foreground">
-                        Página {currentPage} de {totalPages}
-                    </span>
                     <Button
                         variant="outline"
                         size="sm"
                         onClick={() => onPageChange(currentPage + 1)}
                         disabled={currentPage === totalPages}
                     >
-                        Siguiente
-                        <ChevronRight className="h-4 w-4 ml-1" />
+                        <ChevronRight className="w-4 h-4" />
                     </Button>
                 </div>
             )}

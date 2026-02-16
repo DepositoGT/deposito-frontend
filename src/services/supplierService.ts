@@ -19,14 +19,17 @@ export interface ApiSupplier {
   phone?: string | null;
   email?: string | null;
   address?: string | null;
-  category_id?: number | string | null;
   products?: number | string | null;
   last_order?: string | null;
   total_purchases?: number | string | null;
   rating?: number | string | null;
   status_id?: number | string | null;
   payment_terms_id?: number | string | null;
+  // Para compatibilidad hacia atrás se mantiene category,
+  // pero el nuevo diseño usa categories / categoryNames
   category?: { id: number | string; name: string } | null;
+  categories?: { id: number | string; name: string }[] | null;
+  categoryNames?: string[] | null;
   status?: { id: number | string; name: string } | null;
   payment_term?: { id: number | string; name: string } | null;
   productsList?: ApiProduct[] | null;
@@ -85,7 +88,19 @@ const formatDateTime = (dateStr: string | null | undefined): string => {
 };
 
 export const adaptApiSupplier = (s: ApiSupplier): Supplier => {
-  const categoryName = s.category?.name ?? (s.category_id != null ? String(s.category_id) : "");
+  const categoriesFromApi = Array.isArray(s.categories)
+    ? s.categories.map(c => ({ id: c.id, name: String(c.name) }))
+    : []
+
+  const categoryNamesFromApi =
+    Array.isArray(s.categoryNames) && s.categoryNames.length > 0
+      ? s.categoryNames
+      : (categoriesFromApi.map(c => c.name))
+
+  const categoryLabel =
+    categoryNamesFromApi.length > 0
+      ? categoryNamesFromApi.join(", ")
+      : (s.category?.name ?? "");
   const statusRaw: string | number | undefined = s.status?.name ?? (s.status_id != null ? Number(s.status_id) : undefined);
   const paymentTerms = s.payment_term?.name ?? "";
 
@@ -100,7 +115,7 @@ export const adaptApiSupplier = (s: ApiSupplier): Supplier => {
     phone: s.phone ?? "",
     email: s.email ?? "",
     address: s.address ?? "",
-    category: categoryName || "",
+    category: categoryLabel || "",
     products: toNumber(s.products, 0),
     // Format last_order date properly
     lastOrder: formatDateTime(s.last_order),
@@ -108,6 +123,8 @@ export const adaptApiSupplier = (s: ApiSupplier): Supplier => {
     rating: toNumber(s.rating, 0),
     status: mapStatus(statusRaw),
     paymentTerms: paymentTerms,
+    categories: categoriesFromApi,
+    categoriesLabel: categoryLabel || undefined,
     productsList,
   };
 };
@@ -170,7 +187,8 @@ export interface CreateSupplierPayload {
   phone?: string;
   email?: string;
   address?: string;
-  category_id?: number | string;
+  // Nuevo contrato: enviar múltiples categorías (ids numéricos o string)
+  category_ids?: Array<number | string>;
   status_id?: number | string;
   payment_terms_id?: number | string;
   rating?: number;

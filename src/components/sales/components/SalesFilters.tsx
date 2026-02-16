@@ -52,8 +52,6 @@ export const SalesFilters = ({
                             <SelectTrigger><SelectValue placeholder='Estado' /></SelectTrigger>
                             <SelectContent>
                                 <SelectItem value='all'>Todos los estados</SelectItem>
-                                <SelectItem value='pending'>Pendiente</SelectItem>
-                                <SelectItem value='paid'>Pagado</SelectItem>
                                 <SelectItem value='completed'>Completado</SelectItem>
                                 <SelectItem value='cancelled'>Cancelado</SelectItem>
                             </SelectContent>

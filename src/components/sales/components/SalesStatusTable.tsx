@@ -35,8 +35,6 @@ interface SalesStatusTableProps {
 
 const getStatusBadge = (status: SaleStatus) => {
     const badges: Record<string, React.ReactNode> = {
-        pending: <Badge className='bg-yellow-500 text-white'>Pendiente</Badge>,
-        paid: <Badge className='bg-blue-500 text-white'>Pagado</Badge>,
         completed: <Badge className='bg-green-500 text-white'>Completado</Badge>,
         cancelled: <Badge variant='destructive'>Cancelado</Badge>,
     }
@@ -148,8 +146,6 @@ export const SalesStatusTable = ({
                                                         : getStatusBadge(sale.status)}
                                                 </SelectTrigger>
                                                 <SelectContent>
-                                                    <SelectItem value='pending'>Pendiente</SelectItem>
-                                                    <SelectItem value='paid'>Pagado</SelectItem>
                                                     <SelectItem value='completed'>Completado</SelectItem>
                                                     <SelectItem value='cancelled'>Cancelado</SelectItem>
                                                 </SelectContent>
