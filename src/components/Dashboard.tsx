@@ -8,7 +8,7 @@
  * For licensing inquiries: GitHub @dpatzan2
  */
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
@@ -278,7 +278,7 @@ const Dashboard = ({ onSectionChange }: DashboardProps) => {
                 className="w-full"
                 onClick={() => navigate('/reportes')}
               >
-                <DollarSign className="w-4 h-4 mr-2" />
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">Q</span>
                 Generar Reporte
               </Button>
             )}

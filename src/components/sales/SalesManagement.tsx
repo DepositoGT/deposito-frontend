@@ -14,34 +14,25 @@
  * This component orchestrates the sales management feature.
  * All UI components and business logic are extracted to sub-modules.
  */
-import { useState, useMemo } from 'react'
+import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Plus, Calendar, Calculator } from 'lucide-react'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { DialogTrigger, Dialog } from '@/components/ui/dialog'
 import { useToast } from '@/hooks/use-toast'
 import { Sale, SaleStatus } from '@/types'
-import { useAllProducts } from '@/hooks/useProducts'
-import { createSale } from '@/services/saleService'
 import { updateSaleStatus as apiUpdateSaleStatus } from '@/services/salesService'
 import { useRealtimeSales } from '@/hooks/useRealtimeSales'
 import { useAuth } from '@/context/useAuth'
 import { useAuthPermissions } from '@/hooks/useAuthPermissions'
-import { usePaymentMethods, PaymentMethod as PaymentMethodType } from '@/hooks/usePaymentMethods'
 
 // Feature imports
-import { useCart, useSalesData } from './hooks'
-import { usePromotions } from '@/hooks/usePromotions'
+import { useSalesData } from './hooks'
 import {
     SalesKPICards,
     SalesFilters,
-    AvailabilityDialog,
-    AdminAuthDialog,
     NegativeStockDialog,
     SalesStatusTable,
     SaleDetailDialog,
-    NewSaleDialog,
-    PromotionCodeInput
 } from './components'
 import { STATUS_DB_NAMES, NegativeStockDialogState, SaleStatusKey } from './types'
 import { useNavigate } from 'react-router-dom'
@@ -59,39 +50,11 @@ const SalesManagement = ({ onSectionChange }: SalesManagementProps) => {
     const { toast } = useToast()
     const { hasPermission } = useAuthPermissions()
 
-    // Data hooks
-    const paymentMethodsQuery = usePaymentMethods()
-    const paymentMethods = useMemo(() => paymentMethodsQuery.data ?? [], [paymentMethodsQuery.data])
-    const productsQuery = useAllProducts()
-    const availableProducts = useMemo(() => productsQuery.data ?? [], [productsQuery.data])
     const salesData = useSalesData()
-    const cart = useCart({ availableProducts })
-
-    // Promotions hook - prepare cart items for validation
-    const promotionCartItems = useMemo(() =>
-        cart.cartItems.map(item => ({
-            product_id: item.id,
-            price: Number(item.price),
-            qty: item.qty
-        })),
-        [cart.cartItems]
-    )
-    const promotions = usePromotions({
-        cartItems: promotionCartItems,
-        cartTotal: cart.cartTotal
-    })
 
     // UI state
-    const [isNewSaleOpen, setIsNewSaleOpen] = useState(false)
     const [isViewSaleOpen, setIsViewSaleOpen] = useState(false)
     const [selectedSale, setSelectedSale] = useState<Sale | null>(null)
-    const [productSearch, setProductSearch] = useState('')
-    const [customer, setCustomer] = useState('')
-    const [customerNit, setCustomerNit] = useState('')
-    const [isFinalConsumer, setIsFinalConsumer] = useState(false)
-    const [paymentMethod, setPaymentMethod] = useState<PaymentMethodType | null>(null)
-    const [amountReceived, setAmountReceived] = useState('')
-    const [isProcessingSale, setIsProcessingSale] = useState(false)
     const [updatingSaleIds, setUpdatingSaleIds] = useState<Set<string>>(new Set())
     const [isValidatingClosure, setIsValidatingClosure] = useState(false)
     const [negativeStockDialog, setNegativeStockDialog] = useState<NegativeStockDialogState>({ open: false, products: [] })
@@ -112,53 +75,6 @@ const SalesManagement = ({ onSectionChange }: SalesManagementProps) => {
             salesData.refreshSales()
         }
     })
-
-    // Computed
-    const filteredProducts = useMemo(() =>
-        availableProducts.filter(p => p.name.toLowerCase().includes(productSearch.toLowerCase()) || (p.barcode ?? '').includes(productSearch)),
-        [availableProducts, productSearch]
-    )
-    const changeAmount = paymentMethod?.name?.toLowerCase() === 'efectivo' && amountReceived
-        ? Math.max(0, parseFloat(amountReceived) - promotions.finalTotal) : 0
-
-    // Process sale
-    const processSale = async () => {
-        if (!canCreateSale) {
-            toast({ title: 'Sin permiso para crear ventas', variant: 'destructive' })
-            return
-        }
-        if (!paymentMethod) {
-            toast({ title: 'Selecciona un método de pago', variant: 'destructive' })
-            return
-        }
-        const isCash = paymentMethod.name?.toLowerCase() === 'efectivo'
-        const salePayload = {
-            customer,
-            customer_nit: customerNit,
-            is_final_consumer: isFinalConsumer,
-            payment_method_id: paymentMethod.id,
-            status_id: 0,
-            items: cart.cartItems.map(item => ({ product_id: item.id, price: item.price, qty: item.qty })),
-            amount_received: isCash && amountReceived ? Number(amountReceived) : undefined,
-            change: isCash ? changeAmount : undefined,
-            admin_authorized_products: Array.from(cart.adminAuthorizedProducts),
-            promotion_codes: promotions.promotionCodes,
-        }
-        setIsProcessingSale(true)
-        try {
-            await createSale(salePayload)
-            toast({ title: 'Venta registrada' })
-            salesData.refreshSales()
-            setIsNewSaleOpen(false)
-            cart.clearCart()
-            promotions.clearPromotions()
-            setCustomer(''); setCustomerNit(''); setPaymentMethod(null); setAmountReceived('')
-        } catch (e) {
-            toast({ title: 'Error', description: (e as Error)?.message, variant: 'destructive' })
-        } finally {
-            setIsProcessingSale(false)
-        }
-    }
 
     // Status update
     const updateSaleStatus = async (saleId: string, newStatus: SaleStatus) => {
@@ -228,14 +144,13 @@ const SalesManagement = ({ onSectionChange }: SalesManagementProps) => {
                         </Button>
                     )}
                     {canCreateSale && (
-                        <Dialog open={isNewSaleOpen} onOpenChange={setIsNewSaleOpen}>
-                            <DialogTrigger asChild>
-                                <Button className='bg-primary hover:bg-primary/90 whitespace-nowrap shrink-0 text-xs sm:text-sm'>
-                                    <Plus className='w-4 h-4 sm:mr-2' />
-                                    <span className='hidden sm:inline'>Nueva Venta</span>
-                                </Button>
-                            </DialogTrigger>
-                        </Dialog>
+                        <Button
+                            className='bg-primary hover:bg-primary/90 whitespace-nowrap shrink-0 text-xs sm:text-sm'
+                            onClick={() => navigate('/ventas/nueva')}
+                        >
+                            <Plus className='w-4 h-4 sm:mr-2' />
+                            <span className='hidden sm:inline'>Nueva Venta</span>
+                        </Button>
                     )}
                 </div>
             </div>
@@ -258,9 +173,9 @@ const SalesManagement = ({ onSectionChange }: SalesManagementProps) => {
                 onPaymentChange={salesData.setPaymentFilter}
             />
 
-            {/* Sales Tables */}
+            {/* Sales Tables (solo Completadas y Canceladas) */}
             <div className='space-y-6'>
-                {(['paid', 'pending', 'completed', 'cancelled'] as const).map(key => (
+                {(['completed', 'cancelled'] as const).map(key => (
                     <SalesStatusTable
                         key={key}
                         statusKey={key}
@@ -277,66 +192,10 @@ const SalesManagement = ({ onSectionChange }: SalesManagementProps) => {
                 ))}
             </div>
 
-            {/* Dialogs */}
-            <NewSaleDialog
-                open={isNewSaleOpen}
-                onOpenChange={setIsNewSaleOpen}
-                customer={customer}
-                onCustomerChange={setCustomer}
-                customerNit={customerNit}
-                onCustomerNitChange={setCustomerNit}
-                isFinalConsumer={isFinalConsumer}
-                onFinalConsumerChange={setIsFinalConsumer}
-                paymentMethod={paymentMethod}
-                paymentMethods={paymentMethods}
-                isLoadingPaymentMethods={paymentMethodsQuery.isLoading}
-                onPaymentMethodChange={setPaymentMethod}
-                cartItems={cart.cartItems}
-                cartTotal={cart.cartTotal}
-                productSearch={productSearch}
-                onProductSearchChange={setProductSearch}
-                filteredProducts={filteredProducts}
-                isLoadingProducts={productsQuery.isLoading}
-                onAddToCart={cart.addToCart}
-                onRemoveFromCart={cart.removeFromCart}
-                onUpdateQuantity={cart.updateQuantity}
-                amountReceived={amountReceived}
-                onAmountReceivedChange={setAmountReceived}
-                changeAmount={changeAmount}
-                isProcessing={isProcessingSale}
-                onSubmit={processSale}
-                // Promotion props
-                appliedPromotions={promotions.appliedPromotions}
-                totalDiscount={promotions.totalDiscount}
-                finalTotal={promotions.finalTotal}
-                isValidatingPromotion={promotions.isValidating}
-                onApplyPromoCode={promotions.applyCode}
-                onRemovePromotion={promotions.removePromotion}
-            />
-
             <SaleDetailDialog
                 open={isViewSaleOpen}
                 onOpenChange={setIsViewSaleOpen}
                 sale={selectedSale}
-            />
-
-            <AvailabilityDialog
-                state={cart.availabilityDialog}
-                additionalQty={cart.additionalQty}
-                onAdditionalQtyChange={cart.setAdditionalQty}
-                onConfirm={cart.handleConfirmAdditionalQty}
-                onCancel={cart.handleCancelAvailability}
-            />
-
-            <AdminAuthDialog
-                state={cart.adminAuthDialog}
-                username={cart.adminUsername}
-                password={cart.adminPassword}
-                isAuthenticating={cart.isAuthenticating}
-                onUsernameChange={cart.setAdminUsername}
-                onPasswordChange={cart.setAdminPassword}
-                onConfirm={cart.handleAdminAuth}
-                onCancel={cart.closeAdminAuthDialog}
             />
 
             <NegativeStockDialog

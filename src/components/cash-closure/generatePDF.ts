@@ -16,6 +16,9 @@ import autoTable, { type jsPDFDocument } from 'jspdf-autotable'
 import type { CashClosure } from './types'
 import { formatCurrency, formatDateTime, toNumber } from './types'
 
+/** Color naranja/ámbar de la plataforma para encabezados en PDF (RGB) */
+const PDF_HEADER_COLOR: [number, number, number] = [217, 119, 6] // amber / liquor-amber
+
 export const generateClosurePDF = (closure: CashClosure) => {
     const doc = new jsPDF() as jsPDFDocument
     const pageWidth = doc.internal.pageSize.getWidth()
@@ -85,7 +88,7 @@ export const generateClosurePDF = (closure: CashClosure) => {
         head: [['Concepto', 'Valor']],
         body: summaryData,
         theme: 'grid',
-        headStyles: { fillColor: [41, 128, 185], textColor: 255, fontStyle: 'bold' },
+        headStyles: { fillColor: PDF_HEADER_COLOR, textColor: 255, fontStyle: 'bold' },
         columnStyles: {
             0: { cellWidth: 80, fontStyle: 'bold' },
             1: { cellWidth: 'auto', halign: 'right' }
@@ -113,7 +116,7 @@ export const generateClosurePDF = (closure: CashClosure) => {
         head: [['Método', 'Teórico', 'Contado', 'Diferencia', 'Notas']],
         body: paymentData,
         theme: 'grid',
-        headStyles: { fillColor: [41, 128, 185], textColor: 255, fontStyle: 'bold' },
+        headStyles: { fillColor: PDF_HEADER_COLOR, textColor: 255, fontStyle: 'bold' },
         columnStyles: {
             1: { halign: 'right' },
             2: { halign: 'right' },
@@ -147,7 +150,7 @@ export const generateClosurePDF = (closure: CashClosure) => {
             head: [['Denominación', 'Tipo', 'Cantidad', 'Subtotal']],
             body: denominationData,
             theme: 'grid',
-            headStyles: { fillColor: [41, 128, 185], textColor: 255, fontStyle: 'bold' },
+            headStyles: { fillColor: PDF_HEADER_COLOR, textColor: 255, fontStyle: 'bold' },
             columnStyles: {
                 2: { halign: 'center' },
                 3: { halign: 'right' }
