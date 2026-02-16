@@ -38,6 +38,7 @@ import {
 } from "lucide-react";
 import UserImportDialog from "./users/UserImportDialog";
 import { useAuth } from "@/context/useAuth";
+import { useAuthPermissions } from "@/hooks/useAuthPermissions";
 import type { User } from "@/services/userService";
 import { UserDetailDialog } from "@/components/users/UserDetailDialog";
 import { Pagination } from "@/components/shared/Pagination";
@@ -71,35 +72,15 @@ const UserAvatar = ({ user }: { user: User }) => {
 const UserManagement = () => {
   const { toast } = useToast();
   const { user: currentUser } = useAuth();
+  const { hasPermission, isAdmin } = useAuthPermissions();
   const navigate = useNavigate();
-  
-  // Verificar admin de múltiples formas para mayor robustez
-  let isAdmin = false;
-  
-  // Método 1: Desde el contexto
-  if (currentUser?.role_id === 1 || currentUser?.role?.id === 1) {
-    isAdmin = true;
-  }
-  
-  // Método 2: Por nombre de rol
-  if (currentUser?.role?.name?.toLowerCase() === 'admin') {
-    isAdmin = true;
-  }
-  
-  // Método 3: Verificar directamente desde localStorage como fallback
-  if (!isAdmin) {
-    try {
-      const storedUser = localStorage.getItem('auth:user');
-      if (storedUser) {
-        const parsed = JSON.parse(storedUser);
-        if (parsed?.role_id === 1 || parsed?.role?.id === 1 || parsed?.role?.name?.toLowerCase() === 'admin') {
-          isAdmin = true;
-        }
-      }
-    } catch (e) {
-      console.error('Error checking admin from localStorage:', e);
-    }
-  }
+
+  // Acceso: admin o quien tenga permiso users.view
+  const canViewUsers = isAdmin || hasPermission('users.view');
+  const canViewRoles = isAdmin || hasPermission('roles.view') || hasPermission('roles.manage');
+  const canManageRoles = isAdmin || hasPermission('roles.manage');
+  const canImportUsers = isAdmin || hasPermission('users.import');
+  const canCreateUser = isAdmin || hasPermission('users.create');
 
   // Estados para modales
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -421,7 +402,7 @@ const UserManagement = () => {
     );
   };
 
-  if (!isAdmin) {
+  if (!canViewUsers) {
     return (
       <div className="p-6">
         <Card>
@@ -429,7 +410,7 @@ const UserManagement = () => {
             <Shield className="w-16 h-16 mx-auto mb-4 text-muted-foreground" />
             <h3 className="text-lg font-semibold mb-2">Acceso Restringido</h3>
             <p className="text-muted-foreground">
-              Solo los administradores pueden acceder a la gestión de usuarios
+              No tienes permiso para ver la gestión de usuarios
             </p>
           </CardContent>
         </Card>
@@ -448,26 +429,32 @@ const UserManagement = () => {
           </p>
         </div>
         <div className="flex gap-2">
-          <Button
-            variant="outline"
-            onClick={() => navigate("/usuarios/roles-permisos")}
-          >
-            Roles y Permisos
-          </Button>
-          <Button
-            variant="outline"
-            onClick={() => setIsImportOpen(true)}
-          >
-            <FileUp className="w-4 h-4 mr-2" />
-            Importar
-          </Button>
-          <Button
-            className="bg-liquor-amber hover:bg-liquor-amber/90 text-white"
-            onClick={() => setIsCreateOpen(true)}
-          >
-            <UserPlus className="w-4 h-4 mr-2" />
-            Nuevo Usuario
-          </Button>
+          {canViewRoles && (
+            <Button
+              variant="outline"
+              onClick={() => navigate("/usuarios/roles-permisos")}
+            >
+              Roles y Permisos
+            </Button>
+          )}
+          {canImportUsers && (
+            <Button
+              variant="outline"
+              onClick={() => setIsImportOpen(true)}
+            >
+              <FileUp className="w-4 h-4 mr-2" />
+              Importar
+            </Button>
+          )}
+          {canCreateUser && (
+            <Button
+              className="bg-liquor-amber hover:bg-liquor-amber/90 text-white"
+              onClick={() => setIsCreateOpen(true)}
+            >
+              <UserPlus className="w-4 h-4 mr-2" />
+              Nuevo Usuario
+            </Button>
+          )}
         </div>
       </div>
 
