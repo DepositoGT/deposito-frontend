@@ -13,7 +13,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { usePermissions, useRolesWithPermissions } from "@/hooks/usePermissions";
 import { useToast } from "@/hooks/use-toast";
-import { useAuth } from "@/context/useAuth";
+import { useAuthPermissions } from "@/hooks/useAuthPermissions";
 import type { Role, Permission } from "@/services/userService";
 import { deleteRole } from "@/services/userService";
 import { Shield, ArrowLeft, CheckSquare, List, LayoutGrid, Trash2, Loader2 } from "lucide-react";
@@ -21,31 +21,12 @@ import { useNavigate } from "react-router-dom";
 import { Input } from "@/components/ui/input";
 
 const RolesPermissionsManagement = () => {
-  const { user: currentUser } = useAuth();
+  const { hasPermission, isAdmin } = useAuthPermissions();
   const navigate = useNavigate();
   const { toast } = useToast();
 
-  // Determinar si el usuario actual es admin
-  let isAdmin = false;
-  if (currentUser?.role_id === 1 || currentUser?.role?.id === 1) isAdmin = true;
-  if (currentUser?.role?.name?.toLowerCase() === "admin") isAdmin = true;
-  if (!isAdmin) {
-    try {
-      const storedUser = localStorage.getItem("auth:user");
-      if (storedUser) {
-        const parsed = JSON.parse(storedUser);
-        if (
-          parsed?.role_id === 1 ||
-          parsed?.role?.id === 1 ||
-          parsed?.role?.name?.toLowerCase() === "admin"
-        ) {
-          isAdmin = true;
-        }
-      }
-    } catch {
-      // noop
-    }
-  }
+  const canViewRoles = isAdmin || hasPermission("roles.view") || hasPermission("roles.manage");
+  const canManageRoles = isAdmin || hasPermission("roles.manage");
 
   const { data: allPermissions = [] } = usePermissions();
   const [viewMode, setViewMode] = useState<"cards" | "table">("cards");
@@ -57,7 +38,7 @@ const RolesPermissionsManagement = () => {
     data: rolesData,
     isLoading: rolesLoading,
     refetch: refetchRoles,
-  } = useRolesWithPermissions({ page: currentPage, pageSize, enabled: isAdmin });
+  } = useRolesWithPermissions({ page: currentPage, pageSize, enabled: canViewRoles });
 
   const roles = rolesData?.items || [];
 
@@ -129,7 +110,7 @@ const RolesPermissionsManagement = () => {
     }
   };
 
-  if (!isAdmin) {
+  if (!canViewRoles) {
     return (
       <div className="p-6">
         <Card>
@@ -137,7 +118,7 @@ const RolesPermissionsManagement = () => {
             <Shield className="w-16 h-16 mx-auto mb-4 text-muted-foreground" />
             <h3 className="text-lg font-semibold mb-2">Acceso Restringido</h3>
             <p className="text-muted-foreground">
-              Solo los administradores pueden acceder a la gestión de roles y permisos
+              No tienes permiso para ver roles y permisos
             </p>
           </CardContent>
         </Card>
@@ -162,13 +143,15 @@ const RolesPermissionsManagement = () => {
           </div>
         </div>
         <div className="flex gap-2">
-          <Button
-            className="bg-liquor-amber hover:bg-liquor-amber/90 text-white"
-            size="sm"
-            onClick={() => navigate("/usuarios/roles-permisos/nuevo")}
-          >
-            Nuevo rol
-          </Button>
+          {canManageRoles && (
+            <Button
+              className="bg-liquor-amber hover:bg-liquor-amber/90 text-white"
+              size="sm"
+              onClick={() => navigate("/usuarios/roles-permisos/nuevo")}
+            >
+              Nuevo rol
+            </Button>
+          )}
           <Button
             variant={viewMode === "table" ? "default" : "outline"}
             size="sm"
@@ -217,9 +200,11 @@ const RolesPermissionsManagement = () => {
                         <th className="text-left p-3 font-medium text-muted-foreground">
                           Permisos
                         </th>
-                        <th className="text-right p-3 font-medium text-muted-foreground">
-                          Acciones
-                        </th>
+                        {canManageRoles && (
+                          <th className="text-right p-3 font-medium text-muted-foreground">
+                            Acciones
+                          </th>
+                        )}
                       </tr>
                     </thead>
                     <tbody>
@@ -243,23 +228,25 @@ const RolesPermissionsManagement = () => {
                           <td className="p-3 text-sm text-muted-foreground">
                             {rolePermissionsCount(role)} permisos
                           </td>
-                          <td className="p-3 text-right">
-                            {!isProtectedRole(role) && (
-                              <Button
-                                variant="destructive"
-                                size="icon"
-                                className="h-8 w-8"
-                                onClick={(event) => handleDeleteRole(event, role)}
-                                disabled={deletingId === role.id}
-                              >
-                                {deletingId === role.id ? (
-                                  <Loader2 className="w-4 h-4 animate-spin" />
-                                ) : (
-                                  <Trash2 className="w-4 h-4" />
-                                )}
-                              </Button>
-                            )}
-                          </td>
+                          {canManageRoles && (
+                            <td className="p-3 text-right">
+                              {!isProtectedRole(role) && (
+                                <Button
+                                  variant="destructive"
+                                  size="icon"
+                                  className="h-8 w-8"
+                                  onClick={(event) => handleDeleteRole(event, role)}
+                                  disabled={deletingId === role.id}
+                                >
+                                  {deletingId === role.id ? (
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                  ) : (
+                                    <Trash2 className="w-4 h-4" />
+                                  )}
+                                </Button>
+                              )}
+                            </td>
+                          )}
                         </tr>
                       ))}
                     </tbody>
@@ -283,7 +270,7 @@ const RolesPermissionsManagement = () => {
                             </span>
                           )}
                         </div>
-                        {!isProtectedRole(role) && (
+                        {canManageRoles && !isProtectedRole(role) && (
                           <Button
                             variant="destructive"
                             size="icon"
