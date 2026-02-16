@@ -27,13 +27,11 @@ interface PaginatedSales {
 }
 
 const mapStatusNameToKey = (name?: string): SaleStatusKey => {
-    if (!name) return 'pending'
+    if (!name) return 'completed'
     const n = name.toLowerCase()
     if (n.includes('complet')) return 'completed'
-    if (n.includes('pend')) return 'pending'
     if (n.includes('cancel')) return 'cancelled'
-    if (n.includes('pag')) return 'paid'
-    return 'pending'
+    return 'completed'
 }
 
 export const normalizeRawSale = (raw: unknown): Sale => {
@@ -190,27 +188,19 @@ export const useSalesData = (): UseSalesDataReturn => {
     const [period, setPeriod] = useState('today')
 
     const [pages, setPages] = useState<Record<SaleStatusKey, number>>({
-        pending: 1,
-        paid: 1,
         completed: 1,
         cancelled: 1,
     })
 
-    // Queries per status
+    // Queries per status (solo Completada y Cancelada)
     const completedQuery = useSalesByStatus('Completada', { period, page: pages.completed, pageSize: 5 })
-    const pendingQuery = useSalesByStatus('Pendiente', { period, page: pages.pending, pageSize: 5 })
     const cancelledQuery = useSalesByStatus('Cancelada', { period, page: pages.cancelled, pageSize: 5 })
-    const paidQuery = useSalesByStatus('Pagado', { period, page: pages.paid, pageSize: 5 })
 
     const completedData = completedQuery.data as PaginatedSales | undefined
-    const pendingData = pendingQuery.data as PaginatedSales | undefined
     const cancelledData = cancelledQuery.data as PaginatedSales | undefined
-    const paidData = paidQuery.data as PaginatedSales | undefined
 
     const refreshSales = () => {
         completedQuery.refetch?.()
-        pendingQuery.refetch?.()
-        paidQuery.refetch?.()
         cancelledQuery.refetch?.()
     }
 
@@ -225,24 +215,18 @@ export const useSalesData = (): UseSalesDataReturn => {
     })
 
     const salesByStatus: Record<SaleStatusKey, Sale[]> = useMemo(() => ({
-        pending: filterClient((pendingData?.items ?? []).map(normalizeRawSale)),
-        paid: filterClient((paidData?.items ?? []).map(normalizeRawSale)),
         completed: filterClient((completedData?.items ?? []).map(normalizeRawSale)),
         cancelled: filterClient((cancelledData?.items ?? []).map(normalizeRawSale)),
-    }), [pendingData, paidData, completedData, cancelledData, searchTerm, paymentFilter, statusFilter])
+    }), [completedData, cancelledData, searchTerm, paymentFilter, statusFilter])
 
     const pageInfoByStatus: Record<SaleStatusKey, { page: number; totalPages: number }> = {
-        pending: { page: pendingData?.page ?? pages.pending, totalPages: pendingData?.totalPages ?? 1 },
-        paid: { page: paidData?.page ?? pages.paid, totalPages: paidData?.totalPages ?? 1 },
         completed: { page: completedData?.page ?? pages.completed, totalPages: completedData?.totalPages ?? 1 },
         cancelled: { page: cancelledData?.page ?? pages.cancelled, totalPages: cancelledData?.totalPages ?? 1 },
     }
 
     const isLoadingByStatus: Record<SaleStatusKey, boolean> = {
         completed: completedQuery.isLoading,
-        pending: pendingQuery.isLoading,
         cancelled: cancelledQuery.isLoading,
-        paid: paidQuery.isLoading,
     }
 
     const setPageFor = (key: SaleStatusKey, newPage: number) =>

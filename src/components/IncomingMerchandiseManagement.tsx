@@ -68,9 +68,9 @@ const IncomingMerchandiseManagement = () => {
   const [isDetailOpen, setIsDetailOpen] = useState(false)
   const [isFilterOpen, setIsFilterOpen] = useState(false)
 
-  // Permissions
+  // Permissions (registrar ingreso usa products.register_incoming, igual que la ruta /inventario/registrar-ingreso)
   const canView = hasPermission('merchandise.view')
-  const canRegister = hasPermission('merchandise.register')
+  const canRegister = hasPermission('products.register_incoming')
   const canDetails = hasPermission('merchandise.details')
   const canReports = hasPermission('merchandise.reports')
 

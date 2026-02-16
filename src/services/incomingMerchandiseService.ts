@@ -55,6 +55,8 @@ export interface IncomingMerchandiseQueryParams {
   start_date?: string
   end_date?: string
   search?: string
+  /** Si es false, la query no se ejecuta (para uso en hooks). No se envía al API. */
+  enabled?: boolean
 }
 
 export interface IncomingMerchandiseResponse {

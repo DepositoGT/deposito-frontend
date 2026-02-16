@@ -35,7 +35,9 @@ import Dashboard from "@/components/Dashboard";
 import ProductManagement from "@/components/ProductManagement";
 import Analytics from "@/components/Analytics";
 import SalesManagement from "@/components/SalesManagement";
+import NewSalePage from "@/components/sales/NewSalePage";
 import SuppliersManagement from "@/components/SuppliersManagement";
+import SupplierDetailPage from "@/components/suppliers/SupplierDetailPage";
 import ReportsManagement from "@/components/ReportsManagement";
 import AlertsManagement from "@/components/AlertsManagement";
 import ScannerManagement from "@/components/ScannerManagement";
@@ -89,6 +91,14 @@ const App = () => (
                   element={
                     <PermissionRoute any={["sales.view", "sales.create"]}>
                       <SalesManagement />
+                    </PermissionRoute>
+                  }
+                />
+                <Route
+                  path="/ventas/nueva"
+                  element={
+                    <PermissionRoute any={["sales.create"]}>
+                      <NewSalePage />
                     </PermissionRoute>
                   }
                 />
@@ -169,6 +179,14 @@ const App = () => (
                   element={
                     <PermissionRoute any={["suppliers.import"]}>
                       <SupplierImportPage />
+                    </PermissionRoute>
+                  }
+                />
+                <Route
+                  path="/proveedores/:id"
+                  element={
+                    <PermissionRoute any={["suppliers.view"]}>
+                      <SupplierDetailPage />
                     </PermissionRoute>
                   }
                 />
