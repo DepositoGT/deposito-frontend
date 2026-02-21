@@ -9,7 +9,7 @@
  */
 
 /**
- * App configuration for Odoo-style navigation
+ * App 
  * Defines all available modules with their routes, icons, and colors
  */
 import {

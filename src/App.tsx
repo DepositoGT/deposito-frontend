@@ -37,11 +37,13 @@ import Analytics from "@/components/Analytics";
 import SalesManagement from "@/components/SalesManagement";
 import NewSalePage from "@/components/sales/NewSalePage";
 import SuppliersManagement from "@/components/SuppliersManagement";
-import SupplierDetailPage from "@/components/suppliers/SupplierDetailPage";
-import ReportsManagement from "@/components/ReportsManagement";
-import AlertsManagement from "@/components/AlertsManagement";
+import SupplierDetailPage from "./components/suppliers/SupplierDetailPage";
+import ProductDetailPage from "./components/products/ProductDetailPage";
+import ReportsManagement from "./components/ReportsManagement";
+import AlertsManagement from "./components/AlertsManagement";
 import ScannerManagement from "@/components/ScannerManagement";
 import UserManagement from "@/components/UserManagement";
+import UserDetailPage from "@/components/users/UserDetailPage";
 import RolesPermissionsManagement from "@/components/users/RolesPermissionsManagement";
 import RolePermissionsDetail from "@/components/users/RolePermissionsDetail";
 import RoleCreatePage from "@/components/users/RoleCreatePage";
@@ -117,6 +119,14 @@ const App = () => (
                   element={
                     <PermissionRoute any={["products.view"]}>
                       <ProductManagement />
+                    </PermissionRoute>
+                  }
+                />
+                <Route
+                  path="/inventario/:id"
+                  element={
+                    <PermissionRoute any={["products.view"]}>
+                      <ProductDetailPage />
                     </PermissionRoute>
                   }
                 />
@@ -275,6 +285,14 @@ const App = () => (
                   element={
                     <PermissionRoute any={["users.view", "roles.manage"]}>
                       <UserManagement />
+                    </PermissionRoute>
+                  }
+                />
+                <Route
+                  path="/usuarios/:id"
+                  element={
+                    <PermissionRoute any={["users.view", "roles.manage"]}>
+                      <UserDetailPage />
                     </PermissionRoute>
                   }
                 />

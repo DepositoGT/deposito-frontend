@@ -181,8 +181,16 @@ export const createRole = async (
   });
 };
 
-export const deleteRole = async (id: number): Promise<{ message: string; id: number }> => {
-  return apiFetch<{ message: string; id: number }>(`/api/auth/roles/${id}`, {
+export type DeleteRoleResponse = {
+  message: string;
+  id: number;
+  reassignedUsers?: number;
+  fallbackRoleId?: number;
+  fallbackRoleName?: string;
+};
+
+export const deleteRole = async (id: number): Promise<DeleteRoleResponse> => {
+  return apiFetch<DeleteRoleResponse>(`/api/auth/roles/${id}`, {
     method: "DELETE",
   });
 };
