@@ -9,7 +9,7 @@
  */
 
 import { useState, useEffect, useMemo, useRef } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -130,6 +130,7 @@ const SuppliersManagement = () => {
 
   const { toast } = useToast();
   const { hasPermission } = useAuthPermissions();
+  const location = useLocation();
 
   const canCreate = hasPermission("suppliers.create");
   const canEdit = hasPermission("suppliers.edit");
@@ -140,6 +141,18 @@ const SuppliersManagement = () => {
   useEffect(() => {
     setCurrentPage(1);
   }, [searchTerm]);
+
+  // Abrir modal de edición si venimos desde el detalle con un id específico
+  useEffect(() => {
+    if (!canEdit) return;
+    const state = location.state as { editSupplierId?: string } | null;
+    const editId = state?.editSupplierId;
+    if (!editId || !suppliers.length) return;
+    const supplierToEdit = suppliers.find((s) => String(s.id) === String(editId));
+    if (supplierToEdit) {
+      editSupplier(supplierToEdit);
+    }
+  }, [location.state, suppliers, canEdit]);
 
   const stats: SupplierStats = {
     totalSuppliers: totalItems,
@@ -589,24 +602,26 @@ const SuppliersManagement = () => {
                 className="pl-10"
               />
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center border rounded-md bg-background/80">
               <Button
-                variant={viewMode === "table" ? "default" : "outline"}
-                size="sm"
+                type="button"
+                variant={viewMode === "table" ? "default" : "ghost"}
+                size="icon"
+                className="h-8 w-8 rounded-r-none"
                 onClick={() => setViewMode("table")}
-                className="h-9"
+                aria-label="Vista de tabla"
               >
-                <List className="w-4 h-4 mr-2" />
-                Tabla
+                <List className="w-4 h-4" />
               </Button>
               <Button
-                variant={viewMode === "cards" ? "default" : "outline"}
-                size="sm"
+                type="button"
+                variant={viewMode === "cards" ? "default" : "ghost"}
+                size="icon"
+                className="h-8 w-8 rounded-l-none"
                 onClick={() => setViewMode("cards")}
-                className="h-9"
+                aria-label="Vista de cuadros"
               >
-                <LayoutGrid className="w-4 h-4 mr-2" />
-                Cards
+                <LayoutGrid className="w-4 h-4" />
               </Button>
             </div>
           </div>
@@ -693,15 +708,6 @@ const SuppliersManagement = () => {
                               >
                                 <Eye className="w-4 h-4 mr-1" />
                                 Ver
-                              </Button>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => editSupplier(supplier)}
-                                disabled={deleteIsLoading || updateIsLoading}
-                              >
-                                <Edit className="w-4 h-4 mr-1" />
-                                Editar
                               </Button>
                               <AlertDialog>
                                 <AlertDialogTrigger asChild>
@@ -806,16 +812,6 @@ const SuppliersManagement = () => {
                     >
                       <Eye className="w-3 h-3 mr-1" />
                       Ver
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => editSupplier(supplier)}
-                      className="h-7 text-xs"
-                      disabled={deleteIsLoading || updateIsLoading}
-                    >
-                      <Edit className="w-3 h-3 mr-1" />
-                      Editar
                     </Button>
                     <AlertDialog>
                       <AlertDialogTrigger asChild>

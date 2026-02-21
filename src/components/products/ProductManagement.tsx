@@ -21,7 +21,7 @@ import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Label } from '@/components/ui/label'
 import {
-    Plus, Search, Filter, Edit, Trash2, Eye, ScanLine, Download, MoreVertical,
+    Plus, Search, Filter, Trash2, Eye, ScanLine, Download, MoreVertical,
     QrCode, PackagePlus, ChevronLeft, ChevronRight, Upload, LayoutGrid, List, Package
 } from 'lucide-react'
 import {
@@ -40,13 +40,12 @@ import { useSuppliers } from '@/hooks/useSuppliers'
 import { useCategories } from '@/hooks/useCategories'
 import { useCreateProduct } from '@/hooks/useCreateProduct'
 import { useDeleteProduct } from '@/hooks/useDeleteProduct'
-import useUpdateProduct from '@/hooks/useUpdateProduct'
 import { adaptApiProduct } from '@/services/productService'
 import { Pagination } from '@/components/shared/Pagination'
 
 // Feature imports
 import { useProductForm } from './hooks'
-import { ProductFormDialog, ProductDetailDialog, ImportDialog } from './components'
+import { ProductFormDialog, ImportDialog } from './components'
 import { useAuthPermissions } from '@/hooks/useAuthPermissions'
 import { useNavigate } from 'react-router-dom'
 
@@ -66,7 +65,6 @@ const ProductManagement = () => {
     // Dialog states
     const [isNewProductOpen, setIsNewProductOpen] = useState(false)
     const [isViewProductOpen, setIsViewProductOpen] = useState(false)
-    const [isEditProductOpen, setIsEditProductOpen] = useState(false)
     const [isScannerOpen, setIsScannerOpen] = useState(false)
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
     const [isImportDialogOpen, setIsImportDialogOpen] = useState(false)
@@ -101,7 +99,6 @@ const ProductManagement = () => {
 
     // Mutations
     const createProductMutation = useCreateProduct()
-    const updateMutation = useUpdateProduct()
     const deleteMutation = useDeleteProduct()
     const { mutateAsync: deleteMutateAsync, isPending: deleteIsLoading } = deleteMutation
 
@@ -189,38 +186,6 @@ const ProductManagement = () => {
         })
     }
 
-    const handleUpdateProduct = async () => {
-        if (!selectedProduct || !productForm.validateForm()) return
-
-        try {
-            const payload = {
-                id: selectedProduct.id,
-                name: productForm.formData.name.trim(),
-                category_id: Number(productForm.formData.category),
-                brand: productForm.formData.brand?.trim() || undefined,
-                size: productForm.formData.size?.trim() || undefined,
-                stock: productForm.formData.stock ? Number(productForm.formData.stock) : 0,
-                min_stock: productForm.formData.minStock ? Number(productForm.formData.minStock) : 0,
-                price: Number(productForm.formData.price),
-                cost: productForm.formData.cost ? Number(productForm.formData.cost) : 0,
-                image_url: productForm.formData.imageUrl || undefined,
-                supplier_id: productForm.formData.supplier,
-                barcode: productForm.formData.barcode?.trim() || undefined,
-                description: productForm.formData.description?.trim() || undefined,
-                status_id: 1
-            }
-
-            await updateMutation.mutateAsync({ id: selectedProduct.id, payload })
-            toast({ title: 'Producto actualizado', description: 'El producto fue actualizado correctamente' })
-            productForm.resetForm()
-            setIsEditProductOpen(false)
-            setSelectedProduct(null)
-        } catch (err: unknown) {
-            const message = (err as { message?: string })?.message || 'No se pudo actualizar el producto'
-            toast({ title: 'Error', description: message, variant: 'destructive' })
-        }
-    }
-
     const handleDeleteProduct = async () => {
         if (!deleteTargetId) return
         try {
@@ -242,16 +207,8 @@ const ProductManagement = () => {
 
     // View/Edit handlers
     const viewProduct = (product: Product) => {
-        setSelectedProduct(product)
-        setIsViewProductOpen(true)
+        navigate(`/inventario/${product.id}`)
     }
-
-    const editProduct = (product: Product) => {
-        setSelectedProduct(product)
-        productForm.populateFromProduct(product, suppliers, normalizedCategories)
-        setIsEditProductOpen(true)
-    }
-
 
     const searchByBarcode = () => {
         if (!scannedCode) return
@@ -369,25 +326,27 @@ const ProductManagement = () => {
             <Card>
                 <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                     <CardTitle>Productos ({totalItems})</CardTitle>
-                    {/* View mode toggle (Tabla / Cuadros) */}
-                    <div className="flex items-center gap-2">
+                    {/* View mode toggle (solo iconos, igual que /mercancia) */}
+                    <div className="flex items-center border rounded-md bg-background/80">
                         <Button
                             type="button"
-                            variant={viewMode === 'table' ? 'default' : 'outline'}
-                            size="sm"
+                            variant={viewMode === 'table' ? 'default' : 'ghost'}
+                            size="icon"
+                            className="h-8 w-8 rounded-r-none"
                             onClick={() => setViewMode('table')}
+                            aria-label="Vista de tabla"
                         >
-                            <List className="w-4 h-4 mr-2" />
-                            Tabla
+                            <List className="w-4 h-4" />
                         </Button>
                         <Button
                             type="button"
-                            variant={viewMode === 'cards' ? 'default' : 'outline'}
-                            size="sm"
+                            variant={viewMode === 'cards' ? 'default' : 'ghost'}
+                            size="icon"
+                            className="h-8 w-8 rounded-l-none"
                             onClick={() => setViewMode('cards')}
+                            aria-label="Vista de cuadros"
                         >
-                            <LayoutGrid className="w-4 h-4 mr-2" />
-                            Cuadros
+                            <LayoutGrid className="w-4 h-4" />
                         </Button>
                     </div>
                 </CardHeader>
@@ -441,11 +400,6 @@ const ProductManagement = () => {
                                                             </DropdownMenuTrigger>
                                                             <DropdownMenuContent align="end" className="bg-popover border-border">
                                                                 <DropdownMenuItem onClick={() => viewProduct(product)}><Eye className="w-4 h-4 mr-2" />Ver Detalles</DropdownMenuItem>
-                                                                {canEdit && (
-                                                                    <DropdownMenuItem onClick={() => editProduct(product)}>
-                                                                        <Edit className="w-4 h-4 mr-2" />Editar
-                                                                    </DropdownMenuItem>
-                                                                )}
                                                                 <DropdownMenuItem onClick={() => viewProduct(product)}><ScanLine className="w-4 h-4 mr-2" />Ver Código</DropdownMenuItem>
                                                                 {canDelete && (
                                                                     <DropdownMenuItem
@@ -521,11 +475,6 @@ const ProductManagement = () => {
                                                 <Button size="sm" variant="outline" onClick={() => viewProduct(product)}>
                                                     <Eye className="w-3 h-3 mr-1" /> Detalles
                                                 </Button>
-                                                {canEdit && (
-                                                    <Button size="sm" variant="outline" onClick={() => editProduct(product)}>
-                                                        <Edit className="w-3 h-3 mr-1" /> Editar
-                                                    </Button>
-                                                )}
                                                 {canDelete && (
                                                     <Button
                                                         size="sm"
@@ -572,25 +521,7 @@ const ProductManagement = () => {
                 submitLabel="Guardar Producto"
             />
 
-            <ProductFormDialog
-                open={isEditProductOpen}
-                onOpenChange={setIsEditProductOpen}
-                title="Editar Producto"
-                formData={productForm.formData}
-                onFormChange={(field, value) => productForm.setFormData(prev => ({ ...prev, [field]: value }))}
-                onSubmit={handleUpdateProduct}
-                onGenerateBarcode={productForm.generateBarcode}
-                categories={normalizedCategories.length > 0 ? normalizedCategories : categories.filter(c => c !== 'all')}
-                suppliers={suppliers}
-                isLoading={updateMutation.isPending}
-                submitLabel="Actualizar Producto"
-            />
-
-            <ProductDetailDialog
-                open={isViewProductOpen}
-                onOpenChange={setIsViewProductOpen}
-                product={selectedProduct}
-            />
+            {/* Detalle y edición de producto ahora son vistas dedicadas en /inventario/:id */}
 
 
             {/* Delete Confirmation */}

@@ -9,7 +9,7 @@
  */
 
 /**
- * HomePage - Main landing page with app grid (Odoo-style)
+ * HomePage
  * Shows all available modules in a searchable grid
  */
 import { useState, useMemo } from 'react'
