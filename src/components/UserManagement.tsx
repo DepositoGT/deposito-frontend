@@ -436,7 +436,7 @@ const UserManagement = () => {
               variant="outline"
               onClick={() => navigate("/usuarios/roles-permisos")}
             >
-              Roles y Permisos
+              Cargos y Permisos
             </Button>
           )}
           {canImportUsers && (
@@ -551,24 +551,26 @@ const UserManagement = () => {
                 {filteredUsers.length} usuario{filteredUsers.length !== 1 ? 's' : ''} encontrado{filteredUsers.length !== 1 ? 's' : ''}
               </CardDescription>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center border rounded-md bg-background/80">
               <Button
-                variant={viewMode === "table" ? "default" : "outline"}
-                size="sm"
+                type="button"
+                variant={viewMode === "table" ? "default" : "ghost"}
+                size="icon"
+                className="h-8 w-8 rounded-r-none"
                 onClick={() => setViewMode("table")}
-                className="h-9"
+                aria-label="Vista de tabla"
               >
-                <List className="w-4 h-4 mr-2" />
-                Tabla
+                <List className="w-4 h-4" />
               </Button>
               <Button
-                variant={viewMode === "cards" ? "default" : "outline"}
-                size="sm"
+                type="button"
+                variant={viewMode === "cards" ? "default" : "ghost"}
+                size="icon"
+                className="h-8 w-8 rounded-l-none"
                 onClick={() => setViewMode("cards")}
-                className="h-9"
+                aria-label="Vista de cuadros"
               >
-                <LayoutGrid className="w-4 h-4 mr-2" />
-                Cards
+                <LayoutGrid className="w-4 h-4" />
               </Button>
             </div>
           </div>
@@ -619,7 +621,7 @@ const UserManagement = () => {
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => handleViewUser(user)}
+                            onClick={() => navigate(`/usuarios/${user.id}`)}
                           >
                             <Eye className="w-4 h-4 mr-1" />
                             Ver
@@ -679,7 +681,7 @@ const UserManagement = () => {
                 <div
                   key={user.id}
                   className="border rounded-lg p-4 hover:bg-muted/50 transition-colors cursor-pointer"
-                  onClick={() => handleViewUser(user)}
+                  onClick={() => navigate(`/usuarios/${user.id}`)}
                 >
                   <div className="flex items-center gap-3 mb-3">
                     <UserAvatar user={user} />
@@ -703,7 +705,7 @@ const UserManagement = () => {
                       size="sm"
                       onClick={(e) => {
                         e.stopPropagation()
-                        handleViewUser(user)
+                        navigate(`/usuarios/${user.id}`)
                       }}
                       className="flex-1"
                     >

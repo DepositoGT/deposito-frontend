@@ -19,6 +19,7 @@ import { AlertTriangle, PackageX, RotateCcw, Tag } from 'lucide-react'
 import { Sale, SaleStatus } from '@/types'
 import { formatMoney, formatDateTime } from '@/utils'
 import { useNavigate } from 'react-router-dom'
+import { useAuthPermissions } from '@/hooks/useAuthPermissions'
 
 interface SaleDetailDialogProps {
     open: boolean
@@ -42,6 +43,8 @@ export const SaleDetailDialog = ({
     sale
 }: SaleDetailDialogProps) => {
     const navigate = useNavigate()
+    const { hasPermission } = useAuthPermissions()
+    const canManageReturns = hasPermission('returns.manage')
 
     if (!sale) return null
 
@@ -216,8 +219,8 @@ export const SaleDetailDialog = ({
                         )}
                     </div>
 
-                    {/* Return Button */}
-                    {sale.status === 'completed' && (
+                    {/* Return Button - solo si tiene permiso returns.manage */}
+                    {sale.status === 'completed' && canManageReturns && (
                         <div className='pt-4 border-t'>
                             <Button
                                 variant='outline'

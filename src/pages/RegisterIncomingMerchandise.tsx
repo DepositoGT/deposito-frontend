@@ -16,14 +16,17 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
-import { ArrowLeft, Plus, Trash2, Package } from 'lucide-react'
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from '@/components/ui/command'
+import { ScrollArea } from '@/components/ui/scroll-area'
+import { ArrowLeft, Plus, Trash2, Package, Check, ChevronsUpDown } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { useSuppliers } from '@/hooks/useSuppliers'
 import { useProducts } from '@/hooks/useProducts'
@@ -41,6 +44,8 @@ export const RegisterIncomingMerchandise = () => {
   const navigate = useNavigate()
   const { toast } = useToast()
   const [selectedSupplierId, setSelectedSupplierId] = useState<string>('')
+  const [supplierPopoverOpen, setSupplierPopoverOpen] = useState(false)
+  const [openProductPopoverIndex, setOpenProductPopoverIndex] = useState<number | null>(null)
   const [notes, setNotes] = useState('')
   const [items, setItems] = useState<IncomingItem[]>([])
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -272,18 +277,44 @@ export const RegisterIncomingMerchandise = () => {
           {/* Supplier Selection */}
           <div>
             <Label htmlFor="supplier">Proveedor *</Label>
-            <Select value={selectedSupplierId} onValueChange={setSelectedSupplierId}>
-              <SelectTrigger id="supplier">
-                <SelectValue placeholder="Seleccione un proveedor" />
-              </SelectTrigger>
-              <SelectContent>
-                {suppliers.map((supplier) => (
-                  <SelectItem key={supplier.id} value={supplier.id}>
-                    {supplier.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Popover open={supplierPopoverOpen} onOpenChange={setSupplierPopoverOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  id="supplier"
+                  variant="outline"
+                  role="combobox"
+                  className="w-full justify-between mt-1"
+                >
+                  {selectedSupplier ? selectedSupplier.name : 'Seleccione un proveedor'}
+                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-[320px] p-0" align="start">
+                <Command>
+                  <CommandInput placeholder="Buscar proveedor..." />
+                  <CommandEmpty>No se encontraron proveedores.</CommandEmpty>
+                  <CommandList>
+                    <CommandGroup>
+                      <ScrollArea className="h-48">
+                        {suppliers.map((supplier) => (
+                          <CommandItem
+                            key={supplier.id}
+                            value={supplier.name}
+                            onSelect={() => {
+                              setSelectedSupplierId(supplier.id)
+                              setSupplierPopoverOpen(false)
+                            }}
+                          >
+                            <Check className={`mr-2 h-4 w-4 ${supplier.id === selectedSupplierId ? 'opacity-100' : 'opacity-0'}`} />
+                            {supplier.name}
+                          </CommandItem>
+                        ))}
+                      </ScrollArea>
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
             {selectedSupplier && (
               <p className="text-sm text-muted-foreground mt-2">
                 Contacto: {selectedSupplier.contact} • {selectedSupplier.phone}
@@ -325,22 +356,49 @@ export const RegisterIncomingMerchandise = () => {
                         <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
                           <div className="md:col-span-5">
                             <Label>Producto *</Label>
-                            <Select
-                              value={item.product_id}
-                              onValueChange={(value) => handleProductChange(index, value)}
+                            <Popover
+                              open={openProductPopoverIndex === index}
+                              onOpenChange={(open) => setOpenProductPopoverIndex(open ? index : null)}
                             >
-                              <SelectTrigger>
-                                <SelectValue placeholder="Seleccione producto" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {availableProducts.map((product) => (
-                                  <SelectItem key={product.id} value={product.id}>
-                                    {product.name} {product.brand && `• ${product.brand}`}
-                                    {product.size && ` • ${product.size}`}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
+                              <PopoverTrigger asChild>
+                                <Button
+                                  variant="outline"
+                                  role="combobox"
+                                  className="w-full justify-between mt-1"
+                                >
+                                  {item.product_name || 'Seleccione producto'}
+                                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                </Button>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-[320px] p-0" align="start">
+                                <Command>
+                                  <CommandInput placeholder="Buscar producto..." />
+                                  <CommandEmpty>No se encontraron productos.</CommandEmpty>
+                                  <CommandList>
+                                    <CommandGroup>
+                                      <ScrollArea className="h-48">
+                                        {availableProducts.map((product) => {
+                                          const label = `${product.name}${product.brand ? ` • ${product.brand}` : ''}${product.size ? ` • ${product.size}` : ''}`
+                                          return (
+                                            <CommandItem
+                                              key={product.id}
+                                              value={label}
+                                              onSelect={() => {
+                                                handleProductChange(index, product.id)
+                                                setOpenProductPopoverIndex(null)
+                                              }}
+                                            >
+                                              <Check className={`mr-2 h-4 w-4 ${product.id === item.product_id ? 'opacity-100' : 'opacity-0'}`} />
+                                              {label}
+                                            </CommandItem>
+                                          )
+                                        })}
+                                      </ScrollArea>
+                                    </CommandGroup>
+                                  </CommandList>
+                                </Command>
+                              </PopoverContent>
+                            </Popover>
                           </div>
                           <div className="md:col-span-3">
                             <Label>Cantidad *</Label>
