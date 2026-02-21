@@ -152,24 +152,28 @@ const RolesPermissionsManagement = () => {
               Nuevo rol
             </Button>
           )}
+          <div className="flex items-center border rounded-md bg-background/80">
           <Button
-            variant={viewMode === "table" ? "default" : "outline"}
-            size="sm"
+            type="button"
+            variant={viewMode === "table" ? "default" : "ghost"}
+            size="icon"
+            className="h-8 w-8 rounded-r-none"
             onClick={() => setViewMode("table")}
-            className="h-9"
+            aria-label="Vista de lista"
           >
-            <List className="w-4 h-4 mr-2" />
-            Lista
+            <List className="w-4 h-4" />
           </Button>
           <Button
-            variant={viewMode === "cards" ? "default" : "outline"}
-            size="sm"
+            type="button"
+            variant={viewMode === "cards" ? "default" : "ghost"}
+            size="icon"
+            className="h-8 w-8 rounded-l-none"
             onClick={() => setViewMode("cards")}
-            className="h-9"
+            aria-label="Vista de cuadros"
           >
-            <LayoutGrid className="w-4 h-4 mr-2" />
-            Cuadros
+            <LayoutGrid className="w-4 h-4" />
           </Button>
+        </div>
         </div>
       </div>
 

@@ -141,6 +141,11 @@ export const fetchAllProducts = async (): Promise<Product[]> => {
   return data.items.map(adaptApiProduct);
 };
 
+export const fetchProductById = async (id: string): Promise<ApiProduct | null> => {
+  const data = await apiFetch<ApiProduct>(`/api/products/${id}`, { method: "GET" });
+  return data ?? null;
+};
+
 export const fetchCriticalProducts = async (): Promise<Product[]> => {
   const data = await apiFetch<ApiProduct[]>("/api/products/critical", { method: "GET" });
   if (!Array.isArray(data)) return [];

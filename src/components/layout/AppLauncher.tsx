@@ -9,7 +9,7 @@
  */
 
 /**
- * AppLauncher - Odoo-style app grid modal
+ * AppLauncher 
  * Shows all available modules in a grid with search functionality
  */
 import { useState, useMemo } from 'react'
