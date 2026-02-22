@@ -40,7 +40,6 @@ import UserImportDialog from "./users/UserImportDialog";
 import { useAuth } from "@/context/useAuth";
 import { useAuthPermissions } from "@/hooks/useAuthPermissions";
 import type { User } from "@/services/userService";
-import { UserDetailDialog } from "@/components/users/UserDetailDialog";
 import { Pagination } from "@/components/shared/Pagination";
 import { useNavigate } from "react-router-dom";
 
@@ -85,7 +84,6 @@ const UserManagement = () => {
   // Estados para modales
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
-  const [isViewOpen, setIsViewOpen] = useState(false);
   const [isImportOpen, setIsImportOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
 
@@ -239,12 +237,6 @@ const UserManagement = () => {
     setEditPassword("");
     setEditRoleId(String(user.role_id));
     setIsEditOpen(true);
-  };
-
-  // Función para abrir modal de vista
-  const handleViewUser = (user: User) => {
-    setSelectedUser(user);
-    setIsViewOpen(true);
   };
 
   // Función para actualizar usuario
@@ -944,44 +936,6 @@ const UserManagement = () => {
           </div>
         </DialogContent>
       </Dialog>
-
-      {/* Modal Ver Usuario */}
-      <UserDetailDialog
-        user={selectedUser}
-        open={isViewOpen}
-        onOpenChange={(open) => {
-          setIsViewOpen(open)
-          if (!open) {
-            setSelectedUser(null)
-          }
-        }}
-        onUpdate={async () => {
-          // Refrescar la lista de usuarios automáticamente
-          try {
-            const result = await refetchUsers()
-            // Actualizar el usuario seleccionado con los datos más recientes
-            if (result.data?.items && selectedUser) {
-              const updatedUser = result.data.items.find((u: User) => u.id === selectedUser.id)
-              if (updatedUser) {
-                setSelectedUser(updatedUser)
-              }
-            }
-            
-            // Si el usuario actualizado es el usuario logueado, actualizar localStorage y contexto
-            if (result.data?.items && currentUser) {
-              const updatedCurrentUser = result.data.items.find((u: User) => u.id === currentUser.id)
-              if (updatedCurrentUser) {
-                // Actualizar localStorage
-                localStorage.setItem('auth:user', JSON.stringify(updatedCurrentUser))
-                // Disparar evento para actualizar el contexto de autenticación
-                window.dispatchEvent(new CustomEvent('auth:userUpdated', { detail: updatedCurrentUser }))
-              }
-            }
-          } catch (error) {
-            console.error('Error al refrescar usuarios:', error)
-          }
-        }}
-      />
 
       {/* Import Dialog */}
       <UserImportDialog
