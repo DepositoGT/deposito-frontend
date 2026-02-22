@@ -37,7 +37,6 @@ export const SalesKPICards = ({
                             <p className='text-sm text-muted-foreground'>Ventas Hoy</p>
                             <p className='text-2xl font-bold text-foreground'>{formatMoney(totalSalesToday)}</p>
                         </div>
-                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">Q</span>
                     </div>
                 </CardContent>
             </Card>

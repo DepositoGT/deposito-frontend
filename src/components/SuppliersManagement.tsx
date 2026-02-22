@@ -22,7 +22,6 @@ import {
   Phone,
   Mail,
   MapPin,
-  Building,
   Package,
   TrendingUp,
   Eye,
@@ -40,7 +39,6 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import {
   Select,
@@ -66,7 +64,6 @@ import { useSuppliers } from "@/hooks/useSuppliers";
 import { useCategories } from "@/hooks/useCategories";
 import { usePaymentTerms } from "@/hooks/usePaymentTerms";
 import { useStatuses } from "@/hooks/useStatuses";
-import { useCreateSupplier } from "@/hooks/useCreateSupplier";
 import { useSupplier } from "@/hooks/useSupplier";
 import { useUpdateSupplier } from "@/hooks/useUpdateSupplier";
 import { useDeleteSupplier } from "@/hooks/useDeleteSupplier";
@@ -95,7 +92,6 @@ const SuppliersManagement = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize] = useState(10);
   const [viewMode, setViewMode] = useState<"table" | "cards">("cards");
-  const [isNewSupplierOpen, setIsNewSupplierOpen] = useState(false);
   const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(null);
   const [isImportOpen, setIsImportOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
@@ -161,19 +157,6 @@ const SuppliersManagement = () => {
     avgRating: "0.0",
   };
 
-  // form state for new supplier
-  const [newName, setNewName] = useState("");
-  const [newContact, setNewContact] = useState("");
-  const [newPhone, setNewPhone] = useState("");
-  const [newEmail, setNewEmail] = useState("");
-  const [newCategoryIds, setNewCategoryIds] = useState<string[]>([]);
-  const [newPaymentTermId, setNewPaymentTermId] = useState<string | undefined>(undefined);
-  const [newAddress, setNewAddress] = useState("");
-
-  const createSupplierMutation = useCreateSupplier();
-  const createMutateAsync = createSupplierMutation.mutateAsync;
-  const createIsLoading = createSupplierMutation.isPending;
-
   const [editStatusId, setEditStatusId] = useState<string | undefined>(undefined);
   // edit form fields (controlled)
   const [editName, setEditName] = useState<string>("");
@@ -226,103 +209,6 @@ const SuppliersManagement = () => {
   const updateMutation = useUpdateSupplier();
   const updateMutateAsync = updateMutation.mutateAsync;
   const updateIsLoading = updateMutation.isPending;
-
-  const handleCreateSupplier = async () => {
-    // Validaciones de campos requeridos
-    if (!newName || newName.trim() === "") {
-      toast({
-        title: "Campo requerido",
-        description: "El nombre de la empresa es obligatorio",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    if (!newContact || newContact.trim() === "") {
-      toast({
-        title: "Campo requerido",
-        description: "La persona de contacto es obligatoria",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    if (!newPhone || newPhone.trim() === "") {
-      toast({
-        title: "Campo requerido",
-        description: "El teléfono es obligatorio",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    if (!newEmail || newEmail.trim() === "") {
-      toast({
-        title: "Campo requerido",
-        description: "El email es obligatorio",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    // Validar formato de email
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(newEmail)) {
-      toast({
-        title: "Email inválido",
-        description: "Por favor ingrese un email válido",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    if (!newAddress || newAddress.trim() === "") {
-      toast({
-        title: "Campo requerido",
-        description: "La dirección es obligatoria",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    if (!newCategoryIds || newCategoryIds.length === 0) {
-      toast({
-        title: "Campo requerido",
-        description: "Debes seleccionar al menos una categoría",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    try {
-      await createMutateAsync({
-        name: newName.trim(),
-        contact: newContact.trim(),
-        phone: newPhone.trim(),
-        email: newEmail.trim(),
-        address: newAddress.trim(),
-        category_ids: newCategoryIds.map((id) => Number(id)),
-        payment_terms_id: newPaymentTermId ? Number(newPaymentTermId) : undefined,
-      });
-      setIsNewSupplierOpen(false);
-      // reset form
-      setNewName("");
-      setNewContact("");
-      setNewPhone("");
-      setNewEmail("");
-      setNewCategoryIds([]);
-      setNewPaymentTermId(undefined);
-      setNewAddress("");
-      toast({ title: "Proveedor agregado", description: "Proveedor creado correctamente" });
-    } catch (err: unknown) {
-      let message = "No se pudo crear el proveedor";
-      if (err && typeof err === "object" && "message" in err) {
-        const m = (err as { message?: unknown }).message;
-        if (m !== undefined) message = String(m) || message;
-      }
-      toast({ title: "Error", description: message });
-    }
-  };
 
   const viewSupplier = (supplier: Supplier) => {
     navigate(`/proveedores/${supplier.id}`);
@@ -387,165 +273,10 @@ const SuppliersManagement = () => {
             </>
           )}
           {canCreate && (
-            <Dialog open={isNewSupplierOpen} onOpenChange={setIsNewSupplierOpen}>
-              <DialogTrigger asChild>
-                <Button className="bg-liquor-amber hover:bg-liquor-amber/90 text-white">
-                  <Plus className="w-4 h-4 mr-2" />
-                  Nuevo Proveedor
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-2xl">
-              <DialogHeader>
-                <DialogTitle>Agregar Nuevo Proveedor</DialogTitle>
-              </DialogHeader>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-4">
-                  <div>
-                    <Label htmlFor="name">Nombre de la Empresa</Label>
-                    <Input id="name" value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Ej: Diageo Guatemala" />
-                  </div>
-                  <div>
-                    <Label htmlFor="contact">Persona de Contacto</Label>
-                    <Input id="contact" value={newContact} onChange={(e) => setNewContact(e.target.value)} placeholder="Nombre completo" />
-                  </div>
-                  <div>
-                    <Label htmlFor="phone">Teléfono</Label>
-                    <Input id="phone" value={newPhone} onChange={(e) => setNewPhone(e.target.value)} placeholder="+502 2345-6789" />
-                  </div>
-                  <div>
-                    <Label htmlFor="email">Email</Label>
-                    <Input id="email" type="email" value={newEmail} onChange={(e) => setNewEmail(e.target.value)} placeholder="contacto@empresa.com" />
-                  </div>
-                </div>
-                <div className="space-y-4">
-                  <div>
-                    <Label htmlFor="category">Categorías</Label>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button
-                          variant="outline"
-                          role="combobox"
-                          className="w-full justify-between"
-                        >
-                          <span className="truncate text-left">
-                            {newCategoryIds.length === 0
-                              ? "Seleccionar categorías"
-                              : `${newCategoryIds.length} categoría(s) seleccionada(s)`}
-                          </span>
-                          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-[320px] p-0" align="start">
-                        <Command>
-                          <CommandInput placeholder="Buscar categoría..." />
-                          <CommandList>
-                            <CommandEmpty>Sin resultados.</CommandEmpty>
-                            <CommandGroup>
-                              <ScrollArea className="max-h-64">
-                                {categories.map((c) => {
-                                  const id = String(c.id);
-                                  const selected = newCategoryIds.includes(id);
-                                  return (
-                                    <CommandItem
-                                      key={id}
-                                      value={c.name}
-                                      onSelect={() => {
-                                        setNewCategoryIds((prev) =>
-                                          prev.includes(id)
-                                            ? prev.filter((v) => v !== id)
-                                            : [...prev, id]
-                                        );
-                                      }}
-                                    >
-                                      <Check
-                                        className={cn(
-                                          "mr-2 h-4 w-4",
-                                          selected ? "opacity-100" : "opacity-0"
-                                        )}
-                                      />
-                                      {c.name}
-                                    </CommandItem>
-                                  );
-                                })}
-                                {categories.length === 0 && (
-                                  <div className="px-2 py-3 text-xs text-muted-foreground">
-                                    Configura categorías en catálogos primero.
-                                  </div>
-                                )}
-                              </ScrollArea>
-                            </CommandGroup>
-                          </CommandList>
-                        </Command>
-                      </PopoverContent>
-                    </Popover>
-                    {newCategoryIds.length > 0 && (
-                      <div className="flex flex-wrap gap-1 mt-2">
-                        {categories
-                          .filter((c) => newCategoryIds.includes(String(c.id)))
-                          .map((c) => (
-                            <Badge
-                              key={String(c.id)}
-                              variant="secondary"
-                              className="text-xs"
-                            >
-                              {c.name}
-                            </Badge>
-                          ))}
-                      </div>
-                    )}
-                  </div>
-                  <div>
-                    <Label htmlFor="terms">Términos de Pago</Label>
-                    <Select value={newPaymentTermId} onValueChange={(v) => setNewPaymentTermId(v)}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Seleccionar términos" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {paymentTerms.length > 0 ? (
-                          paymentTerms.map((t) => (
-                            <SelectItem key={String(t.id)} value={String(t.id)}>
-                              {t.name}
-                            </SelectItem>
-                          ))
-                        ) : (
-                          <>
-                            <SelectItem value="1">7 días</SelectItem>
-                            <SelectItem value="2">15 días</SelectItem>
-                            <SelectItem value="3">30 días</SelectItem>
-                            <SelectItem value="4">45 días</SelectItem>
-                          </>
-                        )}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <Label htmlFor="address">Dirección</Label>
-                    <Textarea id="address" value={newAddress} onChange={(e) => setNewAddress(e.target.value)} placeholder="Dirección completa" rows={3} />
-                  </div>
-                </div>
-              </div>
-              <div className="flex justify-end space-x-2 mt-6">
-                <Button variant="outline" onClick={() => setIsNewSupplierOpen(false)} disabled={createIsLoading}>
-                  Cancelar
-                </Button>
-                <Button
-                  className="bg-liquor-amber hover:bg-liquor-amber/90 text-white"
-                  disabled={createIsLoading}
-                  onClick={handleCreateSupplier}
-                >
-                  {createIsLoading ? (
-                    <svg className="animate-spin w-4 h-4 mr-2 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
-                    </svg>
-                  ) : (
-                    <Building className="w-4 h-4 mr-2" />
-                  )}
-                  {createIsLoading ? 'Creando...' : 'Agregar Proveedor'}
-                </Button>
-              </div>
-            </DialogContent>
-          </Dialog>
+            <Button className="bg-liquor-amber hover:bg-liquor-amber/90 text-white" onClick={() => navigate("/proveedores/nuevo")}>
+              <Plus className="w-4 h-4 mr-2" />
+              Nuevo Proveedor
+            </Button>
           )}
         </div>
       </div>

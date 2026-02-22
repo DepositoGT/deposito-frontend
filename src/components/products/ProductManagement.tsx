@@ -38,14 +38,12 @@ import type { Product } from '@/types'
 import { useProducts } from '@/hooks/useProducts'
 import { useSuppliers } from '@/hooks/useSuppliers'
 import { useCategories } from '@/hooks/useCategories'
-import { useCreateProduct } from '@/hooks/useCreateProduct'
 import { useDeleteProduct } from '@/hooks/useDeleteProduct'
 import { adaptApiProduct } from '@/services/productService'
 import { Pagination } from '@/components/shared/Pagination'
 
 // Feature imports
-import { useProductForm } from './hooks'
-import { ProductFormDialog, ImportDialog } from './components'
+import { ImportDialog } from './components'
 import { useAuthPermissions } from '@/hooks/useAuthPermissions'
 import { useNavigate } from 'react-router-dom'
 
@@ -63,7 +61,6 @@ const ProductManagement = () => {
     const [pageSize, setPageSize] = useState(5) // Default page size
 
     // Dialog states
-    const [isNewProductOpen, setIsNewProductOpen] = useState(false)
     const [isViewProductOpen, setIsViewProductOpen] = useState(false)
     const [isScannerOpen, setIsScannerOpen] = useState(false)
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
@@ -89,21 +86,9 @@ const ProductManagement = () => {
         if (!productsData?.items) return []
         return productsData.items.map(adaptApiProduct)
     }, [productsData])
-    const normalizedCategories = useMemo(() => {
-        // Handle both paginated response and direct array
-        const categories = Array.isArray(categoriesData) 
-            ? categoriesData 
-            : (categoriesData as { items?: Array<{ id: string | number; name: string }> })?.items ?? []
-        return categories.map(c => ({ id: String(c.id), name: String(c.name) }))
-    }, [categoriesData])
-
     // Mutations
-    const createProductMutation = useCreateProduct()
     const deleteMutation = useDeleteProduct()
     const { mutateAsync: deleteMutateAsync, isPending: deleteIsLoading } = deleteMutation
-
-    // Form hook
-    const productForm = useProductForm()
 
     // Categories list
     const categories = useMemo(() => {
@@ -154,38 +139,6 @@ const ProductManagement = () => {
     }
 
     // CRUD handlers
-    const handleSaveProduct = () => {
-        if (!productForm.validateForm()) return
-
-        const payload = {
-            name: productForm.formData.name.trim(),
-            category_id: Number(productForm.formData.category),
-            brand: productForm.formData.brand?.trim() || undefined,
-            size: productForm.formData.size?.trim() || undefined,
-            stock: productForm.formData.stock ? Number(productForm.formData.stock) : 0,
-            min_stock: productForm.formData.minStock ? Number(productForm.formData.minStock) : 0,
-            price: Number(productForm.formData.price),
-            cost: productForm.formData.cost ? Number(productForm.formData.cost) : 0,
-            image_url: productForm.formData.imageUrl || undefined,
-            supplier_id: productForm.formData.supplier,
-            barcode: productForm.formData.barcode?.trim() || undefined,
-            description: productForm.formData.description?.trim() || undefined,
-            status_id: 1
-        }
-
-        createProductMutation.mutate(payload, {
-            onSuccess: () => {
-                toast({ title: 'Producto creado', description: 'El producto fue creado correctamente' })
-                productForm.resetForm()
-                setIsNewProductOpen(false)
-            },
-            onError: (err: unknown) => {
-                const message = (err as { message?: string })?.message || 'No se pudo crear el producto'
-                toast({ title: 'Error', description: message, variant: 'destructive' })
-            }
-        })
-    }
-
     const handleDeleteProduct = async () => {
         if (!deleteTargetId) return
         try {
@@ -280,14 +233,10 @@ const ProductManagement = () => {
                         </DialogContent>
                     </Dialog>
                     {canCreate && (
-                        <Dialog open={isNewProductOpen} onOpenChange={setIsNewProductOpen}>
-                            <DialogTrigger asChild>
-                                <Button size="sm" className="shrink-0">
-                                    <Plus className="w-4 h-4 sm:mr-2" />
-                                    <span className="hidden sm:inline">Nuevo Producto</span>
-                                </Button>
-                            </DialogTrigger>
-                        </Dialog>
+                        <Button size="sm" className="shrink-0" onClick={() => navigate('/inventario/nuevo')}>
+                            <Plus className="w-4 h-4 sm:mr-2" />
+                            <span className="hidden sm:inline">Nuevo Producto</span>
+                        </Button>
                     )}
                 </div>
             </div>
@@ -505,24 +454,6 @@ const ProductManagement = () => {
                     )}
                 </CardContent>
             </Card>
-
-            {/* Dialogs */}
-            <ProductFormDialog
-                open={isNewProductOpen}
-                onOpenChange={setIsNewProductOpen}
-                title="Nuevo Producto"
-                formData={productForm.formData}
-                onFormChange={(field, value) => productForm.setFormData(prev => ({ ...prev, [field]: value }))}
-                onSubmit={handleSaveProduct}
-                onGenerateBarcode={productForm.generateBarcode}
-                categories={normalizedCategories.length > 0 ? normalizedCategories : categories.filter(c => c !== 'all')}
-                suppliers={suppliers}
-                isLoading={createProductMutation.isPending}
-                submitLabel="Guardar Producto"
-            />
-
-            {/* Detalle y edición de producto ahora son vistas dedicadas en /inventario/:id */}
-
 
             {/* Delete Confirmation */}
             <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
