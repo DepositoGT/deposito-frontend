@@ -63,7 +63,6 @@ import { useToast } from "@/hooks/use-toast";
 import { useSuppliers } from "@/hooks/useSuppliers";
 import { useCategories } from "@/hooks/useCategories";
 import { usePaymentTerms } from "@/hooks/usePaymentTerms";
-import { useStatuses } from "@/hooks/useStatuses";
 import { useSupplier } from "@/hooks/useSupplier";
 import { useUpdateSupplier } from "@/hooks/useUpdateSupplier";
 import { useDeleteSupplier } from "@/hooks/useDeleteSupplier";
@@ -107,7 +106,6 @@ const SuppliersManagement = () => {
   const totalPages = suppliersData?.totalPages ?? 1;
   const { data: categoriesData } = useCategories();
   const { data: paymentTermsData } = usePaymentTerms();
-  const { data: statusesData } = useStatuses();
 
   const categories = useMemo(() => {
     if (!categoriesData) return [] as Array<{ id: number | string; name: string }>;
@@ -122,7 +120,6 @@ const SuppliersManagement = () => {
     }
     return paymentTermsData?.items ?? [];
   }, [paymentTermsData]);
-  const statuses = useMemo(() => statusesData ?? [], [statusesData]);
 
   const { toast } = useToast();
   const { hasPermission } = useAuthPermissions();
@@ -157,7 +154,7 @@ const SuppliersManagement = () => {
     avgRating: "0.0",
   };
 
-  const [editStatusId, setEditStatusId] = useState<string | undefined>(undefined);
+  const [editEstado, setEditEstado] = useState<number>(1);
   // edit form fields (controlled)
   const [editName, setEditName] = useState<string>("");
   const [editContact, setEditContact] = useState<string>("");
@@ -192,18 +189,9 @@ const SuppliersManagement = () => {
       setEditCategoryIds([]);
     }
     setEditPaymentTermId(supplierData.payment_terms_id ? String(supplierData.payment_terms_id) : undefined);
-    setEditStatusId(supplierData.status_id ? String(supplierData.status_id) : undefined);
+    const raw = supplierData as { estado?: number };
+    setEditEstado(raw.estado !== undefined && raw.estado !== null ? Number(raw.estado) : 1);
   }, [supplierData]);
-
-  // If statuses list loads after supplierData, ensure the select value is set once both are available
-  useEffect(() => {
-    if (!supplierData) return;
-    if (!statuses || statuses.length === 0) return;
-    // only set if we don't already have a value (avoid clobbering manual edits)
-    if (!editStatusId && supplierData.status_id != null) {
-      setEditStatusId(String(supplierData.status_id));
-    }
-  }, [supplierData, statuses, editStatusId]);
 
   // update mutation (TanStack Query v5 uses isPending, not isLoading)
   const updateMutation = useUpdateSupplier();
@@ -733,23 +721,13 @@ const SuppliersManagement = () => {
                 </div>
                 <div>
                   <Label htmlFor="edit-status">Estado</Label>
-                  <Select value={editStatusId} onValueChange={(v) => setEditStatusId(v)}>
+                  <Select value={String(editEstado)} onValueChange={(v) => setEditEstado(Number(v))}>
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {statuses.length > 0 ? (
-                        statuses.map((s) => (
-                          <SelectItem key={String(s.id)} value={String(s.id)}>
-                            {s.name}
-                          </SelectItem>
-                        ))
-                      ) : (
-                        <>
-                          <SelectItem value="1">Activo</SelectItem>
-                          <SelectItem value="2">Inactivo</SelectItem>
-                        </>
-                      )}
+                      <SelectItem value="1">Activo</SelectItem>
+                      <SelectItem value="0">Inactivo</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -846,7 +824,7 @@ const SuppliersManagement = () => {
                       address: editAddress.trim(),
                       category_ids: editCategoryIds.map((id) => Number(id)),
                       payment_terms_id: editPaymentTermId ? Number(editPaymentTermId) : undefined,
-                      status_id: editStatusId ? Number(editStatusId) : undefined,
+                      estado: editEstado,
                     }
                   });
                   setIsEditOpen(false);

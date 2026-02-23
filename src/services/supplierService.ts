@@ -23,14 +23,14 @@ export interface ApiSupplier {
   last_order?: string | null;
   total_purchases?: number | string | null;
   rating?: number | string | null;
-  status_id?: number | string | null;
+  /** 0 = inactivo, 1 = activo (reemplaza status_id) */
+  estado?: number | null;
   payment_terms_id?: number | string | null;
   // Para compatibilidad hacia atrás se mantiene category,
   // pero el nuevo diseño usa categories / categoryNames
   category?: { id: number | string; name: string } | null;
   categories?: { id: number | string; name: string }[] | null;
   categoryNames?: string[] | null;
-  status?: { id: number | string; name: string } | null;
   payment_term?: { id: number | string; name: string } | null;
   productsList?: ApiProduct[] | null;
   [key: string]: unknown;
@@ -58,14 +58,7 @@ const normalizeStatusName = (name: string): Status | string => {
 const mapStatus = (status?: string | number | null): Status | string => {
   if (typeof status === "string") return normalizeStatusName(status);
   if (typeof status === "number") {
-    switch (status) {
-      case 1:
-        return "active";
-      case 2:
-        return "inactive";
-      default:
-        return "active";
-    }
+    return status === 0 ? "inactive" : "active";
   }
   return "active";
 };
@@ -101,7 +94,7 @@ export const adaptApiSupplier = (s: ApiSupplier): Supplier => {
     categoryNamesFromApi.length > 0
       ? categoryNamesFromApi.join(", ")
       : (s.category?.name ?? "");
-  const statusRaw: string | number | undefined = s.status?.name ?? (s.status_id != null ? Number(s.status_id) : undefined);
+  const statusRaw: string | number | undefined = s.estado !== undefined && s.estado !== null ? Number(s.estado) : undefined;
   const paymentTerms = s.payment_term?.name ?? "";
 
   const productsList = Array.isArray(s.productsList)
@@ -117,10 +110,10 @@ export const adaptApiSupplier = (s: ApiSupplier): Supplier => {
     address: s.address ?? "",
     category: categoryLabel || "",
     products: toNumber(s.products, 0),
-    // Format last_order date properly
     lastOrder: formatDateTime(s.last_order),
     totalPurchases: toNumber(s.total_purchases, 0),
     rating: toNumber(s.rating, 0),
+    estado: s.estado !== undefined && s.estado !== null ? Number(s.estado) : 1,
     status: mapStatus(statusRaw),
     paymentTerms: paymentTerms,
     categories: categoriesFromApi,
@@ -189,7 +182,8 @@ export interface CreateSupplierPayload {
   address?: string;
   // Nuevo contrato: enviar múltiples categorías (ids numéricos o string)
   category_ids?: Array<number | string>;
-  status_id?: number | string;
+  /** 0 = inactivo, 1 = activo */
+  estado?: number;
   payment_terms_id?: number | string;
   rating?: number;
 }
