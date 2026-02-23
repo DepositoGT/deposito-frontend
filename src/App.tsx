@@ -38,12 +38,15 @@ import SalesManagement from "@/components/SalesManagement";
 import NewSalePage from "@/components/sales/NewSalePage";
 import SuppliersManagement from "@/components/SuppliersManagement";
 import SupplierDetailPage from "./components/suppliers/SupplierDetailPage";
+import SupplierCreatePage from "./components/suppliers/SupplierCreatePage";
 import ProductDetailPage from "./components/products/ProductDetailPage";
+import ProductCreatePage from "./components/products/ProductCreatePage";
 import ReportsManagement from "./components/ReportsManagement";
 import AlertsManagement from "./components/AlertsManagement";
 import ScannerManagement from "@/components/ScannerManagement";
 import UserManagement from "@/components/UserManagement";
 import UserDetailPage from "@/components/users/UserDetailPage";
+import UserCreatePage from "@/components/users/UserCreatePage";
 import RolesPermissionsManagement from "@/components/users/RolesPermissionsManagement";
 import RolePermissionsDetail from "@/components/users/RolePermissionsDetail";
 import RoleCreatePage from "@/components/users/RoleCreatePage";
@@ -51,6 +54,8 @@ import { CatalogsManagement } from "@/components/CatalogsManagement";
 import ReturnsManagement from "@/components/ReturnsManagement";
 import CashClosureManagement from "@/components/CashClosureManagement";
 import PromotionsManagement from "@/components/PromotionsManagement";
+import PromotionCreatePage from "@/components/promotions/PromotionCreatePage";
+import PromotionEditPage from "@/components/promotions/PromotionEditPage";
 import IncomingMerchandiseManagement from "@/components/IncomingMerchandiseManagement";
 
 const queryClient = new QueryClient();
@@ -123,6 +128,14 @@ const App = () => (
                   }
                 />
                 <Route
+                  path="/inventario/nuevo"
+                  element={
+                    <PermissionRoute any={["products.create", "products.view"]}>
+                      <ProductCreatePage />
+                    </PermissionRoute>
+                  }
+                />
+                <Route
                   path="/inventario/:id"
                   element={
                     <PermissionRoute any={["products.view"]}>
@@ -181,6 +194,14 @@ const App = () => (
                   element={
                     <PermissionRoute any={["suppliers.view"]}>
                       <SuppliersManagement />
+                    </PermissionRoute>
+                  }
+                />
+                <Route
+                  path="/proveedores/nuevo"
+                  element={
+                    <PermissionRoute any={["suppliers.create", "suppliers.view"]}>
+                      <SupplierCreatePage />
                     </PermissionRoute>
                   }
                 />
@@ -260,6 +281,22 @@ const App = () => (
                     </PermissionRoute>
                   }
                 />
+                <Route
+                  path="/promociones/nueva"
+                  element={
+                    <PermissionRoute any={["promotions.manage"]}>
+                      <PromotionCreatePage />
+                    </PermissionRoute>
+                  }
+                />
+                <Route
+                  path="/promociones/:id/editar"
+                  element={
+                    <PermissionRoute any={["promotions.manage"]}>
+                      <PromotionEditPage />
+                    </PermissionRoute>
+                  }
+                />
 
                 {/* Catalogs (Admin) */}
                 <Route
@@ -285,6 +322,14 @@ const App = () => (
                   element={
                     <PermissionRoute any={["users.view", "roles.manage"]}>
                       <UserManagement />
+                    </PermissionRoute>
+                  }
+                />
+                <Route
+                  path="/usuarios/nuevo"
+                  element={
+                    <PermissionRoute any={["users.create", "users.view", "roles.manage"]}>
+                      <UserCreatePage />
                     </PermissionRoute>
                   }
                 />
