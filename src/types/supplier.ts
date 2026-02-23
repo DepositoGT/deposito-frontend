@@ -28,7 +28,9 @@ export interface Supplier extends BaseEntity {
   lastOrder: string;
   totalPurchases: number;
   rating: number;
-  status: Status | string; // permitir string desde API
+  /** 0 = inactivo, 1 = activo (reemplaza status_id) */
+  estado?: number;
+  status: Status | string; // derivado de estado para UI (active/inactive)
   paymentTerms: string;
   productsList?: Product[]; // productos asociados desde API
 }

@@ -149,8 +149,8 @@ export const generateSupplierPDF = (
     doc.setFont('helvetica', 'bold')
     doc.text('Estado:', rightCol, rightY)
     doc.setFont('helvetica', 'normal')
-    const status = String(supplier.status || 'N/A')
-    doc.text(status.charAt(0).toUpperCase() + status.slice(1), rightCol + 30, rightY)
+    const estadoLabel = supplier.estado === 0 ? 'Inactivo' : 'Activo'
+    doc.text(estadoLabel, rightCol + 30, rightY)
     rightY += 7
 
     doc.setFont('helvetica', 'bold')
