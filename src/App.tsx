@@ -54,6 +54,8 @@ import { CatalogsManagement } from "@/components/CatalogsManagement";
 import ReturnsManagement from "@/components/ReturnsManagement";
 import CashClosureManagement from "@/components/CashClosureManagement";
 import PromotionsManagement from "@/components/PromotionsManagement";
+import PromotionCreatePage from "@/components/promotions/PromotionCreatePage";
+import PromotionEditPage from "@/components/promotions/PromotionEditPage";
 import IncomingMerchandiseManagement from "@/components/IncomingMerchandiseManagement";
 
 const queryClient = new QueryClient();
@@ -276,6 +278,22 @@ const App = () => (
                   element={
                     <PermissionRoute any={["promotions.view", "promotions.manage"]}>
                       <PromotionsManagement />
+                    </PermissionRoute>
+                  }
+                />
+                <Route
+                  path="/promociones/nueva"
+                  element={
+                    <PermissionRoute any={["promotions.manage"]}>
+                      <PromotionCreatePage />
+                    </PermissionRoute>
+                  }
+                />
+                <Route
+                  path="/promociones/:id/editar"
+                  element={
+                    <PermissionRoute any={["promotions.manage"]}>
+                      <PromotionEditPage />
                     </PermissionRoute>
                   }
                 />

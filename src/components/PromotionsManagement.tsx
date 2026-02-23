@@ -36,19 +36,6 @@ import {
     SelectValue
 } from './ui/select'
 import {
-    Command,
-    CommandEmpty,
-    CommandGroup,
-    CommandInput,
-    CommandItem,
-    CommandList
-} from './ui/command'
-import {
-    Popover,
-    PopoverContent,
-    PopoverTrigger
-} from './ui/popover'
-import {
     Table,
     TableBody,
     TableCell,
@@ -57,11 +44,23 @@ import {
     TableRow
 } from './ui/table'
 import { Checkbox } from './ui/checkbox'
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+    AlertDialogTrigger
+} from './ui/alert-dialog'
 import { useToast } from '@/hooks/use-toast'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { apiFetch } from '@/services/api'
-import { fetchAllProducts, type ApiProduct } from '@/services/productService'
 import { generatePromotionTicketsPDF } from './promotions/generatePromotionTicketsPDF'
+import { getFriendlyTypeName } from './promotions/getFriendlyTypeName'
+import { ProductCombobox } from './promotions/ProductCombobox'
 import {
     Plus,
     Pencil,
@@ -79,12 +78,10 @@ import {
     FileDown,
     Eye,
     TicketIcon,
-    ChevronsUpDown,
-    Check,
     ShoppingCart,
     Package
 } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { useNavigate } from 'react-router-dom'
 
 // Types
 interface PromotionType {
@@ -123,25 +120,12 @@ interface Promotion {
     active: boolean
 }
 
-interface PromotionDialogState {
-    open: boolean
-    mode: 'create' | 'edit'
-    item?: Promotion
-}
-
 interface CodesDialogState {
     open: boolean
     promotion?: Promotion
 }
 
 // Hooks
-function usePromotionTypes() {
-    return useQuery({
-        queryKey: ['promotion-types'],
-        queryFn: () => apiFetch<PromotionType[]>('/promotions/types')
-    })
-}
-
 function usePromotions() {
     return useQuery({
         queryKey: ['promotions'],
@@ -152,37 +136,15 @@ function usePromotions() {
     })
 }
 
-function useProducts() {
-    return useQuery({
-        queryKey: ['products-list'],
-        queryFn: fetchAllProducts,
-        staleTime: 5 * 60 * 1000 // Cache for 5 minutes
-    })
-}
-
-// Helper function for friendly type names (Spanish)
-const getFriendlyTypeName = (typeName: string): string => {
-    const names: Record<string, string> = {
-        'PERCENTAGE': 'Porcentaje',
-        'FIXED_AMOUNT': 'Monto Fijo',
-        'BUY_X_GET_Y': 'Lleva X Paga Y',
-        'COMBO_DISCOUNT': 'Combo',
-        'FREE_GIFT': 'Regalo Gratis',
-        'MIN_QTY_DISCOUNT': 'Cantidad Mínima'
-    }
-    return names[typeName] || typeName
-}
-
 // Main Component
 const PromotionsManagement = () => {
+    const navigate = useNavigate()
     const { toast } = useToast()
     const queryClient = useQueryClient()
     const [searchTerm, setSearchTerm] = useState('')
-    const [dialog, setDialog] = useState<PromotionDialogState>({ open: false, mode: 'create' })
     const [codesDialog, setCodesDialog] = useState<CodesDialogState>({ open: false })
 
     const { data: promotions = [], isLoading } = usePromotions()
-    const { data: promotionTypes = [] } = usePromotionTypes()
 
     // Filter promotions
     const filteredPromotions = useMemo(() => {
@@ -196,28 +158,6 @@ const PromotionsManagement = () => {
     }, [promotions, searchTerm])
 
     // Mutations
-    const createMutation = useMutation({
-        mutationFn: (data: Record<string, unknown>) =>
-            apiFetch('/promotions', { method: 'POST', body: JSON.stringify(data) }),
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['promotions'] })
-            toast({ title: 'Promoción creada correctamente' })
-            setDialog({ open: false, mode: 'create' })
-        },
-        onError: (e: Error) => toast({ title: 'Error', description: e.message, variant: 'destructive' })
-    })
-
-    const updateMutation = useMutation({
-        mutationFn: ({ id, ...data }: Record<string, unknown> & { id: string }) =>
-            apiFetch(`/promotions/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['promotions'] })
-            toast({ title: 'Promoción actualizada' })
-            setDialog({ open: false, mode: 'create' })
-        },
-        onError: (e: Error) => toast({ title: 'Error', description: e.message, variant: 'destructive' })
-    })
-
     const deleteMutation = useMutation({
         mutationFn: (id: string) =>
             apiFetch(`/promotions/${id}`, { method: 'DELETE' }),
@@ -293,7 +233,7 @@ const PromotionsManagement = () => {
                                 Administra códigos de descuento
                             </CardDescription>
                         </div>
-                        <Button onClick={() => setDialog({ open: true, mode: 'create' })} size='sm' className='w-full sm:w-auto'>
+                        <Button onClick={() => navigate('/promociones/nueva')} size='sm' className='w-full sm:w-auto'>
                             <Plus className='w-4 h-4 mr-2' />
                             Nueva Promoción
                         </Button>
@@ -387,18 +327,38 @@ const PromotionsManagement = () => {
                                                     <Button
                                                         variant='ghost'
                                                         size='sm'
-                                                        onClick={() => setDialog({ open: true, mode: 'edit', item: promo })}
+                                                        onClick={() => navigate(`/promociones/${promo.id}/editar`)}
                                                     >
                                                         <Pencil className='w-4 h-4' />
                                                     </Button>
-                                                    <Button
-                                                        variant='ghost'
-                                                        size='sm'
-                                                        className='text-destructive hover:text-destructive'
-                                                        onClick={() => deleteMutation.mutate(promo.id)}
-                                                    >
-                                                        <Trash2 className='w-4 h-4' />
-                                                    </Button>
+                                                    <AlertDialog>
+                                                        <AlertDialogTrigger asChild>
+                                                            <Button
+                                                                variant='ghost'
+                                                                size='sm'
+                                                                className='text-destructive hover:text-destructive'
+                                                            >
+                                                                <Trash2 className='w-4 h-4' />
+                                                            </Button>
+                                                        </AlertDialogTrigger>
+                                                        <AlertDialogContent>
+                                                            <AlertDialogHeader>
+                                                                <AlertDialogTitle>¿Eliminar promoción?</AlertDialogTitle>
+                                                                <AlertDialogDescription>
+                                                                    Esta acción no se puede deshacer. Se eliminará la promoción "{promo.name}" y sus códigos asociados.
+                                                                </AlertDialogDescription>
+                                                            </AlertDialogHeader>
+                                                            <AlertDialogFooter>
+                                                                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                                                <AlertDialogAction
+                                                                    className='bg-destructive text-destructive-foreground hover:bg-destructive/90'
+                                                                    onClick={() => deleteMutation.mutate(promo.id)}
+                                                                >
+                                                                    Eliminar
+                                                                </AlertDialogAction>
+                                                            </AlertDialogFooter>
+                                                        </AlertDialogContent>
+                                                    </AlertDialog>
                                                 </div>
                                             </TableCell>
                                         </TableRow>
@@ -409,16 +369,6 @@ const PromotionsManagement = () => {
                     )}
                 </CardContent>
             </Card>
-
-            {/* Create/Edit Dialog */}
-            <PromotionDialog
-                dialog={dialog}
-                setDialog={setDialog}
-                promotionTypes={promotionTypes}
-                onCreate={createMutation.mutate}
-                onUpdate={updateMutation.mutate}
-                isLoading={createMutation.isPending || updateMutation.isPending}
-            />
 
             {/* Codes Dialog with PDF Export */}
             <CodesDialog
@@ -569,634 +519,6 @@ const CodesDialog = ({ dialog, setDialog, onCopyCode }: CodesDialogProps) => {
                         Descargar PDF {selectedCodes.length > 0 ? `(${selectedCodes.length})` : 'Todos'}
                     </Button>
                 </DialogFooter>
-            </DialogContent>
-        </Dialog>
-    )
-}
-
-// ============================================
-// Product Combobox Component
-// ============================================
-interface ProductComboboxProps {
-    value: string
-    onChange: (value: string) => void
-    placeholder?: string
-    label?: string
-    icon?: React.ReactNode
-}
-
-const ProductCombobox = ({ value, onChange, placeholder, label, icon }: ProductComboboxProps) => {
-    const [open, setOpen] = useState(false)
-    const [search, setSearch] = useState('')
-    const { data: products = [], isLoading } = useProducts()
-
-    const filteredProducts = useMemo(() => {
-        if (!search) return products.slice(0, 50) // Limit initial results
-        const term = search.toLowerCase()
-        return products.filter(p =>
-            p.name.toLowerCase().includes(term) ||
-            p.barcode?.toLowerCase().includes(term)
-        ).slice(0, 50)
-    }, [products, search])
-
-    const selectedProduct = products.find(p => p.id === value)
-
-    return (
-        <div className='space-y-1'>
-            {label && <Label className='text-xs text-muted-foreground'>{label}</Label>}
-            <Popover open={open} onOpenChange={setOpen}>
-                <PopoverTrigger asChild>
-                    <Button
-                        variant='outline'
-                        role='combobox'
-                        aria-expanded={open}
-                        className='w-full justify-between font-normal'
-                    >
-                        <div className='flex items-center gap-2 truncate'>
-                            {icon}
-                            {selectedProduct ? (
-                                <span className='truncate'>{selectedProduct.name}</span>
-                            ) : (
-                                <span className='text-muted-foreground'>{placeholder || 'Seleccionar producto...'}</span>
-                            )}
-                        </div>
-                        <ChevronsUpDown className='ml-2 h-4 w-4 shrink-0 opacity-50' />
-                    </Button>
-                </PopoverTrigger>
-                <PopoverContent className='w-[400px] p-0' align='start'>
-                    <Command shouldFilter={false}>
-                        <CommandInput
-                            placeholder='Buscar producto...'
-                            value={search}
-                            onValueChange={setSearch}
-                        />
-                        <CommandList>
-                            {isLoading ? (
-                                <div className='flex items-center justify-center py-6'>
-                                    <Loader2 className='h-4 w-4 animate-spin' />
-                                </div>
-                            ) : filteredProducts.length === 0 ? (
-                                <CommandEmpty>No se encontraron productos</CommandEmpty>
-                            ) : (
-                                <CommandGroup>
-                                    {filteredProducts.map((product) => (
-                                        <CommandItem
-                                            key={product.id}
-                                            value={product.id}
-                                            onSelect={() => {
-                                                onChange(product.id)
-                                                setOpen(false)
-                                                setSearch('')
-                                            }}
-                                        >
-                                            <Check
-                                                className={cn(
-                                                    'mr-2 h-4 w-4',
-                                                    value === product.id ? 'opacity-100' : 'opacity-0'
-                                                )}
-                                            />
-                                            <div className='flex flex-col'>
-                                                <span className='font-medium'>{product.name}</span>
-                                                <span className='text-xs text-muted-foreground'>
-                                                    Q{product.price.toFixed(2)} • {product.category}
-                                                </span>
-                                            </div>
-                                        </CommandItem>
-                                    ))}
-                                </CommandGroup>
-                            )}
-                        </CommandList>
-                    </Command>
-                </PopoverContent>
-            </Popover>
-        </div>
-    )
-}
-
-// ============================================
-// Promotion Dialog Component
-// ============================================
-interface PromotionDialogProps {
-    dialog: PromotionDialogState
-    setDialog: (state: PromotionDialogState) => void
-    promotionTypes: PromotionType[]
-    onCreate: (data: Record<string, unknown>) => void
-    onUpdate: (data: Record<string, unknown> & { id: string }) => void
-    isLoading: boolean
-}
-
-const PromotionDialog = ({ dialog, setDialog, promotionTypes, onCreate, onUpdate, isLoading }: PromotionDialogProps) => {
-    const [formData, setFormData] = useState({
-        name: '',
-        description: '',
-        type_id: 1,
-        discount_percentage: '',
-        discount_value: '',
-        buy_quantity: '',
-        get_quantity: '',
-        min_quantity: '',
-        trigger_product_id: '',
-        target_product_id: '',
-        applies_to_all: true,
-        start_date: '',
-        end_date: '',
-        max_uses: '',
-        min_purchase_amount: ''
-    })
-
-    // Code generation state
-    const [codeMode, setCodeMode] = useState<'auto' | 'manual'>('auto')
-    const [codeCount, setCodeCount] = useState('1')
-    const [codePrefix, setCodePrefix] = useState('')
-    const [manualCodes, setManualCodes] = useState<string[]>([])
-    const [newManualCode, setNewManualCode] = useState('')
-
-    // Reset form when dialog opens
-    const handleOpenChange = (open: boolean) => {
-        if (open && dialog.mode === 'edit' && dialog.item) {
-            setFormData({
-                name: dialog.item.name,
-                description: dialog.item.description || '',
-                type_id: dialog.item.type_id,
-                discount_percentage: dialog.item.discount_percentage || '',
-                discount_value: dialog.item.discount_value || '',
-                buy_quantity: dialog.item.buy_quantity?.toString() || '',
-                get_quantity: dialog.item.get_quantity?.toString() || '',
-                min_quantity: dialog.item.min_quantity?.toString() || '',
-                trigger_product_id: dialog.item.trigger_product_id || '',
-                target_product_id: dialog.item.target_product_id || '',
-                applies_to_all: dialog.item.applies_to_all,
-                start_date: dialog.item.start_date?.split('T')[0] || '',
-                end_date: dialog.item.end_date?.split('T')[0] || '',
-                max_uses: dialog.item.max_uses?.toString() || '',
-                min_purchase_amount: dialog.item.min_purchase_amount || ''
-            })
-            setCodeMode('manual')
-            setManualCodes(dialog.item.codes?.map(c => c.code) || [])
-        } else if (open && dialog.mode === 'create') {
-            setFormData({
-                name: '',
-                description: '',
-                type_id: 1,
-                discount_percentage: '',
-                discount_value: '',
-                buy_quantity: '',
-                get_quantity: '',
-                min_quantity: '',
-                trigger_product_id: '',
-                target_product_id: '',
-                applies_to_all: true,
-                start_date: new Date().toISOString().split('T')[0],
-                end_date: '',
-                max_uses: '',
-                min_purchase_amount: ''
-            })
-            setCodeMode('auto')
-            setCodeCount('1')
-            setCodePrefix('')
-            setManualCodes([])
-        }
-        setDialog({ ...dialog, open })
-    }
-
-    const addManualCode = () => {
-        if (newManualCode.trim() && !manualCodes.includes(newManualCode.toUpperCase())) {
-            setManualCodes([...manualCodes, newManualCode.toUpperCase()])
-            setNewManualCode('')
-        }
-    }
-
-    const removeManualCode = (code: string) => {
-        setManualCodes(manualCodes.filter(c => c !== code))
-    }
-
-    const handleSubmit = (e: React.FormEvent) => {
-        e.preventDefault()
-
-        const payload: Record<string, unknown> = {
-            name: formData.name,
-            description: formData.description || null,
-            type_id: formData.type_id,
-            applies_to_all: formData.applies_to_all,
-            start_date: formData.start_date || null,
-            end_date: formData.end_date || null,
-            max_uses: formData.max_uses ? parseInt(formData.max_uses) : null,
-            min_purchase_amount: formData.min_purchase_amount ? parseFloat(formData.min_purchase_amount) : null
-        }
-
-        // Add type-specific fields
-        const selectedType = promotionTypes.find(t => t.id === formData.type_id)
-        if (selectedType?.name === 'PERCENTAGE' || selectedType?.name === 'MIN_QTY_DISCOUNT') {
-            payload.discount_percentage = formData.discount_percentage ? parseFloat(formData.discount_percentage) : null
-        }
-        if (selectedType?.name === 'FIXED_AMOUNT') {
-            payload.discount_value = formData.discount_value ? parseFloat(formData.discount_value) : null
-        }
-        if (selectedType?.name === 'BUY_X_GET_Y') {
-            payload.buy_quantity = formData.buy_quantity ? parseInt(formData.buy_quantity) : null
-            payload.get_quantity = formData.get_quantity ? parseInt(formData.get_quantity) : null
-        }
-        if (selectedType?.name === 'MIN_QTY_DISCOUNT') {
-            payload.min_quantity = formData.min_quantity ? parseInt(formData.min_quantity) : null
-        }
-        // FREE_GIFT and COMBO_DISCOUNT require trigger and target products
-        if (selectedType?.name === 'FREE_GIFT' || selectedType?.name === 'COMBO_DISCOUNT') {
-            payload.trigger_product_id = formData.trigger_product_id || null
-            payload.target_product_id = formData.target_product_id || null
-            if (selectedType?.name === 'COMBO_DISCOUNT') {
-                payload.discount_percentage = formData.discount_percentage ? parseFloat(formData.discount_percentage) : null
-            }
-        }
-
-        // Handle codes
-        if (dialog.mode === 'create') {
-            if (codeMode === 'auto') {
-                payload.code_count = parseInt(codeCount) || 1
-                payload.code_prefix = codePrefix.toUpperCase()
-            } else {
-                payload.codes = manualCodes
-            }
-        }
-
-        if (dialog.mode === 'edit' && dialog.item) {
-            onUpdate({ ...payload, id: dialog.item.id })
-        } else {
-            onCreate(payload)
-        }
-    }
-
-    const selectedType = promotionTypes.find(t => t.id === formData.type_id)
-
-    return (
-        <Dialog open={dialog.open} onOpenChange={handleOpenChange}>
-            <DialogContent className='max-w-lg max-h-[90vh] overflow-y-auto'>
-                <DialogHeader>
-                    <DialogTitle>
-                        {dialog.mode === 'create' ? 'Nueva Promoción' : 'Editar Promoción'}
-                    </DialogTitle>
-                    <DialogDescription>
-                        {dialog.mode === 'create'
-                            ? 'Crea una promoción con uno o varios códigos'
-                            : 'Modifica los datos de la promoción'
-                        }
-                    </DialogDescription>
-                </DialogHeader>
-
-                <form onSubmit={handleSubmit} className='space-y-4'>
-                    {/* Code Generation - Only for create mode */}
-                    {dialog.mode === 'create' && (
-                        <div className='border rounded-lg p-4 space-y-3 bg-muted/30'>
-                            <Label className='font-medium'>Códigos de Promoción</Label>
-
-                            <div className='flex gap-2'>
-                                <Button
-                                    type='button'
-                                    variant={codeMode === 'auto' ? 'default' : 'outline'}
-                                    size='sm'
-                                    onClick={() => setCodeMode('auto')}
-                                >
-                                    <Shuffle className='w-4 h-4 mr-1' />
-                                    Generar
-                                </Button>
-                                <Button
-                                    type='button'
-                                    variant={codeMode === 'manual' ? 'default' : 'outline'}
-                                    size='sm'
-                                    onClick={() => setCodeMode('manual')}
-                                >
-                                    <Pencil className='w-4 h-4 mr-1' />
-                                    Manual
-                                </Button>
-                            </div>
-
-                            {codeMode === 'auto' ? (
-                                <div className='grid grid-cols-2 gap-3'>
-                                    <div>
-                                        <Label htmlFor='codeCount' className='text-xs'>Cantidad</Label>
-                                        <Input
-                                            id='codeCount'
-                                            type='number'
-                                            min='1'
-                                            max='100'
-                                            value={codeCount}
-                                            onChange={e => setCodeCount(e.target.value)}
-                                            placeholder='1'
-                                        />
-                                    </div>
-                                    <div>
-                                        <Label htmlFor='codePrefix' className='text-xs'>Prefijo (opcional)</Label>
-                                        <Input
-                                            id='codePrefix'
-                                            value={codePrefix}
-                                            onChange={e => setCodePrefix(e.target.value.toUpperCase())}
-                                            placeholder='DESC'
-                                            className='uppercase'
-                                        />
-                                    </div>
-                                </div>
-                            ) : (
-                                <div className='space-y-2'>
-                                    <div className='flex gap-2'>
-                                        <Input
-                                            value={newManualCode}
-                                            onChange={e => setNewManualCode(e.target.value.toUpperCase())}
-                                            placeholder='Escribe un código'
-                                            className='uppercase font-mono'
-                                            onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addManualCode() } }}
-                                        />
-                                        <Button type='button' size='sm' onClick={addManualCode}>
-                                            <Plus className='w-4 h-4' />
-                                        </Button>
-                                    </div>
-                                    {manualCodes.length > 0 && (
-                                        <div className='flex flex-wrap gap-1'>
-                                            {manualCodes.map(code => (
-                                                <Badge key={code} variant='secondary' className='font-mono'>
-                                                    {code}
-                                                    <Button
-                                                        type='button'
-                                                        variant='ghost'
-                                                        size='sm'
-                                                        className='h-4 w-4 p-0 ml-1'
-                                                        onClick={() => removeManualCode(code)}
-                                                    >
-                                                        <X className='w-3 h-3' />
-                                                    </Button>
-                                                </Badge>
-                                            ))}
-                                        </div>
-                                    )}
-                                </div>
-                            )}
-                        </div>
-                    )}
-
-                    {/* Name and Type */}
-                    <div className='grid grid-cols-2 gap-4'>
-                        <div>
-                            <Label htmlFor='name'>Nombre *</Label>
-                            <Input
-                                id='name'
-                                value={formData.name}
-                                onChange={e => setFormData({ ...formData, name: e.target.value })}
-                                placeholder='10% Descuento'
-                                required
-                            />
-                        </div>
-                        <div>
-                            <Label htmlFor='type'>Tipo *</Label>
-                            <Select
-                                value={formData.type_id.toString()}
-                                onValueChange={v => setFormData({ ...formData, type_id: parseInt(v) })}
-                            >
-                                <SelectTrigger>
-                                    <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {promotionTypes.map(t => (
-                                        <SelectItem key={t.id} value={t.id.toString()}>
-                                            {getFriendlyTypeName(t.name)}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </div>
-                    </div>
-
-                    <div>
-                        <Label htmlFor='description'>Descripción <span className='text-xs text-muted-foreground'>(máx. 30 palabras / 170 caracteres)</span></Label>
-                        <Textarea
-                            id='description'
-                            value={formData.description}
-                            onChange={e => {
-                                const newValue = e.target.value
-                                const words = newValue.trim().split(/\s+/).filter(w => w.length > 0)
-                                const isDeleting = newValue.length < formData.description.length
-                                // Allow if deleting, or if both limits are satisfied
-                                if (isDeleting || (words.length <= 30 && newValue.length <= 170)) {
-                                    setFormData({ ...formData, description: newValue })
-                                }
-                            }}
-                            placeholder='Descripción opcional...'
-                            rows={2}
-                            maxLength={170}
-                        />
-                        <div className='text-xs text-muted-foreground text-right mt-1 flex justify-between'>
-                            <span>{formData.description.length}/170 caracteres</span>
-                            <span>{formData.description.trim().split(/\s+/).filter(w => w.length > 0).length}/30 palabras</span>
-                        </div>
-                    </div>
-
-                    {/* Conditional Fields based on Type */}
-                    {(selectedType?.name === 'PERCENTAGE' || selectedType?.name === 'MIN_QTY_DISCOUNT') && (
-                        <div>
-                            <Label htmlFor='discount_percentage'>Porcentaje de Descuento (%)</Label>
-                            <Input
-                                id='discount_percentage'
-                                type='number'
-                                min='0'
-                                max='100'
-                                step='0.01'
-                                value={formData.discount_percentage}
-                                onChange={e => setFormData({ ...formData, discount_percentage: e.target.value })}
-                                placeholder='10'
-                            />
-                        </div>
-                    )}
-
-                    {selectedType?.name === 'FIXED_AMOUNT' && (
-                        <div>
-                            <Label htmlFor='discount_value'>Monto de Descuento (Q)</Label>
-                            <Input
-                                id='discount_value'
-                                type='number'
-                                min='0'
-                                step='0.01'
-                                value={formData.discount_value}
-                                onChange={e => setFormData({ ...formData, discount_value: e.target.value })}
-                                placeholder='50.00'
-                            />
-                        </div>
-                    )}
-
-                    {selectedType?.name === 'BUY_X_GET_Y' && (
-                        <div className='grid grid-cols-2 gap-4'>
-                            <div>
-                                <Label htmlFor='buy_quantity'>Compra (cantidad)</Label>
-                                <Input
-                                    id='buy_quantity'
-                                    type='number'
-                                    min='1'
-                                    value={formData.buy_quantity}
-                                    onChange={e => setFormData({ ...formData, buy_quantity: e.target.value })}
-                                    placeholder='2'
-                                />
-                            </div>
-                            <div>
-                                <Label htmlFor='get_quantity'>Gratis (cantidad)</Label>
-                                <Input
-                                    id='get_quantity'
-                                    type='number'
-                                    min='1'
-                                    value={formData.get_quantity}
-                                    onChange={e => setFormData({ ...formData, get_quantity: e.target.value })}
-                                    placeholder='1'
-                                />
-                            </div>
-                        </div>
-                    )}
-
-                    {selectedType?.name === 'MIN_QTY_DISCOUNT' && (
-                        <div>
-                            <Label htmlFor='min_quantity'>Cantidad Mínima</Label>
-                            <Input
-                                id='min_quantity'
-                                type='number'
-                                min='1'
-                                value={formData.min_quantity}
-                                onChange={e => setFormData({ ...formData, min_quantity: e.target.value })}
-                                placeholder='3'
-                            />
-                        </div>
-                    )}
-
-                    {/* FREE_GIFT Configuration */}
-                    {selectedType?.name === 'FREE_GIFT' && (
-                        <div className='border rounded-lg p-4 space-y-4 bg-pink-50 dark:bg-pink-950/20'>
-                            <div className='flex items-center gap-2 text-pink-700 dark:text-pink-300'>
-                                <Gift className='w-4 h-4' />
-                                <span className='font-medium text-sm'>Configuración de Regalo Gratis</span>
-                            </div>
-                            <p className='text-xs text-muted-foreground'>
-                                Cuando el cliente compre el "Producto Activador", recibirá gratis el "Producto Regalo"
-                            </p>
-                            <div className='space-y-3'>
-                                <ProductCombobox
-                                    value={formData.trigger_product_id}
-                                    onChange={v => setFormData({ ...formData, trigger_product_id: v })}
-                                    label='🛒 Producto Activador (el que compra)'
-                                    placeholder='Seleccionar producto...'
-                                    icon={<ShoppingCart className='w-4 h-4 text-muted-foreground' />}
-                                />
-                                <ProductCombobox
-                                    value={formData.target_product_id}
-                                    onChange={v => setFormData({ ...formData, target_product_id: v })}
-                                    label='🎁 Producto Regalo (gratis)'
-                                    placeholder='Seleccionar producto regalo...'
-                                    icon={<Package className='w-4 h-4 text-muted-foreground' />}
-                                />
-                            </div>
-                        </div>
-                    )}
-
-                    {/* COMBO_DISCOUNT Configuration */}
-                    {selectedType?.name === 'COMBO_DISCOUNT' && (
-                        <div className='border rounded-lg p-4 space-y-4 bg-orange-50 dark:bg-orange-950/20'>
-                            <div className='flex items-center gap-2 text-orange-700 dark:text-orange-300'>
-                                <Sparkles className='w-4 h-4' />
-                                <span className='font-medium text-sm'>Configuración de Combo</span>
-                            </div>
-                            <p className='text-xs text-muted-foreground'>
-                                Cuando el cliente compre el "Producto A", obtiene descuento en el "Producto B"
-                            </p>
-                            <div className='space-y-3'>
-                                <ProductCombobox
-                                    value={formData.trigger_product_id}
-                                    onChange={v => setFormData({ ...formData, trigger_product_id: v })}
-                                    label='🛒 Producto A (el que debe comprar)'
-                                    placeholder='Seleccionar producto...'
-                                    icon={<ShoppingCart className='w-4 h-4 text-muted-foreground' />}
-                                />
-                                <ProductCombobox
-                                    value={formData.target_product_id}
-                                    onChange={v => setFormData({ ...formData, target_product_id: v })}
-                                    label='📦 Producto B (recibe descuento)'
-                                    placeholder='Seleccionar producto...'
-                                    icon={<Package className='w-4 h-4 text-muted-foreground' />}
-                                />
-                                <div>
-                                    <Label htmlFor='combo_percentage' className='text-xs'>% Descuento en Producto B</Label>
-                                    <Input
-                                        id='combo_percentage'
-                                        type='number'
-                                        min='0'
-                                        max='100'
-                                        step='1'
-                                        value={formData.discount_percentage}
-                                        onChange={e => setFormData({ ...formData, discount_percentage: e.target.value })}
-                                        placeholder='50'
-                                    />
-                                </div>
-                            </div>
-                        </div>
-                    )}
-
-                    <div className='grid grid-cols-2 gap-4'>
-                        <div>
-                            <Label htmlFor='start_date'>Fecha Inicio</Label>
-                            <Input
-                                id='start_date'
-                                type='date'
-                                value={formData.start_date}
-                                onChange={e => setFormData({ ...formData, start_date: e.target.value })}
-                            />
-                        </div>
-                        <div>
-                            <Label htmlFor='end_date'>Fecha Fin</Label>
-                            <Input
-                                id='end_date'
-                                type='date'
-                                value={formData.end_date}
-                                onChange={e => setFormData({ ...formData, end_date: e.target.value })}
-                            />
-                        </div>
-                    </div>
-
-                    <div className='grid grid-cols-2 gap-4'>
-                        <div>
-                            <Label htmlFor='max_uses'>Usos Máximos por Código</Label>
-                            <Input
-                                id='max_uses'
-                                type='number'
-                                min='0'
-                                value={formData.max_uses}
-                                onChange={e => setFormData({ ...formData, max_uses: e.target.value })}
-                                placeholder='Ilimitado'
-                            />
-                        </div>
-                        <div>
-                            <Label htmlFor='min_purchase'>Compra Mínima (Q)</Label>
-                            <Input
-                                id='min_purchase'
-                                type='number'
-                                min='0'
-                                step='0.01'
-                                value={formData.min_purchase_amount}
-                                onChange={e => setFormData({ ...formData, min_purchase_amount: e.target.value })}
-                                placeholder='0.00'
-                            />
-                        </div>
-                    </div>
-
-                    <div className='flex items-center space-x-2'>
-                        <Switch
-                            id='applies_to_all'
-                            checked={formData.applies_to_all}
-                            onCheckedChange={v => setFormData({ ...formData, applies_to_all: v })}
-                        />
-                        <Label htmlFor='applies_to_all'>Aplica a todos los productos</Label>
-                    </div>
-
-                    <DialogFooter>
-                        <Button type='button' variant='outline' onClick={() => setDialog({ ...dialog, open: false })}>
-                            Cancelar
-                        </Button>
-                        <Button type='submit' disabled={isLoading}>
-                            {isLoading && <Loader2 className='w-4 h-4 mr-2 animate-spin' />}
-                            {dialog.mode === 'create' ? 'Crear' : 'Guardar'}
-                        </Button>
-                    </DialogFooter>
-                </form>
             </DialogContent>
         </Dialog>
     )
