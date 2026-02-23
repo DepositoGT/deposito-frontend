@@ -50,7 +50,6 @@ import { useUpdateSupplier } from '@/hooks/useUpdateSupplier'
 import type { IncomingMerchandise } from '@/services/incomingMerchandiseService'
 import { useCategories } from '@/hooks/useCategories'
 import { usePaymentTerms } from '@/hooks/usePaymentTerms'
-import { useStatuses } from '@/hooks/useStatuses'
 import {
   Popover,
   PopoverContent,
@@ -144,7 +143,6 @@ export default function SupplierDetailPage() {
 
   const { data: categoriesData } = useCategories()
   const { data: paymentTermsData } = usePaymentTerms()
-  const { data: statusesData } = useStatuses()
 
   const categories = useMemo(() => {
     if (!categoriesData) return [] as Array<{ id: number | string; name: string }>
@@ -161,8 +159,6 @@ export default function SupplierDetailPage() {
     return paymentTermsData?.items ?? []
   }, [paymentTermsData])
 
-  const statuses = useMemo(() => statusesData ?? [], [statusesData])
-
   const [isEditing, setIsEditing] = useState(false)
   const [editName, setEditName] = useState('')
   const [editContact, setEditContact] = useState('')
@@ -171,7 +167,7 @@ export default function SupplierDetailPage() {
   const [editAddress, setEditAddress] = useState('')
   const [editCategoryIds, setEditCategoryIds] = useState<string[]>([])
   const [editPaymentTermId, setEditPaymentTermId] = useState<string | undefined>(undefined)
-  const [editStatusId, setEditStatusId] = useState<string | undefined>(undefined)
+  const [editEstado, setEditEstado] = useState<number>(1)
 
   useEffect(() => {
     if (!supplier) return
@@ -180,11 +176,9 @@ export default function SupplierDetailPage() {
     setEditPhone(supplier.phone ?? '')
     setEditEmail(supplier.email ?? '')
     setEditAddress(supplier.address ?? '')
-    // No tenemos directamente los IDs, así que dejamos los selects en blanco;
-    // el usuario podrá elegir nuevos valores si los quiere cambiar.
     setEditCategoryIds([])
     setEditPaymentTermId(undefined)
-    setEditStatusId(undefined)
+    setEditEstado(supplier.estado !== undefined && supplier.estado !== null ? Number(supplier.estado) : 1)
   }, [supplier])
 
   const handleSave = async () => {
@@ -200,7 +194,7 @@ export default function SupplierDetailPage() {
           address: editAddress,
           category_ids: editCategoryIds.length ? editCategoryIds : undefined,
           payment_terms_id: editPaymentTermId,
-          status_id: editStatusId,
+          estado: editEstado,
         },
       })
       await refetchSupplier()
@@ -447,7 +441,7 @@ export default function SupplierDetailPage() {
                           setEditAddress(supplier.address ?? '')
                           setEditCategoryIds([])
                           setEditPaymentTermId(undefined)
-                          setEditStatusId(undefined)
+                          setEditEstado(supplier.estado !== undefined && supplier.estado !== null ? Number(supplier.estado) : 1)
                         }
                         setIsEditing(false)
                       }}
@@ -590,27 +584,15 @@ export default function SupplierDetailPage() {
                     <Label className="text-muted-foreground">Estado</Label>
                     {isEditing && canEditSupplier ? (
                       <Select
-                        value={editStatusId}
-                        onValueChange={(v) => setEditStatusId(v)}
+                        value={String(editEstado)}
+                        onValueChange={(v) => setEditEstado(Number(v))}
                       >
                         <SelectTrigger className="mt-1">
-                          <SelectValue placeholder={String(supplier.status)} />
+                          <SelectValue placeholder={editEstado === 1 ? 'Activo' : 'Inactivo'} />
                         </SelectTrigger>
                         <SelectContent>
-                          {statuses.length > 0
-                            ? statuses.map((s) => (
-                                <SelectItem key={String(s.id)} value={String(s.id)}>
-                                  {s.name}
-                                </SelectItem>
-                              ))
-                            : [
-                                <SelectItem key="active" value="1">
-                                  Activo
-                                </SelectItem>,
-                                <SelectItem key="inactive" value="2">
-                                  Inactivo
-                                </SelectItem>,
-                              ]}
+                          <SelectItem value="1">Activo</SelectItem>
+                          <SelectItem value="0">Inactivo</SelectItem>
                         </SelectContent>
                       </Select>
                     ) : (
