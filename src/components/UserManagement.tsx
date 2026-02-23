@@ -16,9 +16,9 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { useUsers } from "@/hooks/useUsers";
-import { useCreateUser } from "@/hooks/useCreateUser";
 import { useUpdateUser } from "@/hooks/useUpdateUser";
 import { useDeleteUser } from "@/hooks/useDeleteUser";
 import { useRoles } from "@/hooks/useRoles";
@@ -40,7 +40,6 @@ import UserImportDialog from "./users/UserImportDialog";
 import { useAuth } from "@/context/useAuth";
 import { useAuthPermissions } from "@/hooks/useAuthPermissions";
 import type { User } from "@/services/userService";
-import { UserDetailDialog } from "@/components/users/UserDetailDialog";
 import { Pagination } from "@/components/shared/Pagination";
 import { useNavigate } from "react-router-dom";
 
@@ -83,22 +82,19 @@ const UserManagement = () => {
   const canCreateUser = isAdmin || hasPermission('users.create');
 
   // Estados para modales
-  const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
-  const [isViewOpen, setIsViewOpen] = useState(false);
   const [isImportOpen, setIsImportOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
 
-  // Estados para formularios
-  const [newName, setNewName] = useState("");
-  const [newEmail, setNewEmail] = useState("");
-  const [newPassword, setNewPassword] = useState("");
-  const [newRoleId, setNewRoleId] = useState<string>("");
-
+  // Estados para formularios (edición)
   const [editName, setEditName] = useState("");
   const [editEmail, setEditEmail] = useState("");
   const [editPassword, setEditPassword] = useState("");
   const [editRoleId, setEditRoleId] = useState<string>("");
+  const [editIsEmployee, setEditIsEmployee] = useState(false);
+  const [editPhone, setEditPhone] = useState("");
+  const [editAddress, setEditAddress] = useState("");
+  const [editHireDate, setEditHireDate] = useState("");
 
   // Búsqueda y filtros
   const [searchTerm, setSearchTerm] = useState("");
@@ -123,116 +119,14 @@ const UserManagement = () => {
   const { data: roles = [], isLoading: rolesLoading } = useRoles();
 
   // Mutations
-  const createUserMutation = useCreateUser();
   const updateUserMutation = useUpdateUser();
   const deleteUserMutation = useDeleteUser();
 
   // Estados de carga
-  const [isCreating, setIsCreating] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
   const [deletingUserId, setDeletingUserId] = useState<string | null>(null);
 
   // Función para resetear formulario de creación
-  const resetCreateForm = () => {
-    setNewName("");
-    setNewEmail("");
-    setNewPassword("");
-    setNewRoleId("");
-  };
-
-  // Función para crear usuario
-  const handleCreateUser = async () => {
-    // Validaciones
-    if (!newName || newName.trim() === "") {
-      toast({ 
-        title: "Campo requerido", 
-        description: "El nombre es obligatorio",
-        variant: "destructive" 
-      });
-      return;
-    }
-
-    if (!newEmail || newEmail.trim() === "") {
-      toast({ 
-        title: "Campo requerido", 
-        description: "El email es obligatorio",
-        variant: "destructive" 
-      });
-      return;
-    }
-
-    // Validar formato de email
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(newEmail)) {
-      toast({ 
-        title: "Email inválido", 
-        description: "Por favor ingrese un email válido",
-        variant: "destructive" 
-      });
-      return;
-    }
-
-    if (!newPassword || newPassword.trim() === "") {
-      toast({ 
-        title: "Campo requerido", 
-        description: "La contraseña es obligatoria",
-        variant: "destructive" 
-      });
-      return;
-    }
-
-    if (newPassword.length < 6) {
-      toast({ 
-        title: "Contraseña débil", 
-        description: "La contraseña debe tener al menos 6 caracteres",
-        variant: "destructive" 
-      });
-      return;
-    }
-
-    if (!newRoleId) {
-      toast({ 
-        title: "Campo requerido", 
-        description: "Debe seleccionar un rol",
-        variant: "destructive" 
-      });
-      return;
-    }
-
-    setIsCreating(true);
-    try {
-      await createUserMutation.mutateAsync({
-        name: newName.trim(),
-        email: newEmail.trim(),
-        password: newPassword,
-        role_id: Number(newRoleId),
-      });
-      toast({ 
-        title: "Usuario creado", 
-        description: "El usuario ha sido creado exitosamente" 
-      });
-      resetCreateForm();
-      setIsCreateOpen(false);
-      // Refrescar la lista y volver a la última página para ver el nuevo usuario
-      const result = await refetchUsers();
-      if (result.data && result.data.totalPages > 0) {
-        setCurrentPage(result.data.totalPages);
-      }
-    } catch (err: unknown) {
-      let message = "No se pudo crear el usuario";
-      if (err && typeof err === "object" && "message" in err) {
-        message = String(err.message) || message;
-      }
-      toast({ 
-        title: "Error", 
-        description: message,
-        variant: "destructive" 
-      });
-    } finally {
-      setIsCreating(false);
-    }
-  };
-
   // Función para abrir modal de edición
   const handleEditUser = (user: User) => {
     setSelectedUser(user);
@@ -240,13 +134,11 @@ const UserManagement = () => {
     setEditEmail(user.email);
     setEditPassword("");
     setEditRoleId(String(user.role_id));
+    setEditIsEmployee(user.is_employee ?? false);
+    setEditPhone(user.phone ?? "");
+    setEditAddress(user.address ?? "");
+    setEditHireDate(user.hire_date ? new Date(user.hire_date).toISOString().slice(0, 10) : "");
     setIsEditOpen(true);
-  };
-
-  // Función para abrir modal de vista
-  const handleViewUser = (user: User) => {
-    setSelectedUser(user);
-    setIsViewOpen(true);
   };
 
   // Función para actualizar usuario
@@ -307,6 +199,10 @@ const UserManagement = () => {
         name: editName.trim(),
         email: editEmail.trim(),
         role_id: Number(editRoleId),
+        is_employee: editIsEmployee,
+        phone: editPhone.trim() || null,
+        address: editAddress.trim() || null,
+        hire_date: editHireDate || null,
         ...(editPassword && editPassword.trim() !== "" ? { password: editPassword } : {}),
       };
 
@@ -431,12 +327,13 @@ const UserManagement = () => {
           </p>
         </div>
         <div className="flex gap-2">
-          {canViewRoles && (
+          {canCreateUser && (
             <Button
-              variant="outline"
-              onClick={() => navigate("/usuarios/roles-permisos")}
+              className="bg-liquor-amber hover:bg-liquor-amber/90 text-white"
+              onClick={() => navigate('/usuarios/nuevo')}
             >
-              Cargos y Permisos
+              <UserPlus className="w-4 h-4 mr-2" />
+              Nuevo Usuario
             </Button>
           )}
           {canImportUsers && (
@@ -448,13 +345,12 @@ const UserManagement = () => {
               Importar
             </Button>
           )}
-          {canCreateUser && (
+          {canViewRoles && (
             <Button
-              className="bg-liquor-amber hover:bg-liquor-amber/90 text-white"
-              onClick={() => setIsCreateOpen(true)}
+              variant="outline"
+              onClick={() => navigate("/usuarios/roles-permisos")}
             >
-              <UserPlus className="w-4 h-4 mr-2" />
-              Nuevo Usuario
+              Cargos y Permisos
             </Button>
           )}
         </div>
@@ -769,105 +665,54 @@ const UserManagement = () => {
         </CardContent>
       </Card>
 
-      {/* Modal Crear Usuario */}
-      <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Crear Nuevo Usuario</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="new-name">Nombre Completo</Label>
-              <Input
-                id="new-name"
-                placeholder="Ej: Juan Pérez"
-                value={newName}
-                onChange={(e) => setNewName(e.target.value)}
-              />
-            </div>
-            <div>
-              <Label htmlFor="new-email">Email</Label>
-              <Input
-                id="new-email"
-                type="email"
-                placeholder="usuario@ejemplo.com"
-                value={newEmail}
-                onChange={(e) => setNewEmail(e.target.value)}
-              />
-            </div>
-            <div>
-              <Label htmlFor="new-password">Contraseña</Label>
-              <Input
-                id="new-password"
-                type="password"
-                placeholder="Mínimo 6 caracteres"
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
-              />
-            </div>
-            <div>
-              <Label htmlFor="new-role">Rol</Label>
-              <Select value={newRoleId} onValueChange={setNewRoleId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Seleccionar rol" />
-                </SelectTrigger>
-                <SelectContent>
-                  {rolesLoading ? (
-                    <SelectItem value="loading" disabled>Cargando...</SelectItem>
-                  ) : (
-                    roles.map((role) => (
-                      <SelectItem key={role.id} value={String(role.id)}>
-                        {role.name}
-                      </SelectItem>
-                    ))
-                  )}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          <div className="flex justify-end gap-2 mt-6">
-            <Button
-              variant="outline"
-              onClick={() => {
-                setIsCreateOpen(false);
-                resetCreateForm();
-              }}
-              disabled={isCreating}
-            >
-              Cancelar
-            </Button>
-            <Button
-              className="bg-liquor-amber hover:bg-liquor-amber/90 text-white"
-              onClick={handleCreateUser}
-              disabled={isCreating}
-            >
-              {isCreating ? (
-                <>
-                  <svg className="animate-spin w-4 h-4 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
-                  </svg>
-                  Creando...
-                </>
-              ) : (
-                <>
-                  <UserPlus className="w-4 h-4 mr-2" />
-                  Crear Usuario
-                </>
-              )}
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-
       {/* Modal Editar Usuario */}
       <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Editar Usuario</DialogTitle>
           </DialogHeader>
           {selectedUser && (
             <div className="space-y-4">
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="edit-is-employee"
+                  checked={editIsEmployee}
+                  onCheckedChange={(c) => setEditIsEmployee(c === true)}
+                />
+                <Label htmlFor="edit-is-employee" className="cursor-pointer font-medium">Es empleado</Label>
+              </div>
+              {editIsEmployee && (
+                <div className="grid grid-cols-1 gap-3 p-3 rounded-lg bg-muted/50 border border-border">
+                  <div>
+                    <Label htmlFor="edit-phone">Teléfono</Label>
+                    <Input
+                      id="edit-phone"
+                      type="tel"
+                      value={editPhone}
+                      onChange={(e) => setEditPhone(e.target.value)}
+                      placeholder="Opcional"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="edit-address">Dirección</Label>
+                    <Input
+                      id="edit-address"
+                      value={editAddress}
+                      onChange={(e) => setEditAddress(e.target.value)}
+                      placeholder="Opcional"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="edit-hire-date">Fecha de contratación</Label>
+                    <Input
+                      id="edit-hire-date"
+                      type="date"
+                      value={editHireDate}
+                      onChange={(e) => setEditHireDate(e.target.value)}
+                    />
+                  </div>
+                </div>
+              )}
               <div>
                 <Label htmlFor="edit-name">Nombre Completo</Label>
                 <Input
@@ -946,44 +791,6 @@ const UserManagement = () => {
           </div>
         </DialogContent>
       </Dialog>
-
-      {/* Modal Ver Usuario */}
-      <UserDetailDialog
-        user={selectedUser}
-        open={isViewOpen}
-        onOpenChange={(open) => {
-          setIsViewOpen(open)
-          if (!open) {
-            setSelectedUser(null)
-          }
-        }}
-        onUpdate={async () => {
-          // Refrescar la lista de usuarios automáticamente
-          try {
-            const result = await refetchUsers()
-            // Actualizar el usuario seleccionado con los datos más recientes
-            if (result.data?.items && selectedUser) {
-              const updatedUser = result.data.items.find((u: User) => u.id === selectedUser.id)
-              if (updatedUser) {
-                setSelectedUser(updatedUser)
-              }
-            }
-            
-            // Si el usuario actualizado es el usuario logueado, actualizar localStorage y contexto
-            if (result.data?.items && currentUser) {
-              const updatedCurrentUser = result.data.items.find((u: User) => u.id === currentUser.id)
-              if (updatedCurrentUser) {
-                // Actualizar localStorage
-                localStorage.setItem('auth:user', JSON.stringify(updatedCurrentUser))
-                // Disparar evento para actualizar el contexto de autenticación
-                window.dispatchEvent(new CustomEvent('auth:userUpdated', { detail: updatedCurrentUser }))
-              }
-            }
-          } catch (error) {
-            console.error('Error al refrescar usuarios:', error)
-          }
-        }}
-      />
 
       {/* Import Dialog */}
       <UserImportDialog
