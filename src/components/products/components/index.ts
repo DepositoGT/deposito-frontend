@@ -8,6 +8,5 @@
  * For licensing inquiries: GitHub @dpatzan2
  */
 
-export { ProductFormDialog } from './ProductFormDialog'
 export { ProductDetailDialog } from './ProductDetailDialog'
 export { ImportDialog } from './ImportDialog'
