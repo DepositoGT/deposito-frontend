@@ -170,10 +170,25 @@ export const deleteProduct = async (id: string): Promise<{ ok?: boolean }> => {
 };
 
 // Download products PDF report (returns void; triggers browser download)
-export const exportProductsPdf = async (): Promise<void> => {
+// options.fields: optional list of column keys. Omit for full card layout.
+// options.ids: optional list of product IDs to export only those (if empty or omitted, exports all).
+// options.includeSummary: if false, omits the summary block (productos registrados, unidades, valor inventario). Default true.
+export const exportProductsPdf = async (options?: { fields?: string[]; ids?: string[]; includeSummary?: boolean }): Promise<void> => {
   const token = localStorage.getItem("auth:token");
+  const params = new URLSearchParams();
+  if (options?.fields?.length) {
+    params.set("fields", options.fields.join(","));
+  }
+  if (options?.ids?.length) {
+    params.set("ids", options.ids.join(","));
+  }
+  if (options?.includeSummary === false) {
+    params.set("includeSummary", "0");
+  }
+  const qs = params.toString();
+  const url = `${getApiBaseUrl()}/products/report.pdf${qs ? `?${qs}` : ""}`;
 
-  const res = await fetch(`${getApiBaseUrl()}/products/report.pdf`, {
+  const res = await fetch(url, {
     method: "GET",
     headers: {
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -204,14 +219,14 @@ export const exportProductsPdf = async (): Promise<void> => {
   }
 
   const blob = await res.blob();
-  const url = window.URL.createObjectURL(blob);
+  const blobUrl = window.URL.createObjectURL(blob);
   const a = document.createElement('a');
-  a.href = url;
+  a.href = blobUrl;
   a.download = 'productos_reporte.pdf';
   document.body.appendChild(a);
   a.click();
   a.remove();
-  window.URL.revokeObjectURL(url);
+  window.URL.revokeObjectURL(blobUrl);
 };
 
 export type UpdateProductPayload = UpdateProductPayloadType;

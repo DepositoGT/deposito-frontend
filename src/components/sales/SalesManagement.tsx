@@ -122,6 +122,24 @@ const SalesManagement = ({ onSectionChange }: SalesManagementProps) => {
                     <p className='text-xs sm:text-sm text-muted-foreground'>Control de transacciones</p>
                 </div>
                 <div className='flex gap-2 overflow-x-auto pb-1 -mx-3 px-3 sm:mx-0 sm:px-0 sm:overflow-visible'>
+                    <div className='flex items-center gap-2 shrink-0'>
+                        <span className='text-sm text-muted-foreground hidden sm:inline'>Items por página:</span>
+                        <Select
+                            value={String(salesData.pageSize)}
+                            onValueChange={(v) => {
+                                salesData.setPageSize(Number(v))
+                                salesData.setPageFor('completed', 1)
+                                salesData.setPageFor('cancelled', 1)
+                            }}
+                        >
+                            <SelectTrigger className='w-[72px] h-9'><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                                {[5, 10, 25, 50].map((n) => (
+                                    <SelectItem key={n} value={String(n)}>{n}</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
                     <Select value={salesData.filters.period} onValueChange={salesData.setPeriod}>
                         <SelectTrigger className='w-28 sm:w-36 shrink-0'><Calendar className='w-4 h-4 mr-1 sm:mr-2' /><SelectValue /></SelectTrigger>
                         <SelectContent>

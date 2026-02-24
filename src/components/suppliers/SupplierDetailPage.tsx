@@ -102,6 +102,7 @@ export default function SupplierDetailPage() {
   const { hasPermission } = useAuthPermissions()
 
   const [merchPage, setMerchPage] = useState(1)
+  const [merchPageSize, setMerchPageSize] = useState(10)
   const [detailRecordId, setDetailRecordId] = useState<string | null>(null)
   const [isDetailOpen, setIsDetailOpen] = useState(false)
   const [isPdfOptionsOpen, setIsPdfOptionsOpen] = useState(false)
@@ -128,7 +129,7 @@ export default function SupplierDetailPage() {
   const { data: merchData, isLoading: merchLoading } = useIncomingMerchandise({
     supplier_id: id ?? undefined,
     page: merchPage,
-    pageSize: 10,
+    pageSize: merchPageSize,
     enabled: canViewMerchandise,
   })
   const { data: detailData } = useIncomingMerchandiseById(detailRecordId ?? undefined)
@@ -810,13 +811,31 @@ export default function SupplierDetailPage() {
                       </tbody>
                     </table>
                   </div>
-                  {totalPages > 1 && (
-                    <div className="mt-4">
-                      <Pagination
-                        currentPage={merchPage}
-                        totalPages={totalPages}
-                        onPageChange={setMerchPage}
-                      />
+                  {totalPages > 0 && (
+                    <div className="flex flex-wrap items-center justify-between gap-4 mt-4">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm text-muted-foreground">Items por página:</span>
+                        <Select
+                          value={String(merchPageSize)}
+                          onValueChange={(v) => { setMerchPageSize(Number(v)); setMerchPage(1); }}
+                        >
+                          <SelectTrigger className="w-[72px] h-9">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {[5, 10, 25, 50, 100].map((n) => (
+                              <SelectItem key={n} value={String(n)}>{n}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      {totalPages > 1 && (
+                        <Pagination
+                          currentPage={merchPage}
+                          totalPages={totalPages}
+                          onPageChange={setMerchPage}
+                        />
+                      )}
                     </div>
                   )}
                 </>
