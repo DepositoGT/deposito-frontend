@@ -89,7 +89,7 @@ const SuppliersManagement = () => {
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize] = useState(10);
+  const [pageSize, setPageSize] = useState(10);
   const [viewMode, setViewMode] = useState<"table" | "cards">("cards");
   const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(null);
   const [isImportOpen, setIsImportOpen] = useState(false);
@@ -130,10 +130,10 @@ const SuppliersManagement = () => {
   const canDelete = hasPermission("suppliers.delete");
   const canImport = hasPermission("suppliers.import");
 
-  // Reset page when search term changes
+  // Reset page when search term or page size changes
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm]);
+  }, [searchTerm, pageSize]);
 
   // Abrir modal de edición si venimos desde el detalle con un id específico
   useEffect(() => {
@@ -580,14 +580,32 @@ const SuppliersManagement = () => {
             </div>
           )}
           {totalPages > 0 && (
-            <Pagination
-              currentPage={currentPage}
-              totalPages={totalPages}
-              onPageChange={(page) => setCurrentPage(page)}
-              hasNextPage={suppliersData?.nextPage !== null}
-              hasPrevPage={suppliersData?.prevPage !== null}
-              loading={isLoading}
-            />
+            <div className="flex flex-wrap items-center justify-between gap-4 mt-4">
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-muted-foreground">Items por página:</span>
+                <Select
+                  value={String(pageSize)}
+                  onValueChange={(v) => { setPageSize(Number(v)); setCurrentPage(1); }}
+                >
+                  <SelectTrigger className="w-[72px] h-9">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {[5, 10, 25, 50, 100].map((n) => (
+                      <SelectItem key={n} value={String(n)}>{n}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <Pagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPageChange={(page) => setCurrentPage(page)}
+                hasNextPage={suppliersData?.nextPage !== null}
+                hasPrevPage={suppliersData?.prevPage !== null}
+                loading={isLoading}
+              />
+            </div>
           )}
         </>
       )}

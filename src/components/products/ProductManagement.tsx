@@ -33,13 +33,14 @@ import {
     AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
     AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle
 } from '@/components/ui/alert-dialog'
+import { Checkbox } from '@/components/ui/checkbox'
 import { useToast } from '@/hooks/use-toast'
 import type { Product } from '@/types'
 import { useProducts } from '@/hooks/useProducts'
 import { useSuppliers } from '@/hooks/useSuppliers'
 import { useCategories } from '@/hooks/useCategories'
 import { useDeleteProduct } from '@/hooks/useDeleteProduct'
-import { adaptApiProduct } from '@/services/productService'
+import { adaptApiProduct, fetchAllProducts } from '@/services/productService'
 import { Pagination } from '@/components/shared/Pagination'
 
 // Feature imports
@@ -65,7 +66,28 @@ const ProductManagement = () => {
     const [isScannerOpen, setIsScannerOpen] = useState(false)
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
     const [isImportDialogOpen, setIsImportDialogOpen] = useState(false)
+    const [isExportDialogOpen, setIsExportDialogOpen] = useState(false)
     const [viewMode, setViewMode] = useState<'table' | 'cards'>('cards')
+    const EXPORT_COLUMNS: { id: string; label: string }[] = [
+        { id: 'name', label: 'Nombre' },
+        { id: 'category', label: 'Categoría' },
+        { id: 'brand', label: 'Marca' },
+        { id: 'size', label: 'Tamaño' },
+        { id: 'barcode', label: 'Código de barras' },
+        { id: 'price', label: 'Precio' },
+        { id: 'cost', label: 'Costo' },
+        { id: 'stock', label: 'Stock' },
+        { id: 'min_stock', label: 'Stock mínimo' },
+        { id: 'supplier', label: 'Proveedor' },
+        { id: 'status', label: 'Estado' },
+        { id: 'description', label: 'Descripción' },
+    ]
+    const [exportSelectedFields, setExportSelectedFields] = useState<string[]>(['name', 'category', 'brand', 'size', 'price', 'stock'])
+    const [exportIncludeSummary, setExportIncludeSummary] = useState(true)
+
+    // Selección para exportar (IDs de productos)
+    const [selectedIds, setSelectedIds] = useState<string[]>([])
+    const [selectingAllPages, setSelectingAllPages] = useState(false)
 
     // Selected product
     const [selectedProduct, setSelectedProduct] = useState<Product | null>(null)
@@ -107,6 +129,31 @@ const ProductManagement = () => {
     const totalPages = productsData?.totalPages || 1
     const totalItems = productsData?.totalItems || 0
 
+    const selectedSet = useMemo(() => new Set(selectedIds), [selectedIds])
+    const onPageIds = useMemo(() => paginatedProducts.map((p) => p.id), [paginatedProducts])
+    const allOnPageSelected = onPageIds.length > 0 && onPageIds.every((id) => selectedSet.has(id))
+    const someOnPageSelected = onPageIds.some((id) => selectedSet.has(id))
+
+    const toggleSelection = (id: string) => {
+        setSelectedIds((prev) => (selectedSet.has(id) ? prev.filter((x) => x !== id) : [...prev, id]))
+    }
+    const toggleSelectAllOnPage = () => {
+        if (allOnPageSelected) setSelectedIds((prev) => prev.filter((id) => !onPageIds.includes(id)))
+        else setSelectedIds((prev) => [...new Set([...prev, ...onPageIds])])
+    }
+    const handleSelectAllPages = async () => {
+        setSelectingAllPages(true)
+        try {
+            const all = await fetchAllProducts()
+            setSelectedIds(all.map((p) => p.id))
+            toast({ title: 'Seleccionados', description: `${all.length} productos de todas las páginas` })
+        } catch {
+            toast({ title: 'Error', description: 'No se pudo cargar la lista completa', variant: 'destructive' })
+        } finally {
+            setSelectingAllPages(false)
+        }
+    }
+
     // Permisos
     const canImport = hasPermission('products.import')
     const canExport = canImport && hasPermission('products.view', 'reports.view')
@@ -115,12 +162,17 @@ const ProductManagement = () => {
     const canDelete = hasPermission('products.delete')
     const canRegisterIncoming = hasPermission('products.register_incoming')
 
-    // Export handler
-    const handleExport = async () => {
+    // Export handler: pass selected fields for table PDF, or none for full card layout. If selectedIds.length > 0, only those products are exported.
+    const handleExport = async (fields?: string[], ids?: string[], includeSummary?: boolean) => {
         if (!canExport) return
         try {
             const svc = await import('@/services/productService')
-            await svc.exportProductsPdf()
+            await svc.exportProductsPdf({
+                ...(fields?.length ? { fields } : {}),
+                ...(ids?.length ? { ids } : {}),
+                ...(includeSummary === false ? { includeSummary: false } : {}),
+            })
+            setIsExportDialogOpen(false)
             toast({ title: 'Exportado', description: 'El reporte PDF se descargó correctamente' })
         } catch (err: unknown) {
             const message = (err as { message?: string })?.message || 'No se pudo descargar el reporte'
@@ -185,7 +237,15 @@ const ProductManagement = () => {
                 </div>
                 <div className="flex gap-2 overflow-x-auto pb-1 -mx-3 px-3 sm:mx-0 sm:px-0 sm:overflow-visible">
                     {canExport && (
-                        <Button variant="outline" onClick={handleExport} size="sm" className="shrink-0">
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            className="shrink-0"
+                            onClick={() => {
+                                if (selectedIds.length > 0 && viewMode === 'cards') setExportSelectedFields([])
+                                setIsExportDialogOpen(true)
+                            }}
+                        >
                             <Download className="w-4 h-4 sm:mr-2" /><span className="hidden sm:inline">Exportar</span>
                         </Button>
                     )}
@@ -292,7 +352,7 @@ const ProductManagement = () => {
                             variant={viewMode === 'cards' ? 'default' : 'ghost'}
                             size="icon"
                             className="h-8 w-8 rounded-l-none"
-                            onClick={() => setViewMode('cards')}
+                            onClick={() => { setViewMode('cards'); setSelectedIds([]) }}
                             aria-label="Vista de cuadros"
                         >
                             <LayoutGrid className="w-4 h-4" />
@@ -304,6 +364,23 @@ const ProductManagement = () => {
                     {isError && !isLoading && <div className="p-6 text-destructive">Error al cargar productos.</div>}
                     {!isLoading && !isError && (
                         <div className="space-y-4">
+                            {viewMode === 'table' && selectedIds.length > 0 && (
+                                <div className="flex flex-wrap items-center gap-3 py-2 px-3 rounded-md bg-muted/60 border border-border">
+                                    <span className="text-sm font-medium text-foreground">{selectedIds.length} seleccionado{selectedIds.length !== 1 ? 's' : ''}</span>
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={handleSelectAllPages}
+                                        disabled={selectingAllPages}
+                                    >
+                                        {selectingAllPages ? 'Cargando...' : 'Seleccionar todos (todas las páginas)'}
+                                    </Button>
+                                    <Button type="button" variant="ghost" size="sm" onClick={() => setSelectedIds([])}>
+                                        Limpiar selección
+                                    </Button>
+                                </div>
+                            )}
                             {paginatedProducts.length === 0 ? (
                                 <div className="p-6 text-center text-muted-foreground">
                                     No hay productos para mostrar.
@@ -314,6 +391,13 @@ const ProductManagement = () => {
                                     <table className="w-full">
                                         <thead>
                                             <tr className="border-b border-border">
+                                                <th className="w-10 p-3 text-left">
+                                                    <Checkbox
+                                                        checked={allOnPageSelected}
+                                                        onCheckedChange={toggleSelectAllOnPage}
+                                                        aria-label="Seleccionar todos de esta página"
+                                                    />
+                                                </th>
                                                 <th className="text-left p-3 font-medium text-muted-foreground">Producto</th>
                                                 <th className="text-left p-3 font-medium text-muted-foreground">Categoría</th>
                                                 <th className="text-center p-3 font-medium text-muted-foreground">Stock</th>
@@ -325,6 +409,13 @@ const ProductManagement = () => {
                                         <tbody>
                                             {paginatedProducts.map((product, index) => (
                                                 <tr key={product.id} className="border-b border-border hover:bg-muted transition-colors animate-slide-up" style={{ animationDelay: `${index * 50}ms` }}>
+                                                    <td className="p-3 w-10">
+                                                        <Checkbox
+                                                            checked={selectedSet.has(product.id)}
+                                                            onCheckedChange={() => toggleSelection(product.id)}
+                                                            aria-label={`Seleccionar ${product.name}`}
+                                                        />
+                                                    </td>
                                                     <td className="p-3">
                                                         <div className="font-medium text-foreground">{product.name}</div>
                                                         <div className="text-sm text-muted-foreground">{product.brand} • {product.size}</div>
@@ -367,7 +458,7 @@ const ProductManagement = () => {
                                     </table>
                                 </div>
                             ) : (
-                                // Vista de cuadros (cards)
+                                // Vista de cuadros (cards) — sin selección
                                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                                     {paginatedProducts.map((product, index) => (
                                         <div
@@ -439,17 +530,35 @@ const ProductManagement = () => {
                                 </div>
                             )}
 
-                            {/* Pagination */}
-                            {productsData && productsData.totalPages > 1 && (
-                                <Pagination
-                                    currentPage={productsData.page}
-                                    totalPages={productsData.totalPages}
-                                    onPageChange={setCurrentPage}
-                                    hasNextPage={productsData.nextPage !== null}
-                                    hasPrevPage={productsData.prevPage !== null}
-                                    loading={isLoading}
-                                />
-                            )}
+                            {/* Pagination + page size */}
+                            <div className="flex flex-wrap items-center justify-between gap-4 mt-4">
+                                <div className="flex items-center gap-2">
+                                    <span className="text-sm text-muted-foreground">Items por página:</span>
+                                    <Select
+                                        value={String(pageSize)}
+                                        onValueChange={(v) => { setPageSize(Number(v)); setCurrentPage(1); }}
+                                    >
+                                        <SelectTrigger className="w-[72px] h-9">
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {[5, 10, 25, 50, 100].map((n) => (
+                                                <SelectItem key={n} value={String(n)}>{n}</SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                {productsData && productsData.totalPages > 1 && (
+                                    <Pagination
+                                        currentPage={productsData.page}
+                                        totalPages={productsData.totalPages}
+                                        onPageChange={setCurrentPage}
+                                        hasNextPage={productsData.nextPage !== null}
+                                        hasPrevPage={productsData.prevPage !== null}
+                                        loading={isLoading}
+                                    />
+                                )}
+                            </div>
                         </div>
                     )}
                 </CardContent>
@@ -488,6 +597,84 @@ const ProductManagement = () => {
                     window.location.reload()
                 }}
             />
+
+            {/* Export PDF Dialog - choose columns for report / cotización */}
+            <Dialog open={isExportDialogOpen} onOpenChange={setIsExportDialogOpen}>
+                <DialogContent className="max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>Exportar inventario</DialogTitle>
+                        <p className="text-sm text-muted-foreground">
+                            Elige qué información incluir en el PDF (útil para cotizaciones o listados personalizados).
+                        </p>
+                    </DialogHeader>
+                    <div className="space-y-4 py-2">
+                        <div className="flex flex-wrap gap-4">
+                            {EXPORT_COLUMNS.map((col) => (
+                                <label key={col.id} className="flex items-center gap-2 cursor-pointer">
+                                    <Checkbox
+                                        checked={exportSelectedFields.includes(col.id)}
+                                        onCheckedChange={(checked) => {
+                                            setExportSelectedFields((prev) =>
+                                                checked ? [...prev, col.id] : prev.filter((f) => f !== col.id)
+                                            )
+                                        }}
+                                    />
+                                    <span className="text-sm">{col.label}</span>
+                                </label>
+                            ))}
+                        </div>
+                        <label className="flex items-center gap-2 cursor-pointer pt-2">
+                            <Checkbox
+                                checked={exportIncludeSummary}
+                                onCheckedChange={(checked) => setExportIncludeSummary(checked === true)}
+                            />
+                            <span className="text-sm">Incluir resumen (productos registrados, unidades, valor del inventario)</span>
+                        </label>
+                        <div className="flex flex-wrap gap-2 pt-2 border-t">
+                            <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setExportSelectedFields(['name', 'category', 'brand', 'size', 'price', 'stock'])}
+                            >
+                                Solo cotización
+                            </Button>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setExportSelectedFields(EXPORT_COLUMNS.map((c) => c.id))}
+                            >
+                                Seleccionar todo
+                            </Button>
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleExport(undefined, selectedIds.length ? selectedIds : undefined, exportIncludeSummary)}
+                            >
+                                Vista de tarjetas (completa)
+                            </Button>
+                            <Button
+                                type="button"
+                                size="sm"
+                                className="ml-auto bg-liquor-amber hover:bg-liquor-amber/90 text-white"
+                                onClick={() => {
+                                    const idsToExport = selectedIds.length ? selectedIds : undefined
+                                    if (exportSelectedFields.length === 0) {
+                                        handleExport(undefined, idsToExport, exportIncludeSummary)
+                                    } else {
+                                        handleExport(exportSelectedFields, idsToExport, exportIncludeSummary)
+                                    }
+                                }}
+                            >
+                                <Download className="w-4 h-4 mr-2" />
+                                Generar PDF
+                            </Button>
+                        </div>
+                    </div>
+                </DialogContent>
+            </Dialog>
         </div>
     )
 }

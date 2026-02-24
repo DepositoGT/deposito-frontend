@@ -19,7 +19,8 @@ import {
   DollarSign,
   AlertTriangle,
   Eye,
-  Zap
+  Zap,
+  FileText
 } from "lucide-react";
 import heroImage from "@/assets/hero-liquor.jpg";
 import { DashboardStat, RecentProduct } from "@/types";
@@ -278,7 +279,7 @@ const Dashboard = ({ onSectionChange }: DashboardProps) => {
                 className="w-full"
                 onClick={() => navigate('/reportes')}
               >
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">Q</span>
+                <FileText className="w-4 h-4 mr-2" />
                 Generar Reporte
               </Button>
             )}

@@ -19,6 +19,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Calculator, FileText, User } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { useAuth } from '@/context/useAuth'
@@ -244,6 +245,28 @@ const CashClosureManagement = () => {
                 </CardHeader>
                 <CardContent>
                     <div className="space-y-4">
+                        {!form.isSeller && (
+                            <div className="flex items-center gap-2">
+                                <span className="text-sm text-muted-foreground">Items por página:</span>
+                                <Select
+                                    value={String(api.pageSize)}
+                                    onValueChange={(v) => {
+                                        const n = Number(v)
+                                        api.setPageSize(n)
+                                        api.fetchClosures(1, form.isSeller, n)
+                                    }}
+                                >
+                                    <SelectTrigger className="w-[72px] h-9">
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {[5, 10, 25, 50, 100].map((num) => (
+                                            <SelectItem key={num} value={String(num)}>{num}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        )}
                         <ClosuresHistoryList
                             closures={api.closures}
                             isLoading={api.isLoadingClosures}

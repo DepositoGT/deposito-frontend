@@ -46,10 +46,12 @@ interface UseCashClosureAPIReturn {
     closures: CashClosure[]
     currentPage: number
     totalPages: number
+    pageSize: number
+    setPageSize: (size: number) => void
     // Operations
     calculateTheoretical: (startDate: string, endDate: string) => Promise<TheoreticalData | null>
     saveClosure: (payload: SaveClosurePayload) => Promise<boolean>
-    fetchClosures: (page: number, isSeller: boolean) => Promise<void>
+    fetchClosures: (page: number, isSeller: boolean, pageSizeOverride?: number) => Promise<void>
     fetchClosureDetail: (closureId: string) => Promise<CashClosure | null>
     approveClosure: (closureId: string, supervisorName: string) => Promise<CashClosure | null>
     rejectClosure: (closureId: string, reason: string) => Promise<CashClosure | null>
@@ -65,6 +67,7 @@ export const useCashClosureAPI = (): UseCashClosureAPIReturn => {
     const [closures, setClosures] = useState<CashClosure[]>([])
     const [currentPage, setCurrentPage] = useState(1)
     const [totalPages, setTotalPages] = useState(1)
+    const [pageSize, setPageSize] = useState(10)
 
     const getAuthHeaders = () => ({
         'Content-Type': 'application/json',
@@ -173,11 +176,12 @@ export const useCashClosureAPI = (): UseCashClosureAPIReturn => {
         }
     }, [toast])
 
-    const fetchClosures = useCallback(async (page: number, isSeller: boolean): Promise<void> => {
+    const fetchClosures = useCallback(async (page: number, isSeller: boolean, pageSizeOverride?: number): Promise<void> => {
         setIsLoadingClosures(true)
+        const size = pageSizeOverride ?? (isSeller ? 1 : pageSize)
+        if (pageSizeOverride != null) setPageSize(pageSizeOverride)
         try {
-            const pageSize = isSeller ? 1 : 10
-            const response = await fetch(`${API_URL}/cash-closures?page=${page}&pageSize=${pageSize}`, {
+            const response = await fetch(`${API_URL}/cash-closures?page=${page}&pageSize=${size}`, {
                 headers: getAuthHeaders()
             })
 
@@ -272,6 +276,8 @@ export const useCashClosureAPI = (): UseCashClosureAPIReturn => {
         closures,
         currentPage,
         totalPages,
+        pageSize,
+        setPageSize,
         calculateTheoretical,
         saveClosure,
         fetchClosures,

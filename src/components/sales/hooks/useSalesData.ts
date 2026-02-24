@@ -176,6 +176,8 @@ interface UseSalesDataReturn {
     preferredPaymentMethod: string
     // Pagination
     setPageFor: (key: SaleStatusKey, page: number) => void
+    pageSize: number
+    setPageSize: (size: number) => void
     // Actions
     refreshSales: () => void
 }
@@ -192,9 +194,11 @@ export const useSalesData = (): UseSalesDataReturn => {
         cancelled: 1,
     })
 
+    const [pageSize, setPageSize] = useState(10)
+
     // Queries per status (solo Completada y Cancelada)
-    const completedQuery = useSalesByStatus('Completada', { period, page: pages.completed, pageSize: 5 })
-    const cancelledQuery = useSalesByStatus('Cancelada', { period, page: pages.cancelled, pageSize: 5 })
+    const completedQuery = useSalesByStatus('Completada', { period, page: pages.completed, pageSize })
+    const cancelledQuery = useSalesByStatus('Cancelada', { period, page: pages.cancelled, pageSize })
 
     const completedData = completedQuery.data as PaginatedSales | undefined
     const cancelledData = cancelledQuery.data as PaginatedSales | undefined
@@ -272,6 +276,8 @@ export const useSalesData = (): UseSalesDataReturn => {
         averageTicketToday,
         preferredPaymentMethod,
         setPageFor,
+        pageSize,
+        setPageSize,
         refreshSales,
     }
 }

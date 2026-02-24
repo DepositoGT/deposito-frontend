@@ -93,10 +93,10 @@ const IncomingMerchandiseManagement = () => {
   const totalItems = recordsData?.totalItems ?? 0
   const totalPages = recordsData?.totalPages ?? 1
 
-  // Reset page on filter change
+  // Reset page on filter or page size change
   useEffect(() => {
     setCurrentPage(1)
-  }, [searchTerm, selectedSupplierId, startDate, endDate])
+  }, [searchTerm, selectedSupplierId, startDate, endDate, pageSize])
 
   // Handlers
   const handleViewDetails = (id: string) => {
@@ -430,16 +430,32 @@ const IncomingMerchandiseManagement = () => {
             </div>
           )}
 
-          {/* Pagination */}
-          {totalPages > 1 && (
-            <div className="mt-6">
+          {/* Pagination + page size */}
+          <div className="flex flex-wrap items-center justify-between gap-4 mt-6">
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-muted-foreground">Items por página:</span>
+              <Select
+                value={String(pageSize)}
+                onValueChange={(v) => { setPageSize(Number(v)); setCurrentPage(1); }}
+              >
+                <SelectTrigger className="w-[72px] h-9">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {[5, 10, 25, 50, 100].map((n) => (
+                    <SelectItem key={n} value={String(n)}>{n}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            {totalPages > 1 && (
               <Pagination
                 currentPage={currentPage}
                 totalPages={totalPages}
                 onPageChange={setCurrentPage}
               />
-            </div>
-          )}
+            )}
+          </div>
         </CardContent>
       </Card>
 
