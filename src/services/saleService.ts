@@ -68,6 +68,12 @@ export interface Sale {
   total_returned?: number;
   adjusted_total?: number;
   items: number;
+  created_by?: string;
+  createdBy?: {
+    id: string;
+    name: string;
+    email: string;
+  };
   status: {
     id: number;
     name: string;
