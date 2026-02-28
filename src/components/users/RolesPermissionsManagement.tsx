@@ -19,6 +19,8 @@ import { deleteRole } from "@/services/userService";
 import { Shield, ArrowLeft, CheckSquare, List, LayoutGrid, Trash2, Loader2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Pagination } from "@/components/shared/Pagination";
 
 const RolesPermissionsManagement = () => {
   const { hasPermission, isAdmin } = useAuthPermissions();
@@ -31,7 +33,7 @@ const RolesPermissionsManagement = () => {
   const { data: allPermissions = [] } = usePermissions();
   const [viewMode, setViewMode] = useState<"cards" | "table">("cards");
   const [currentPage, setCurrentPage] = useState(1);
-  const pageSize = 10;
+  const [pageSize, setPageSize] = useState(18);
   const [deletingId, setDeletingId] = useState<number | null>(null);
 
   const {
@@ -41,6 +43,7 @@ const RolesPermissionsManagement = () => {
   } = useRolesWithPermissions({ page: currentPage, pageSize, enabled: canViewRoles });
 
   const roles = rolesData?.items || [];
+  const totalPages = rolesData?.totalPages ?? 1;
 
   const groupPermissionsByModule = (permissions: Permission[]) => {
     const groups: Record<string, Permission[]> = {};
@@ -299,6 +302,35 @@ const RolesPermissionsManagement = () => {
               )}
             </div>
           )}
+          {/* Pagination + page size */}
+          <div className="flex flex-wrap items-center justify-between gap-4 pt-4 border-t mt-4">
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-muted-foreground">Items por página:</span>
+              <Select
+                value={String(pageSize)}
+                onValueChange={(v) => { setPageSize(Number(v)); setCurrentPage(1); }}
+              >
+                <SelectTrigger className="w-[72px] h-9">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {[18, 27, 36].map((n) => (
+                    <SelectItem key={n} value={String(n)}>{n}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            {totalPages > 1 && (
+              <Pagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPageChange={setCurrentPage}
+                hasNextPage={rolesData?.nextPage != null}
+                hasPrevPage={rolesData?.prevPage != null}
+                loading={rolesLoading}
+              />
+            )}
+          </div>
         </CardContent>
       </Card>
     </div>

@@ -62,6 +62,12 @@ export const SaleDetailDialog = ({
                         <div><Label>Fecha</Label><div className='font-medium'>{formatDateTime(sale.date)}</div></div>
                         <div><Label>Método de Pago</Label><div className='font-medium'>{sale.payment}</div></div>
                         <div><Label>Estado</Label><div>{getStatusBadge(sale.status)}</div></div>
+                        <div>
+                            <Label>Registrada por</Label>
+                            <div className='font-medium'>
+                                {sale.createdByName || 'No disponible'}
+                            </div>
+                        </div>
                     </div>
 
                     {/* Returns Alert */}
