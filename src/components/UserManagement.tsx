@@ -103,7 +103,7 @@ const UserManagement = () => {
   
   // Paginación
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
+  const [pageSize, setPageSize] = useState(18);
 
   // Queries
   const { data: usersData, isLoading: usersLoading, refetch: refetchUsers } = useUsers({
@@ -661,7 +661,7 @@ const UserManagement = () => {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {[5, 10, 25, 50, 100].map((n) => (
+                  {[18, 22, 26, 30].map((n) => (
                     <SelectItem key={n} value={String(n)}>{n}</SelectItem>
                   ))}
                 </SelectContent>

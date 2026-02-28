@@ -31,7 +31,9 @@ interface ClosureDetailDialogProps {
 const getStatusBadge = (status: string) => {
     const variants: Record<string, 'default' | 'secondary' | 'destructive' | 'outline'> = {
         'Pendiente': 'secondary',
-        'Validado': 'default',
+        'Aprobado': 'default',
+        'Rechazado': 'destructive',
+        'Validado': 'outline',
         'Cerrado': 'outline'
     }
     return <Badge variant={variants[status] || 'outline'}>{status}</Badge>
@@ -54,22 +56,29 @@ export const ClosureDetailDialog = ({
                 <DialogHeader>
                     <DialogTitle>Detalle del Cierre #{closure.closure_number}</DialogTitle>
                 </DialogHeader>
-                <div className="space-y-4">
-                    {/* Header Info */}
-                    <div className="grid grid-cols-2 gap-4 text-sm">
-                        <div>
-                            <p className="text-muted-foreground">Período</p>
-                            <p className="font-medium">{formatDateTime(closure.start_date)}</p>
-                            <p className="font-medium">hasta {formatDateTime(closure.end_date)}</p>
-                        </div>
-                        <div>
-                            <p className="text-muted-foreground">Estado</p>
-                            {getStatusBadge(closure.status)}
+                <div className="space-y-5">
+                    {/* Sección 1: Período y estado */}
+                    <div className="rounded-lg border bg-card p-4">
+                        <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">Período y estado</h4>
+                        <div className="grid grid-cols-2 gap-4 text-sm">
+                            <div>
+                                <p className="text-muted-foreground">Inicio</p>
+                                <p className="font-medium">{formatDateTime(closure.start_date)}</p>
+                            </div>
+                            <div>
+                                <p className="text-muted-foreground">Fin</p>
+                                <p className="font-medium">{formatDateTime(closure.end_date)}</p>
+                            </div>
+                            <div>
+                                <p className="text-muted-foreground">Estado</p>
+                                {getStatusBadge(closure.status)}
+                            </div>
                         </div>
                     </div>
 
-                    {/* Summary */}
-                    <div className="border rounded-lg p-4 bg-muted/50">
+                    {/* Sección 2: Resumen de totales */}
+                    <div className="rounded-lg border bg-muted/50 p-4">
+                        <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">Resumen</h4>
                         <div className="grid grid-cols-3 gap-4">
                             <div>
                                 <p className="text-sm text-muted-foreground">Total Teórico</p>
@@ -88,9 +97,9 @@ export const ClosureDetailDialog = ({
                         </div>
                     </div>
 
-                    {/* Payment Breakdown */}
-                    <div>
-                        <h4 className="font-semibold mb-2">Desglose por Método de Pago</h4>
+                    {/* Sección 3: Desglose por método de pago */}
+                    <div className="rounded-lg border bg-card p-4">
+                        <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">Desglose por método de pago</h4>
                         <div className="space-y-2">
                             {closure.payment_breakdowns?.map((item) => (
                                 <div key={item.payment_method_id} className="border rounded p-3">
@@ -118,11 +127,11 @@ export const ClosureDetailDialog = ({
                         </div>
                     </div>
 
-                    {/* Denominations */}
-                    {closure.denominations.length > 0 && (
-                        <div>
-                            <h4 className="font-semibold mb-2">Conteo de Efectivo</h4>
-                            <div className="border rounded-lg p-3">
+                    {/* Sección 4: Conteo de efectivo */}
+                    {closure.denominations?.length > 0 && (
+                        <div className="rounded-lg border bg-card p-4">
+                            <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">Conteo de efectivo</h4>
+                            <div className="rounded border bg-muted/30 p-3">
                                 <div className="grid grid-cols-4 gap-2 text-sm font-semibold mb-2">
                                     <div>Denominación</div>
                                     <div>Tipo</div>
@@ -141,33 +150,38 @@ export const ClosureDetailDialog = ({
                         </div>
                     )}
 
-                    {/* Signatures */}
-                    <div className="grid grid-cols-2 gap-4">
-                        <div>
-                            <p className="text-sm font-semibold mb-2">Cajero: {closure.cashier_name}</p>
-                            {closure.cashier_signature && (
-                                <img src={closure.cashier_signature} alt="Firma Cajero" className="border rounded" />
-                            )}
-                        </div>
-                        {closure.supervisor_name && (
+                    {/* Sección 5: Cajero y supervisor */}
+                    <div className="rounded-lg border bg-card p-4">
+                        <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">Responsables</h4>
+                        <div className="grid grid-cols-2 gap-4">
                             <div>
-                                <p className="text-sm font-semibold mb-2">Supervisor: {closure.supervisor_name}</p>
-                                {closure.supervisor_signature && (
-                                    <img src={closure.supervisor_signature} alt="Firma Supervisor" className="border rounded" />
+                                <p className="text-sm text-muted-foreground">Cajero</p>
+                                <p className="font-medium">{closure.cashier_name}</p>
+                                {closure.cashier_signature && (
+                                    <img src={closure.cashier_signature} alt="Firma Cajero" className="mt-2 border rounded max-h-20 object-contain" />
                                 )}
                             </div>
-                        )}
+                            {(closure.supervisor_name || closure.supervisor_signature) && (
+                                <div>
+                                    <p className="text-sm text-muted-foreground">Supervisor</p>
+                                    <p className="font-medium">{closure.supervisor_name || '—'}</p>
+                                    {closure.supervisor_signature && (
+                                        <img src={closure.supervisor_signature} alt="Firma Supervisor" className="mt-2 border rounded max-h-20 object-contain" />
+                                    )}
+                                </div>
+                            )}
+                        </div>
                     </div>
 
-                    {/* Notes */}
+                    {/* Sección 6: Notas */}
                     {closure.notes && (
-                        <div>
-                            <p className="text-sm font-semibold">Notas</p>
-                            <p className="text-sm text-muted-foreground">{closure.notes}</p>
+                        <div className="rounded-lg border bg-card p-4">
+                            <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-2">Notas</h4>
+                            <p className="text-sm text-muted-foreground whitespace-pre-wrap">{closure.notes}</p>
                         </div>
                     )}
 
-                    {/* Action Buttons */}
+                    {/* Acciones */}
                     <div className="flex justify-between gap-2 pt-4 border-t">
                         <div className="flex gap-2">
                             {closure.status === 'Pendiente' && !isSeller && (

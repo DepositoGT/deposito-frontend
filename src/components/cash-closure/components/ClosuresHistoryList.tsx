@@ -30,8 +30,10 @@ interface ClosuresHistoryListProps {
 const getStatusBadge = (status: string) => {
     const variants: Record<string, 'default' | 'secondary' | 'destructive' | 'outline'> = {
         'Pendiente': 'secondary',
-        'Validado': 'default',
-        'Cerrado': 'outline'
+        'Aprobado': 'default',
+        'Rechazado': 'destructive',
+        'Validado': 'outline',  // legacy
+        'Cerrado': 'outline'    // legacy
     }
     return <Badge variant={variants[status] || 'outline'}>{status}</Badge>
 }

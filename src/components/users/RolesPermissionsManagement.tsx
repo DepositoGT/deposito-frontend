@@ -33,7 +33,7 @@ const RolesPermissionsManagement = () => {
   const { data: allPermissions = [] } = usePermissions();
   const [viewMode, setViewMode] = useState<"cards" | "table">("cards");
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
+  const [pageSize, setPageSize] = useState(18);
   const [deletingId, setDeletingId] = useState<number | null>(null);
 
   const {
@@ -314,7 +314,7 @@ const RolesPermissionsManagement = () => {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {[5, 10, 25, 50, 100].map((n) => (
+                  {[18, 27, 36].map((n) => (
                     <SelectItem key={n} value={String(n)}>{n}</SelectItem>
                   ))}
                 </SelectContent>
