@@ -49,10 +49,11 @@ export const PaymentMethodsForm = ({ paymentBreakdown, onUpdateAmount }: Payment
                                     <Input
                                         id={`actual-${index}`}
                                         type="number"
-                                        step="0.01"
+                                        step="1"
+                                        min="0"
                                         value={item.actual_amount || ''}
                                         onChange={(e) => onUpdateAmount(index, 'actual_amount', e.target.value)}
-                                        placeholder="0.00"
+                                        placeholder="0"
                                     />
                                 </div>
                             </div>
