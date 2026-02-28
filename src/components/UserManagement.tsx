@@ -105,6 +105,7 @@ const UserManagement = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(18);
 
+
   // Queries
   const { data: usersData, isLoading: usersLoading, refetch: refetchUsers } = useUsers({
     page: currentPage,
