@@ -135,6 +135,11 @@ export const normalizeRawSale = (raw: unknown): Sale => {
     const subtotal = parseFloat(String(r.subtotal ?? totalNum)) || totalNum
     const discountTotal = parseFloat(String(r.discount_total ?? '0')) || 0
 
+    const createdByRaw = r.createdBy as Record<string, unknown> | undefined
+    const createdById = createdByRaw?.id ? String(createdByRaw.id) : undefined
+    const createdByName = createdByRaw?.name ? String(createdByRaw.name) : undefined
+    const createdByEmail = createdByRaw?.email ? String(createdByRaw.email) : undefined
+
     return {
         id: String(r.id ?? ''),
         date: String(r.sold_at ?? r.date ?? ''),
@@ -155,6 +160,9 @@ export const normalizeRawSale = (raw: unknown): Sale => {
         amountReceived,
         change,
         products,
+        createdById,
+        createdByName,
+        createdByEmail,
     } as Sale
 }
 
@@ -176,6 +184,8 @@ interface UseSalesDataReturn {
     preferredPaymentMethod: string
     // Pagination
     setPageFor: (key: SaleStatusKey, page: number) => void
+    pageSize: number
+    setPageSize: (size: number) => void
     // Actions
     refreshSales: () => void
 }
@@ -192,9 +202,11 @@ export const useSalesData = (): UseSalesDataReturn => {
         cancelled: 1,
     })
 
+    const [pageSize, setPageSize] = useState(10)
+
     // Queries per status (solo Completada y Cancelada)
-    const completedQuery = useSalesByStatus('Completada', { period, page: pages.completed, pageSize: 5 })
-    const cancelledQuery = useSalesByStatus('Cancelada', { period, page: pages.cancelled, pageSize: 5 })
+    const completedQuery = useSalesByStatus('Completada', { period, page: pages.completed, pageSize })
+    const cancelledQuery = useSalesByStatus('Cancelada', { period, page: pages.cancelled, pageSize })
 
     const completedData = completedQuery.data as PaginatedSales | undefined
     const cancelledData = cancelledQuery.data as PaginatedSales | undefined
@@ -272,6 +284,8 @@ export const useSalesData = (): UseSalesDataReturn => {
         averageTicketToday,
         preferredPaymentMethod,
         setPageFor,
+        pageSize,
+        setPageSize,
         refreshSales,
     }
 }

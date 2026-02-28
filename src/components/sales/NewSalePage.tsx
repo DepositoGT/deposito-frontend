@@ -94,6 +94,7 @@ export default function NewSalePage() {
 
   const [productSearch, setProductSearch] = useState('')
   const [productPage, setProductPage] = useState(1)
+  const [productPageSize, setProductPageSize] = useState(9)
   const [customer, setCustomer] = useState('')
   const [customerNit, setCustomerNit] = useState('')
   const [isFinalConsumer, setIsFinalConsumer] = useState(false)
@@ -126,13 +127,13 @@ export default function NewSalePage() {
     [availableProducts, productSearch]
   )
 
-  const pageSize = 9
+  const pageSize = productPageSize
   const totalPages = Math.max(1, Math.ceil(filteredProducts.length / pageSize))
   const safePage = Math.min(productPage, totalPages)
   const pageProducts = useMemo(() => {
     const start = (safePage - 1) * pageSize
     return filteredProducts.slice(start, start + pageSize)
-  }, [filteredProducts, safePage])
+  }, [filteredProducts, safePage, pageSize])
 
   const displayTotal = promotions.finalTotal ?? cart.cartTotal
   const changeAmount =
@@ -447,26 +448,42 @@ export default function NewSalePage() {
                       />
                     ))}
                   </div>
-                  <div className="flex justify-end items-center gap-2 mt-4">
-                    <span className="text-sm text-muted-foreground">
-                      Página {safePage} de {totalPages}
-                    </span>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setProductPage((p) => Math.max(1, p - 1))}
-                      disabled={safePage <= 1}
-                    >
-                      <ChevronLeft className="w-4 h-4" />
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setProductPage((p) => Math.min(totalPages, p + 1))}
-                      disabled={safePage >= totalPages}
-                    >
-                      <ChevronRight className="w-4 h-4" />
-                    </Button>
+                  <div className="flex flex-wrap items-center justify-between gap-4 mt-4">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-muted-foreground">Productos por página:</span>
+                      <Select
+                        value={String(productPageSize)}
+                        onValueChange={(v) => { setProductPageSize(Number(v)); setProductPage(1); }}
+                      >
+                        <SelectTrigger className="w-[72px] h-9"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          {[9, 18, 36, 54].map((n) => (
+                            <SelectItem key={n} value={String(n)}>{n}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-muted-foreground">
+                        Página {safePage} de {totalPages}
+                      </span>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setProductPage((p) => Math.max(1, p - 1))}
+                        disabled={safePage <= 1}
+                      >
+                        <ChevronLeft className="w-4 h-4" />
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setProductPage((p) => Math.min(totalPages, p + 1))}
+                        disabled={safePage >= totalPages}
+                      >
+                        <ChevronRight className="w-4 h-4" />
+                      </Button>
+                    </div>
                   </div>
                 </>
               )}

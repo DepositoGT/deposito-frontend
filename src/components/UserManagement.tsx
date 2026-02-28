@@ -103,8 +103,7 @@ const UserManagement = () => {
   
   // Paginación
   const [currentPage, setCurrentPage] = useState(1);
-
-  const [pageSize] = useState(10);
+  const [pageSize, setPageSize] = useState(18);
 
 
   // Queries
@@ -274,10 +273,10 @@ const UserManagement = () => {
     }
   };
 
-  // Resetear página cuando cambian los filtros
+  // Resetear página cuando cambian los filtros o el tamaño de página
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, filterRole]);
+  }, [searchTerm, filterRole, pageSize]);
 
   // Los usuarios ya vienen filtrados del backend
   const filteredUsers = users;
@@ -651,17 +650,35 @@ const UserManagement = () => {
             </div>
           )}
           
-          {/* Paginación */}
-          {usersData && usersData.totalPages > 1 && (
-            <Pagination
-              currentPage={usersData.page}
-              totalPages={usersData.totalPages}
-              onPageChange={setCurrentPage}
-              hasNextPage={usersData.nextPage !== null}
-              hasPrevPage={usersData.prevPage !== null}
-              loading={usersLoading}
-            />
-          )}
+          {/* Paginación + items por página */}
+          <div className="flex flex-wrap items-center justify-between gap-4 mt-4">
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-muted-foreground">Items por página:</span>
+              <Select
+                value={String(pageSize)}
+                onValueChange={(v) => { setPageSize(Number(v)); setCurrentPage(1); }}
+              >
+                <SelectTrigger className="w-[72px] h-9">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {[18, 22, 26, 30].map((n) => (
+                    <SelectItem key={n} value={String(n)}>{n}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            {usersData && usersData.totalPages > 1 && (
+              <Pagination
+                currentPage={usersData.page}
+                totalPages={usersData.totalPages}
+                onPageChange={setCurrentPage}
+                hasNextPage={usersData.nextPage !== null}
+                hasPrevPage={usersData.prevPage !== null}
+                loading={usersLoading}
+              />
+            )}
+          </div>
         </CardContent>
       </Card>
 

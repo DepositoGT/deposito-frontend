@@ -62,6 +62,10 @@ export interface Sale extends BaseEntity {
   amountReceived: number;
   change: number;
   products: CartProduct[];
+  // Usuario que registró la venta (opcional)
+  createdById?: string;
+  createdByName?: string;
+  createdByEmail?: string;
 }
 
 // Interfaz para nueva venta (form)

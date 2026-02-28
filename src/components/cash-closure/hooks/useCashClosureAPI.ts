@@ -13,7 +13,7 @@
  */
 import { useState, useCallback } from 'react'
 import { useToast } from '@/hooks/use-toast'
-import { getApiBaseUrl } from '@/services/api'
+import { getApiBaseUrl, getAuthToken } from '@/services/api'
 import type { CashClosure, TheoreticalData, PaymentMethodBreakdown, Denomination } from '../types'
 
 // Use centralized API URL
@@ -29,11 +29,49 @@ interface SaveClosurePayload {
     startDate: string
     endDate: string
     cashierName: string
+    /** ID del usuario cajero (trazabilidad) */
+    cashierId?: string
     theoreticalData: TheoreticalData
     actualTotal: number
     notes: string
     paymentBreakdown: PaymentMethodBreakdown[]
     denominations: Denomination[]
+}
+
+/** Formato ISO (UTC) a YYYY-MM-DDTHH:mm:ss en zona Guatemala para inputs datetime-local */
+function toGuatemalaLocalISO(iso: string): string {
+    const d = new Date(iso)
+    const parts = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'America/Guatemala',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false
+    }).formatToParts(d)
+    const get = (type: string) => parts.find(p => p.type === type)?.value ?? ''
+    return `${get('year')}-${get('month')}-${get('day')}T${get('hour')}:${get('minute')}:${get('second')}`
+}
+
+/** Fin del día de hoy en Guatemala como YYYY-MM-DDTHH:mm:ss */
+function endOfTodayGuatemala(): string {
+    const now = new Date()
+    const parts = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'America/Guatemala',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+    }).formatToParts(now)
+    const get = (type: string) => parts.find(p => p.type === type)?.value ?? ''
+    return `${get('year')}-${get('month')}-${get('day')}T23:59:59`
+}
+
+interface LastClosureDateResponse {
+    last_end_date: string | null
+    last_closure_number: number
+    suggested_start: string
 }
 
 interface UseCashClosureAPIReturn {
@@ -46,10 +84,13 @@ interface UseCashClosureAPIReturn {
     closures: CashClosure[]
     currentPage: number
     totalPages: number
+    pageSize: number
+    setPageSize: (size: number) => void
     // Operations
-    calculateTheoretical: (startDate: string, endDate: string) => Promise<TheoreticalData | null>
+    getLastClosureDate: (scope: 'day' | 'mine') => Promise<{ suggestedStart: string; suggestedEnd: string } | null>
+    calculateTheoretical: (startDate: string, endDate: string, cashierId?: string) => Promise<TheoreticalData | null>
     saveClosure: (payload: SaveClosurePayload) => Promise<boolean>
-    fetchClosures: (page: number, isSeller: boolean) => Promise<void>
+    fetchClosures: (page: number, isSeller: boolean, pageSizeOverride?: number, filters?: { status?: string; startDate?: string; endDate?: string }) => Promise<void>
     fetchClosureDetail: (closureId: string) => Promise<CashClosure | null>
     approveClosure: (closureId: string, supervisorName: string) => Promise<CashClosure | null>
     rejectClosure: (closureId: string, reason: string) => Promise<CashClosure | null>
@@ -65,13 +106,29 @@ export const useCashClosureAPI = (): UseCashClosureAPIReturn => {
     const [closures, setClosures] = useState<CashClosure[]>([])
     const [currentPage, setCurrentPage] = useState(1)
     const [totalPages, setTotalPages] = useState(1)
+    const [pageSize, setPageSize] = useState(10)
 
     const getAuthHeaders = () => ({
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${localStorage.getItem('token')}`
+        'Authorization': `Bearer ${getAuthToken() ?? ''}`
     })
 
-    const calculateTheoretical = useCallback(async (startDate: string, endDate: string): Promise<TheoreticalData | null> => {
+    const getLastClosureDate = useCallback(async (scope: 'day' | 'mine'): Promise<{ suggestedStart: string; suggestedEnd: string } | null> => {
+        try {
+            const params = new URLSearchParams({ scope })
+            const response = await fetch(`${API_URL}/cash-closures/last-closure-date?${params.toString()}`, { headers: getAuthHeaders() })
+            if (!response.ok) return null
+            const data: LastClosureDateResponse = await response.json()
+            const suggestedStart = data.suggested_start ? toGuatemalaLocalISO(data.suggested_start) : ''
+            const suggestedEnd = endOfTodayGuatemala()
+            return { suggestedStart, suggestedEnd }
+        } catch (error) {
+            console.error('Error fetching last closure date:', error)
+            return null
+        }
+    }, [])
+
+    const calculateTheoretical = useCallback(async (startDate: string, endDate: string, cashierId?: string): Promise<TheoreticalData | null> => {
         setIsCalculating(true)
         try {
             // Validate stocks first
@@ -92,8 +149,13 @@ export const useCashClosureAPI = (): UseCashClosureAPIReturn => {
                 return null
             }
 
+            const params = new URLSearchParams({
+                start_date: startDate,
+                end_date: endDate
+            })
+            if (cashierId) params.set('cashier_id', cashierId)
             const response = await fetch(
-                `${API_URL}/cash-closures/calculate-theoretical?start_date=${encodeURIComponent(startDate)}&end_date=${encodeURIComponent(endDate)}`,
+                `${API_URL}/cash-closures/calculate-theoretical?${params.toString()}`,
                 { headers: getAuthHeaders() }
             )
 
@@ -102,10 +164,18 @@ export const useCashClosureAPI = (): UseCashClosureAPIReturn => {
             const data: TheoreticalData = await response.json()
             setTheoreticalData(data)
 
-            toast({
-                title: 'Cálculo completado',
-                description: `Total teórico: Q ${data.theoretical.net_total.toFixed(2)}`,
-            })
+            if (data.metrics.total_transactions === 0) {
+                toast({
+                    title: 'Sin ventas en el período',
+                    description: 'No hay ventas en el período seleccionado. Puedes guardar el cierre con total Q 0.00 si lo deseas.',
+                    variant: 'default',
+                })
+            } else {
+                toast({
+                    title: 'Cálculo completado',
+                    description: `Total teórico: Q ${data.theoretical.net_total.toFixed(2)} (${data.metrics.total_transactions} transacciones)`,
+                })
+            }
 
             return data
         } catch (error) {
@@ -124,7 +194,7 @@ export const useCashClosureAPI = (): UseCashClosureAPIReturn => {
     const saveClosure = useCallback(async (payload: SaveClosurePayload): Promise<boolean> => {
         setIsSaving(true)
         try {
-            const closureData = {
+            const closureData: Record<string, unknown> = {
                 startDate: payload.startDate,
                 endDate: payload.endDate,
                 cashierName: payload.cashierName,
@@ -142,6 +212,7 @@ export const useCashClosureAPI = (): UseCashClosureAPIReturn => {
                 paymentBreakdowns: payload.paymentBreakdown,
                 denominations: payload.denominations.filter(d => d.quantity > 0)
             }
+            if (payload.cashierId) closureData.cashierId = payload.cashierId
 
             const response = await fetch(`${API_URL}/cash-closures`, {
                 method: 'POST',
@@ -173,11 +244,16 @@ export const useCashClosureAPI = (): UseCashClosureAPIReturn => {
         }
     }, [toast])
 
-    const fetchClosures = useCallback(async (page: number, isSeller: boolean): Promise<void> => {
+    const fetchClosures = useCallback(async (page: number, isSeller: boolean, pageSizeOverride?: number, filters?: { status?: string; startDate?: string; endDate?: string }): Promise<void> => {
         setIsLoadingClosures(true)
+        const size = pageSizeOverride ?? (isSeller ? 1 : pageSize)
+        if (pageSizeOverride != null) setPageSize(pageSizeOverride)
         try {
-            const pageSize = isSeller ? 1 : 10
-            const response = await fetch(`${API_URL}/cash-closures?page=${page}&pageSize=${pageSize}`, {
+            const params = new URLSearchParams({ page: String(page), pageSize: String(size) })
+            if (filters?.status) params.set('status', filters.status)
+            if (filters?.startDate) params.set('startDate', filters.startDate)
+            if (filters?.endDate) params.set('endDate', filters.endDate)
+            const response = await fetch(`${API_URL}/cash-closures?${params.toString()}`, {
                 headers: getAuthHeaders()
             })
 
@@ -272,6 +348,9 @@ export const useCashClosureAPI = (): UseCashClosureAPIReturn => {
         closures,
         currentPage,
         totalPages,
+        pageSize,
+        setPageSize,
+        getLastClosureDate,
         calculateTheoretical,
         saveClosure,
         fetchClosures,
