@@ -77,7 +77,8 @@ export interface CashClosure {
     total_customers: number
     average_ticket: number | string
     notes: string | null
-    status: 'Pendiente' | 'Validado' | 'Cerrado'
+    /** Estados unificados: Pendiente / Aprobado / Rechazado. Validado/Cerrado solo legacy. */
+    status: 'Pendiente' | 'Aprobado' | 'Rechazado' | 'Validado' | 'Cerrado'
     created_at: string
     updated_at: string
     payment_breakdowns: PaymentMethodBreakdown[]

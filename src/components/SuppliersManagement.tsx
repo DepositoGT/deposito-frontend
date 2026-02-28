@@ -89,7 +89,7 @@ const SuppliersManagement = () => {
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
+  const [pageSize, setPageSize] = useState(18);
   const [viewMode, setViewMode] = useState<"table" | "cards">("cards");
   const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(null);
   const [isImportOpen, setIsImportOpen] = useState(false);
@@ -591,7 +591,7 @@ const SuppliersManagement = () => {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {[5, 10, 25, 50, 100].map((n) => (
+                    {[18, 22, 26, 30].map((n) => (
                       <SelectItem key={n} value={String(n)}>{n}</SelectItem>
                     ))}
                   </SelectContent>

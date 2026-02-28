@@ -20,6 +20,8 @@ interface UseCashClosureFormReturn {
     // Dates
     startDate: string
     endDate: string
+    setStartDate: (value: string) => void
+    setEndDate: (value: string) => void
     // Form data
     paymentBreakdown: PaymentMethodBreakdown[]
     denominations: Denomination[]
@@ -139,6 +141,8 @@ export const useCashClosureForm = (): UseCashClosureFormReturn => {
     return {
         startDate,
         endDate,
+        setStartDate,
+        setEndDate,
         paymentBreakdown,
         denominations,
         notes,

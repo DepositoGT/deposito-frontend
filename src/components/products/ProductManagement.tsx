@@ -59,7 +59,7 @@ const ProductManagement = () => {
 
     // Pagination
     const [currentPage, setCurrentPage] = useState(1)
-    const [pageSize, setPageSize] = useState(5) // Default page size
+    const [pageSize, setPageSize] = useState(18) // Default page size
 
     // Dialog states
     const [isViewProductOpen, setIsViewProductOpen] = useState(false)
@@ -542,7 +542,7 @@ const ProductManagement = () => {
                                             <SelectValue />
                                         </SelectTrigger>
                                         <SelectContent>
-                                            {[5, 10, 25, 50, 100].map((n) => (
+                                            {[18, 27, 36].map((n) => (
                                                 <SelectItem key={n} value={String(n)}>{n}</SelectItem>
                                             ))}
                                         </SelectContent>
