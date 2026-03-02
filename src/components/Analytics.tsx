@@ -26,8 +26,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useAnalytics } from "@/hooks/useAnalytics";
+import { useSystemSettings } from "@/hooks/useSystemSettings";
 
 const Analytics = () => {
+  const { locale, currencyCode } = useSystemSettings();
+  const formatCurrency = (n: number) =>
+    new Intl.NumberFormat(locale || 'es-GT', { style: 'currency', currency: currencyCode || 'GTQ', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n);
+  const formatNumber = (n: number) => (n ?? 0).toLocaleString(locale || 'es-GT');
+
   // Filtro de año desde 2025 hasta el actual, con opción "Todos"
   const currentYear = new Date().getFullYear();
   const initialYear = currentYear < 2025 ? 2025 : currentYear;
@@ -85,11 +91,11 @@ const Analytics = () => {
             <div className="flex items-center justify-between">
               <div className="flex-1">
                 <p className="text-sm text-muted-foreground">Ventas Netas</p>
-                <p className="text-2xl font-bold text-green-700">{isLoading ? '...' : (data?.totals.totalSales?.toLocaleString?.('es-GT', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) ?? '0.00')}</p>
+                <p className="text-2xl font-bold text-green-700">{isLoading ? '...' : formatCurrency(data?.totals?.totalSales ?? 0)}</p>
                 {data?.totals.totalReturns && data.totals.totalReturns > 0 && (
                   <div className="mt-1 flex flex-col gap-0.5">
-                    <p className="text-xs text-muted-foreground line-through">Q {data.totals.totalSalesGross?.toFixed(2)}</p>
-                    <p className="text-xs text-orange-600">(-) Dev: Q {data.totals.totalReturns.toFixed(2)}</p>
+                    <p className="text-xs text-muted-foreground line-through">{formatCurrency(data.totals.totalSalesGross ?? 0)}</p>
+                    <p className="text-xs text-orange-600">(-) Dev: {formatCurrency(data.totals.totalReturns)}</p>
                   </div>
                 )}
               </div>
@@ -125,7 +131,7 @@ const Analytics = () => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">Productos Vendidos</p>
-                <p className="text-2xl font-bold text-foreground">{isLoading ? '...' : (data?.totals.productsCount?.toLocaleString?.() ?? '0')}</p>
+                <p className="text-2xl font-bold text-foreground">{isLoading ? '...' : formatNumber(data?.totals?.productsCount ?? 0)}</p>
                 {/* removed mock growth badge */}
               </div>
               <div className="w-12 h-12 bg-muted rounded-lg flex items-center justify-center">
@@ -187,11 +193,11 @@ const Analytics = () => {
                     <div className="flex-1">
                       <div className="flex items-center justify-between mb-1">
                         <div className="flex flex-col">
-                          <span className="text-sm font-semibold text-green-700">Q {ventasNetas.toLocaleString()}</span>
+                          <span className="text-sm font-semibold text-green-700">{formatCurrency(ventasNetas)}</span>
                           {hasDevoluciones && (
                             <div className="flex gap-2 text-xs">
-                              <span className="text-muted-foreground line-through">Q {month.ventas.toFixed(2)}</span>
-                              <span className="text-orange-600">-Q {month.devoluciones.toFixed(2)}</span>
+                              <span className="text-muted-foreground line-through">{formatCurrency(month.ventas)}</span>
+                              <span className="text-orange-600">-{formatCurrency(month.devoluciones)}</span>
                             </div>
                           )}
                         </div>
@@ -228,7 +234,7 @@ const Analytics = () => {
                     <div className="text-sm text-muted-foreground">{product.category}</div>
                   </div>
                   <div className="text-right">
-                    <div className="font-medium text-foreground">Q {product.revenue.toLocaleString()}</div>
+                    <div className="font-medium text-foreground">{formatCurrency(product.revenue)}</div>
                     <div className="flex items-center justify-end">
                       <span className="text-sm text-muted-foreground mr-2">{product.ventas} unidades</span>
                       <TrendingUp className="w-3 h-3 text-liquor-gold" />

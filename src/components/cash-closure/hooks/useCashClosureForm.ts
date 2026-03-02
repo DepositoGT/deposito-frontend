@@ -15,6 +15,7 @@ import { useState, useCallback, useEffect } from 'react'
 import { useAuth } from '@/context/useAuth'
 import type { PaymentMethodBreakdown, Denomination, TheoreticalData } from '../types'
 import { GUATEMALAN_DENOMINATIONS, toNumber } from '../types'
+import { getDenominations } from '@/services/settingsService'
 
 interface UseCashClosureFormReturn {
     // Dates
@@ -59,6 +60,24 @@ export const useCashClosureForm = (): UseCashClosureFormReturn => {
     const [paymentBreakdown, setPaymentBreakdown] = useState<PaymentMethodBreakdown[]>([])
     const [denominations, setDenominations] = useState<Denomination[]>([...GUATEMALAN_DENOMINATIONS])
     const [notes, setNotes] = useState('')
+
+    // Load denominations from API (fallback to GUATEMALAN_DENOMINATIONS)
+    useEffect(() => {
+        let cancelled = false
+        getDenominations().then((list) => {
+            if (cancelled) return
+            if (list.length > 0) {
+                const mapped: Denomination[] = list.map((d) => ({
+                    denomination: d.denomination,
+                    type: d.type as 'Billete' | 'Moneda',
+                    quantity: 0,
+                    subtotal: 0,
+                }))
+                setDenominations(mapped)
+            }
+        }).catch(() => { /* keep default */ })
+        return () => { cancelled = true }
+    }, [])
 
     // Initialize dates for today
     useEffect(() => {
@@ -133,7 +152,7 @@ export const useCashClosureForm = (): UseCashClosureFormReturn => {
 
     const resetForm = useCallback(() => {
         setPaymentBreakdown([])
-        setDenominations([...GUATEMALAN_DENOMINATIONS])
+        setDenominations((prev) => prev.map((d) => ({ ...d, quantity: 0, subtotal: 0 })))
         setNotes('')
         initializeTodayDates()
     }, [initializeTodayDates])

@@ -10,6 +10,8 @@ import { Label } from '@/components/ui/label'
 import { ArrowLeft, Edit, QrCode, Check, ChevronsUpDown } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { useAuthPermissions } from '@/hooks/useAuthPermissions'
+import { useSystemSettings } from '@/hooks/useSystemSettings'
+import { formatMoney } from '@/utils'
 import type { Product } from '@/types'
 import { adaptApiProduct, fetchProductById, type ApiProduct } from '@/services/productService'
 import { Input } from '@/components/ui/input'
@@ -42,6 +44,8 @@ export default function ProductDetailPage() {
   const { hasPermission } = useAuthPermissions()
   const canEdit = hasPermission('products.edit')
   const canViewCost = hasPermission('products.create')
+  const { locale, currencyCode } = useSystemSettings()
+  const fmt = (n: number) => formatMoney(n, locale, currencyCode)
 
   const { data: suppliersData } = useSuppliers()
   const { data: categoriesData } = useCategories()
@@ -327,12 +331,12 @@ export default function ProductDetailPage() {
                     </div>
                     <div>
                       <Label className="text-muted-foreground">Precio de venta</Label>
-                      {isEditing && canEdit ? <Input type="number" value={editPrice} onChange={(e) => setEditPrice(e.target.value)} className="mt-1" /> : <p className="text-foreground font-medium">Q {product.price.toFixed(2)}</p>}
+                      {isEditing && canEdit ? <Input type="number" value={editPrice} onChange={(e) => setEditPrice(e.target.value)} className="mt-1" /> : <p className="text-foreground font-medium">{fmt(product.price)}</p>}
                     </div>
                     {canViewCost && (
                       <div>
                         <Label className="text-muted-foreground">Costo</Label>
-                        {isEditing && canEdit ? <Input type="number" value={editCost} onChange={(e) => setEditCost(e.target.value)} className="mt-1" /> : <p className="text-foreground font-medium">Q {product.cost.toFixed(2)}</p>}
+                        {isEditing && canEdit ? <Input type="number" value={editCost} onChange={(e) => setEditCost(e.target.value)} className="mt-1" /> : <p className="text-foreground font-medium">{fmt(product.cost)}</p>}
                       </div>
                     )}
                     <div>
@@ -433,11 +437,11 @@ export default function ProductDetailPage() {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
                     <div>
                       <span className="text-muted-foreground">Margen de ganancia:</span>
-                      <div className="font-medium">Q {(product.price - product.cost).toFixed(2)} ({product.price > 0 ? (((product.price - product.cost) / product.price) * 100).toFixed(1) : '0'}%)</div>
+                      <div className="font-medium">{fmt(product.price - product.cost)} ({product.price > 0 ? (((product.price - product.cost) / product.price) * 100).toFixed(1) : '0'}%)</div>
                     </div>
                     <div>
                       <span className="text-muted-foreground">Valor de inventario:</span>
-                      <div className="font-medium">Q {(product.stock * product.cost).toFixed(2)}</div>
+                      <div className="font-medium">{fmt(product.stock * product.cost)}</div>
                     </div>
                   </div>
                 </div>

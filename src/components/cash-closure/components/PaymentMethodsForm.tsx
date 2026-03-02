@@ -15,6 +15,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { useSystemSettings } from '@/hooks/useSystemSettings'
 import type { PaymentMethodBreakdown } from '../types'
 import { formatCurrency, toNumber } from '../types'
 
@@ -24,6 +25,7 @@ interface PaymentMethodsFormProps {
 }
 
 export const PaymentMethodsForm = ({ paymentBreakdown, onUpdateAmount }: PaymentMethodsFormProps) => {
+    const { currencyCode, locale } = useSystemSettings()
     return (
         <div className="space-y-4">
             <h3 className="font-semibold">Desglose por Método de Pago</h3>
@@ -34,14 +36,14 @@ export const PaymentMethodsForm = ({ paymentBreakdown, onUpdateAmount }: Payment
                             <div className="flex items-center justify-between">
                                 <h4 className="font-medium">{item.payment_method_name}</h4>
                                 <Badge variant={toNumber(item.difference) === 0 ? 'default' : toNumber(item.difference) > 0 ? 'secondary' : 'destructive'}>
-                                    {toNumber(item.difference) >= 0 ? '+' : ''}{formatCurrency(item.difference)}
+                                    {toNumber(item.difference) >= 0 ? '+' : ''}{formatCurrency(item.difference, currencyCode, locale)}
                                 </Badge>
                             </div>
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div>
                                     <Label className="text-muted-foreground">Teórico</Label>
-                                    <p className="text-lg font-semibold">{formatCurrency(item.theoretical_amount)}</p>
+                                    <p className="text-lg font-semibold">{formatCurrency(item.theoretical_amount, currencyCode, locale)}</p>
                                     <p className="text-sm text-muted-foreground">{item.theoretical_count} transacciones</p>
                                 </div>
                                 <div className="space-y-2">

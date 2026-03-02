@@ -8,17 +8,23 @@
  * For licensing inquiries: GitHub @dpatzan2
  */
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLogin } from "@/hooks/useLogin";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Lock, Mail } from "lucide-react";
+import { getCompanyNamePublic } from "@/services/settingsService";
 
 const Login = () => {
   const { mutateAsync, isPending, error } = useLogin();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [companyName, setCompanyName] = useState("Deposito");
+
+  useEffect(() => {
+    getCompanyNamePublic().then((d) => setCompanyName(d.company_name));
+  }, []);
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -29,7 +35,7 @@ const Login = () => {
     <div className="min-h-screen flex items-center justify-center bg-background px-4">
       <Card className="w-full max-w-sm border-border">
         <CardHeader>
-          <CardTitle className="text-center text-2xl">Deposito</CardTitle>
+          <CardTitle className="text-center text-2xl">{companyName}</CardTitle>
           <p className="text-sm text-muted-foreground text-center">Accede a tu cuenta</p>
         </CardHeader>
         <CardContent>

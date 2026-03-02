@@ -21,6 +21,8 @@ import {
 import { ChevronsUpDown, Check, Loader2 } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
 import { fetchAllProducts } from '@/services/productService'
+import { useSystemSettings } from '@/hooks/useSystemSettings'
+import { formatMoney } from '@/utils'
 import { cn } from '@/lib/utils'
 
 export interface ProductComboboxProps {
@@ -42,6 +44,7 @@ function useProducts() {
 export const ProductCombobox = ({ value, onChange, placeholder, label, icon }: ProductComboboxProps) => {
   const [open, setOpen] = useState(false)
   const [search, setSearch] = useState('')
+  const { locale, currencyCode } = useSystemSettings()
   const { data: products = [], isLoading } = useProducts()
 
   const filteredProducts = useMemo(() => {
@@ -119,7 +122,7 @@ export const ProductCombobox = ({ value, onChange, placeholder, label, icon }: P
                     <div className="flex flex-col">
                       <span className="font-medium">{product.name}</span>
                       <span className="text-xs text-muted-foreground">
-                        Q{product.price?.toFixed(2) ?? '0.00'} • {product.category ?? '-'}
+                        {formatMoney(product.price ?? 0, locale, currencyCode)} • {product.category ?? '-'}
                       </span>
                     </div>
                   </CommandItem>

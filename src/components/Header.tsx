@@ -14,11 +14,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/context/useAuth";
 import { useNavigate } from "react-router-dom";
+import { useSystemSettings } from "@/hooks/useSystemSettings";
 
 const Header = () => {
   const [hasAlerts, setHasAlerts] = useState(true);
   const { logout } = useAuth();
   const navigate = useNavigate();
+  const { companyName } = useSystemSettings();
 
   const handleLogout = () => {
     logout();
@@ -34,7 +36,7 @@ const Header = () => {
             <Wine className="w-6 h-6" />
           </div>
           <div>
-            <h1 className="text-xl font-bold text-foreground">Deposito</h1>
+            <h1 className="text-xl font-bold text-foreground">{companyName}</h1>
             <p className="text-sm text-muted-foreground"> © Sistema de Inventario todos los derechos reservados ©</p>
           </div>
         </div>

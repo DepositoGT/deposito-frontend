@@ -11,6 +11,7 @@
 /**
  * TheoreticalSummary - Display theoretical closure summary
  */
+import { useSystemSettings } from '@/hooks/useSystemSettings'
 import type { TheoreticalData } from '../types'
 import { formatCurrency } from '../types'
 
@@ -19,21 +20,22 @@ interface TheoreticalSummaryProps {
 }
 
 export const TheoreticalSummary = ({ data }: TheoreticalSummaryProps) => {
+    const { currencyCode, locale } = useSystemSettings()
     return (
         <div className="border rounded-lg p-4 bg-muted/50">
             <h3 className="font-semibold mb-3">Resumen Teórico</h3>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                 <div>
                     <p className="text-sm text-muted-foreground">Total Teórico</p>
-                    <p className="text-lg font-bold">{formatCurrency(data.theoretical.net_total)}</p>
+                    <p className="text-lg font-bold">{formatCurrency(data.theoretical.net_total, currencyCode, locale)}</p>
                 </div>
                 <div>
                     <p className="text-sm text-muted-foreground">Ventas Brutas</p>
-                    <p className="text-lg font-semibold">{formatCurrency(data.theoretical.total_sales)}</p>
+                    <p className="text-lg font-semibold">{formatCurrency(data.theoretical.total_sales, currencyCode, locale)}</p>
                 </div>
                 <div>
                     <p className="text-sm text-muted-foreground">Devoluciones</p>
-                    <p className="text-lg font-semibold text-red-600">-{formatCurrency(data.theoretical.total_returns)}</p>
+                    <p className="text-lg font-semibold text-red-600">-{formatCurrency(data.theoretical.total_returns, currencyCode, locale)}</p>
                 </div>
                 <div>
                     <p className="text-sm text-muted-foreground">Transacciones</p>
@@ -45,7 +47,7 @@ export const TheoreticalSummary = ({ data }: TheoreticalSummaryProps) => {
                 </div>
                 <div>
                     <p className="text-sm text-muted-foreground">Ticket Promedio</p>
-                    <p className="text-lg font-semibold">{formatCurrency(data.metrics.average_ticket)}</p>
+                    <p className="text-lg font-semibold">{formatCurrency(data.metrics.average_ticket, currencyCode, locale)}</p>
                 </div>
             </div>
         </div>

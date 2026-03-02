@@ -10,19 +10,23 @@
 
 /**
  * MainLayout - Layout wrapper for authenticated pages
- * Includes TopBar and content area
+ * Includes TopBar and content area.
+ * SystemSettingsProvider hace una sola petición GET /settings/public compartida por toda la app privada.
  */
 import { Outlet } from 'react-router-dom'
 import { TopBar } from './TopBar'
+import { SystemSettingsProvider } from '@/context/SystemSettingsContext'
 
 export const MainLayout = () => {
     return (
-        <div className='min-h-screen bg-background flex flex-col'>
-            <TopBar />
-            <main className='flex-1 overflow-auto'>
-                <Outlet />
-            </main>
-        </div>
+        <SystemSettingsProvider>
+            <div className='min-h-screen bg-background flex flex-col'>
+                <TopBar />
+                <main className='flex-1 overflow-auto'>
+                    <Outlet />
+                </main>
+            </div>
+        </SystemSettingsProvider>
     )
 }
 

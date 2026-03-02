@@ -57,6 +57,7 @@ import PromotionsManagement from "@/components/PromotionsManagement";
 import PromotionCreatePage from "@/components/promotions/PromotionCreatePage";
 import PromotionEditPage from "@/components/promotions/PromotionEditPage";
 import IncomingMerchandiseManagement from "@/components/IncomingMerchandiseManagement";
+import ConfigManagement from "@/components/config/ConfigManagement";
 
 const queryClient = new QueryClient();
 
@@ -370,6 +371,16 @@ const App = () => (
                   element={
                     <PermissionRoute any={["roles.manage"]}>
                       <RolePermissionsDetail />
+                    </PermissionRoute>
+                  }
+                />
+
+                {/* Configuración del sistema */}
+                <Route
+                  path="/configuracion"
+                  element={
+                    <PermissionRoute any={["settings.view", "settings.manage"]}>
+                      <ConfigManagement />
                     </PermissionRoute>
                   }
                 />

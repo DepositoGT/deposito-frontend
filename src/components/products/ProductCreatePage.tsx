@@ -21,6 +21,7 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { ArrowLeft, Package, QrCode, Image as ImageIcon, Check, ChevronsUpDown } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
+import { useSystemSettings } from '@/hooks/useSystemSettings'
 import { useProductForm } from './hooks'
 import { useCreateProduct } from '@/hooks/useCreateProduct'
 import { useCategories } from '@/hooks/useCategories'
@@ -37,6 +38,15 @@ type CategoryItem = { id: string | number; name: string }
 export default function ProductCreatePage() {
   const navigate = useNavigate()
   const { toast } = useToast()
+  const { locale, currencyCode } = useSystemSettings()
+  const currencySymbol = useMemo(() => {
+    try {
+      const parts = new Intl.NumberFormat(locale || 'es-GT', { style: 'currency', currency: currencyCode || 'GTQ' }).formatToParts(0)
+      return parts.find((p) => p.type === 'currency')?.value ?? currencyCode ?? 'Q'
+    } catch {
+      return currencyCode || 'Q'
+    }
+  }, [locale, currencyCode])
   const productForm = useProductForm()
   const createProductMutation = useCreateProduct()
   const { data: categoriesData } = useCategories()
@@ -274,13 +284,13 @@ export default function ProductCreatePage() {
                   <div>
                     <Label className="text-muted-foreground">Precio de Venta *</Label>
                     <div className="relative mt-1">
-                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">Q</span>
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground min-w-[3.5rem]">{currencySymbol}</span>
                       <Input
                         type="number"
                         placeholder="0.00"
                         value={formData.price}
                         onChange={(e) => onFormChange('price', e.target.value)}
-                        className="pl-10"
+                        className="pl-[4.5rem]"
                         step="0.01"
                       />
                     </div>
@@ -288,13 +298,13 @@ export default function ProductCreatePage() {
                   <div>
                     <Label className="text-muted-foreground">Costo</Label>
                     <div className="relative mt-1">
-                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">Q</span>
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground min-w-[3.5rem]">{currencySymbol}</span>
                       <Input
                         type="number"
                         placeholder="0.00"
                         value={formData.cost}
                         onChange={(e) => onFormChange('cost', e.target.value)}
-                        className="pl-10"
+                        className="pl-[4.5rem]"
                         step="0.01"
                       />
                     </div>

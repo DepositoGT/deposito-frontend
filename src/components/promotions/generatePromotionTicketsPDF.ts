@@ -40,15 +40,23 @@ interface TicketOptions {
     promotion: Promotion
     terms: string
     logoBase64?: string
+    locale?: string
+    currencyCode?: string
 }
 
 /**
  * Format promotion value for display
  */
-const formatPromoValue = (promo: Promotion): string => {
+const formatPromoValue = (promo: Promotion, locale?: string, currencyCode?: string): string => {
     const typeName = promo.type?.name
     if (typeName === 'PERCENTAGE') return `${promo.discount_percentage}% OFF`
-    if (typeName === 'FIXED_AMOUNT') return `Q${promo.discount_value} OFF`
+    if (typeName === 'FIXED_AMOUNT') {
+        const n = Number(promo.discount_value)
+        const formatted = Number.isFinite(n)
+            ? new Intl.NumberFormat(locale || 'es-GT', { style: 'currency', currency: currencyCode || 'GTQ', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n)
+            : `${promo.discount_value}`
+        return `${formatted} OFF`
+    }
     if (typeName === 'BUY_X_GET_Y') return `${promo.buy_quantity}x${(promo.buy_quantity || 0) - (promo.get_quantity || 0)}`
     if (typeName === 'MIN_QTY_DISCOUNT') return `${promo.min_quantity}+ = ${promo.discount_percentage}%`
     if (typeName === 'FREE_GIFT') return '🎁 REGALO'
@@ -59,9 +67,9 @@ const formatPromoValue = (promo: Promotion): string => {
 /**
  * Format date for display
  */
-const formatDate = (dateStr?: string): string => {
+const formatDate = (dateStr?: string, locale?: string): string => {
     if (!dateStr) return 'Sin fecha de expiración'
-    return new Date(dateStr).toLocaleDateString('es-GT', {
+    return new Date(dateStr).toLocaleDateString(locale || 'es-GT', {
         year: 'numeric',
         month: 'long',
         day: 'numeric'
@@ -80,7 +88,9 @@ const drawTicket = (
     code: string,
     promotion: Promotion,
     terms: string,
-    logoBase64?: string
+    logoBase64?: string,
+    locale?: string,
+    currencyCode?: string
 ) => {
     const padding = 10
     const innerWidth = width - (padding * 2)
@@ -127,7 +137,7 @@ const drawTicket = (
     doc.setFontSize(14)
     doc.setFont('helvetica', 'bold')
     doc.setTextColor(211, 84, 0) // Orange color
-    const promoValue = formatPromoValue(promotion)
+    const promoValue = formatPromoValue(promotion, locale, currencyCode)
     doc.text(promoValue, x + width - padding - innerMargin, currentY + 5, { align: 'right' })
 
     currentY += 20
@@ -196,7 +206,7 @@ const drawTicket = (
     doc.setFont('helvetica', 'normal')
     doc.setTextColor(100, 100, 100)
     const expiryText = promotion.end_date
-        ? `Válido hasta: ${formatDate(promotion.end_date)}`
+        ? `Válido hasta: ${formatDate(promotion.end_date, locale)}`
         : 'Sin fecha de expiración'
     doc.text(expiryText, x + width / 2, currentY, { align: 'center' })
 
@@ -214,7 +224,7 @@ const drawTicket = (
  * Tickets are arranged in a 2-column grid
  */
 export const generatePromotionTicketsPDF = (options: TicketOptions) => {
-    const { codes, promotion, terms, logoBase64 } = options
+    const { codes, promotion, terms, logoBase64, locale = 'es-GT', currencyCode = 'GTQ' } = options
 
     if (codes.length === 0) return
 
@@ -245,7 +255,7 @@ export const generatePromotionTicketsPDF = (options: TicketOptions) => {
         const x = margin + (col * (ticketWidth + gapX))
         const y = margin + (row * (ticketHeight + gapY))
 
-        drawTicket(doc, x, y, ticketWidth, ticketHeight, codeObj.code, promotion, terms, logoBase64)
+        drawTicket(doc, x, y, ticketWidth, ticketHeight, codeObj.code, promotion, terms, logoBase64, locale, currencyCode)
     })
 
     // Save the PDF

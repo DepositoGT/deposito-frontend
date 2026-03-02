@@ -46,12 +46,16 @@ import { Pagination } from '@/components/shared/Pagination'
 // Feature imports
 import { ImportDialog } from './components'
 import { useAuthPermissions } from '@/hooks/useAuthPermissions'
+import { useSystemSettings } from '@/hooks/useSystemSettings'
 import { useNavigate } from 'react-router-dom'
+import { formatMoney } from '@/utils'
 
 const ProductManagement = () => {
     const navigate = useNavigate()
     const { toast } = useToast()
     const { hasPermission } = useAuthPermissions()
+    const { locale, currencyCode } = useSystemSettings()
+    const fmt = (n: number) => formatMoney(n, locale, currencyCode)
 
     // Filter state
     const [searchTerm, setSearchTerm] = useState('')
@@ -427,9 +431,9 @@ const ProductManagement = () => {
                                                         <div className="text-xs text-muted-foreground">Min: {product.minStock}</div>
                                                     </td>
                                                     <td className="p-3 text-right">
-                                                        <div className="font-medium text-foreground">Q {product.price.toFixed(2)}</div>
+                                                        <div className="font-medium text-foreground">{fmt(product.price)}</div>
                                                         {canCreate && (
-                                                            <div className="text-xs text-muted-foreground">Costo: Q {product.cost.toFixed(2)}</div>
+                                                            <div className="text-xs text-muted-foreground">Costo: {fmt(product.cost)}</div>
                                                         )}
                                                     </td>
                                                     <td className="p-3 text-center">{getStatusBadge(product)}</td>
@@ -496,10 +500,10 @@ const ProductManagement = () => {
                                             <div className="mt-3 flex items-center justify-between text-sm">
                                                 <div>
                                                     <div className="text-xs text-muted-foreground">Precio</div>
-                                                    <div className="font-semibold text-primary">Q {product.price.toFixed(2)}</div>
+                                                    <div className="font-semibold text-primary">{fmt(product.price)}</div>
                                                     {canCreate && (
                                                         <div className="text-[11px] text-muted-foreground">
-                                                            Costo: Q {product.cost.toFixed(2)}
+                                                            Costo: {fmt(product.cost)}
                                                         </div>
                                                     )}
                                                 </div>

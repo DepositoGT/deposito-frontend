@@ -13,6 +13,7 @@
  */
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
+import { useSystemSettings } from '@/hooks/useSystemSettings'
 import type { Denomination } from '../types'
 import { formatCurrency, toNumber } from '../types'
 
@@ -27,6 +28,7 @@ export const DenominationsCounter = ({
     onUpdateQuantity,
     cashTotal
 }: DenominationsCounterProps) => {
+    const { currencyCode, locale } = useSystemSettings()
     return (
         <div className="space-y-4">
             <h3 className="font-semibold">Conteo de Efectivo</h3>
@@ -51,12 +53,12 @@ export const DenominationsCounter = ({
                                     placeholder="0"
                                     className="h-8"
                                 />
-                                <div className="font-semibold">{formatCurrency(denom.subtotal)}</div>
+                                <div className="font-semibold">{formatCurrency(denom.subtotal, currencyCode, locale)}</div>
                             </div>
                         ))}
                         <div className="border-t pt-3 mt-3 flex justify-between items-center">
                             <span className="font-semibold">Total Efectivo Contado:</span>
-                            <span className="text-xl font-bold">{formatCurrency(cashTotal)}</span>
+                            <span className="text-xl font-bold">{formatCurrency(cashTotal, currencyCode, locale)}</span>
                         </div>
                     </div>
                 </CardContent>

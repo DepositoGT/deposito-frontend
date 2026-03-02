@@ -34,6 +34,7 @@ import { Calculator, FileText, User, Save } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { useAuth } from '@/context/useAuth'
 import { useAuthPermissions } from '@/hooks/useAuthPermissions'
+import { useSystemSettings } from '@/hooks/useSystemSettings'
 
 // Feature imports
 import { useCashClosureForm, useCashClosureAPI } from './hooks'
@@ -53,8 +54,8 @@ const CashClosureManagement = () => {
     const { toast } = useToast()
     const { user } = useAuth()
     const { hasPermission } = useAuthPermissions()
+    const { companyName, currencyCode, locale, cashClosureMaxDiffPct } = useSystemSettings()
 
-    // Hooks
     const form = useCashClosureForm()
     const api = useCashClosureAPI()
 
@@ -141,9 +142,8 @@ const CashClosureManagement = () => {
         }
 
         const theoreticalTotal = api.theoreticalData.theoretical.net_total
-        const difference = form.getTotalDifference(theoreticalTotal)
         const differencePct = form.getDifferencePercentage(theoreticalTotal)
-        const isLargeDifference = theoreticalTotal > 0 && (Math.abs(differencePct) > 5 || Math.abs(difference) > 100)
+        const isLargeDifference = theoreticalTotal > 0 && Math.abs(differencePct) > cashClosureMaxDiffPct
 
         if (isLargeDifference) {
             setShowConfirmSaveDialog(true)
@@ -193,7 +193,7 @@ const CashClosureManagement = () => {
 
     const handleDownloadPDF = () => {
         if (selectedClosure) {
-            generateClosurePDF(selectedClosure)
+            generateClosurePDF(selectedClosure, companyName, currencyCode, locale)
             toast({ title: 'PDF Generado', description: `Cierre #${selectedClosure.closure_number} descargado` })
         }
     }
@@ -234,7 +234,7 @@ const CashClosureManagement = () => {
                                 <div>
                                     <p className="text-xs text-muted-foreground mb-0.5">Fecha</p>
                                     <p className="text-sm font-medium">
-                                        {new Date().toLocaleDateString('es-GT', {
+                                        {new Date().toLocaleDateString(locale || 'es-GT', {
                                             weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
                                         })}
                                     </p>
@@ -314,7 +314,10 @@ const CashClosureManagement = () => {
                                 actualTotal={form.getActualTotal()}
                                 difference={form.getTotalDifference(api.theoreticalData.theoretical.net_total)}
                                 differencePercentage={form.getDifferencePercentage(api.theoreticalData.theoretical.net_total)}
+                                currencyCode={currencyCode}
+                                locale={locale}
                             />
+
 
                             <div className="border rounded-lg p-4 bg-muted/50">
                                 <div className="flex items-center gap-2">
@@ -463,13 +466,12 @@ const CashClosureManagement = () => {
                     <AlertDialogHeader>
                         <AlertDialogTitle>Diferencia significativa</AlertDialogTitle>
                         <AlertDialogDescription>
-                            La diferencia entre el total contado y el teórico es grande
+                            La diferencia supera el {cashClosureMaxDiffPct}% configurado.
                             {api.theoreticalData && (
                                 <>
                                     {' '}
-                                    ({form.getTotalDifference(api.theoreticalData.theoretical.net_total) >= 0 ? '+' : ''}
-                                    Q {form.getTotalDifference(api.theoreticalData.theoretical.net_total).toFixed(2)} /{' '}
-                                    {form.getDifferencePercentage(api.theoreticalData.theoretical.net_total).toFixed(1)}%).
+                                    Diferencia: {form.getTotalDifference(api.theoreticalData.theoretical.net_total) >= 0 ? '+' : ''}
+                                    {new Intl.NumberFormat(locale || 'es-GT', { style: 'currency', currency: currencyCode || 'GTQ' }).format(form.getTotalDifference(api.theoreticalData.theoretical.net_total))} ({form.getDifferencePercentage(api.theoreticalData.theoretical.net_total).toFixed(1)}%).
                                 </>
                             )}
                             {' '}

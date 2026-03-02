@@ -19,6 +19,7 @@ import {
   SelectValue
 } from '@/components/ui/select'
 import { useToast } from '@/hooks/use-toast'
+import { useSystemSettings } from '@/hooks/useSystemSettings'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { apiFetch } from '@/services/api'
 import { getFriendlyTypeName } from './getFriendlyTypeName'
@@ -71,6 +72,8 @@ export default function PromotionCreatePage() {
   const navigate = useNavigate()
   const { toast } = useToast()
   const queryClient = useQueryClient()
+  const { currencyCode } = useSystemSettings()
+  const currencyLabel = currencyCode || 'Q'
 
   const [formData, setFormData] = useState(defaultFormData)
   const [codeMode, setCodeMode] = useState<'auto' | 'manual'>('auto')
@@ -456,7 +459,7 @@ export default function PromotionCreatePage() {
 
               {selectedType?.name === 'FIXED_AMOUNT' && (
                 <div>
-                  <Label htmlFor="discount_value">Monto de descuento (Q) *</Label>
+                  <Label htmlFor="discount_value">Monto de descuento ({currencyLabel}) *</Label>
                   <Input
                     id="discount_value"
                     type="number"
@@ -644,7 +647,7 @@ export default function PromotionCreatePage() {
                 />
               </div>
               <div>
-                <Label htmlFor="min_purchase">Compra mínima (Q)</Label>
+                <Label htmlFor="min_purchase">Compra mínima ({currencyLabel})</Label>
                 <Input
                   id="min_purchase"
                   type="number"

@@ -56,6 +56,7 @@ import {
     AlertDialogTrigger
 } from './ui/alert-dialog'
 import { useToast } from '@/hooks/use-toast'
+import { useSystemSettings } from '@/hooks/useSystemSettings'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { apiFetch } from '@/services/api'
 import { generatePromotionTicketsPDF } from './promotions/generatePromotionTicketsPDF'
@@ -141,6 +142,7 @@ const PromotionsManagement = () => {
     const navigate = useNavigate()
     const { toast } = useToast()
     const queryClient = useQueryClient()
+    const { locale, currencyCode } = useSystemSettings()
     const [searchTerm, setSearchTerm] = useState('')
     const [codesDialog, setCodesDialog] = useState<CodesDialogState>({ open: false })
 
@@ -207,7 +209,13 @@ const PromotionsManagement = () => {
     const formatPromoValue = (promo: Promotion) => {
         const typeName = promo.type?.name
         if (typeName === 'PERCENTAGE') return `${promo.discount_percentage}% OFF`
-        if (typeName === 'FIXED_AMOUNT') return `Q${promo.discount_value} OFF`
+        if (typeName === 'FIXED_AMOUNT') {
+            const n = Number(promo.discount_value)
+            const formatted = Number.isFinite(n)
+                ? new Intl.NumberFormat(locale || 'es-GT', { style: 'currency', currency: currencyCode || 'GTQ', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n)
+                : String(promo.discount_value)
+            return `${formatted} OFF`
+        }
         if (typeName === 'BUY_X_GET_Y') return `${promo.buy_quantity}x${(promo.buy_quantity || 0) - (promo.get_quantity || 0)}`
         if (typeName === 'MIN_QTY_DISCOUNT') return `${promo.min_quantity}+ = ${promo.discount_percentage}%`
         if (typeName === 'FREE_GIFT') return '🎁 Regalo'
@@ -421,7 +429,9 @@ const CodesDialog = ({ dialog, setDialog, onCopyCode }: CodesDialogProps) => {
         generatePromotionTicketsPDF({
             codes: codesToExport,
             promotion: promotion,
-            terms: termsText
+            terms: termsText,
+            locale,
+            currencyCode
         })
     }
 

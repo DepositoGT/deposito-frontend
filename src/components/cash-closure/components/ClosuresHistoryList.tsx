@@ -14,6 +14,7 @@
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Eye, ChevronLeft, ChevronRight } from 'lucide-react'
+import { useSystemSettings } from '@/hooks/useSystemSettings'
 import type { CashClosure } from '../types'
 import { formatCurrency, formatDateTime, toNumber } from '../types'
 
@@ -47,6 +48,7 @@ export const ClosuresHistoryList = ({
     onViewClosure,
     onPageChange
 }: ClosuresHistoryListProps) => {
+    const { currencyCode, locale } = useSystemSettings()
     if (isLoading) {
         return <p className="text-center text-muted-foreground py-8">Cargando...</p>
     }
@@ -75,9 +77,9 @@ export const ClosuresHistoryList = ({
                         </div>
                         <div className="flex items-center gap-4">
                             <div className="text-right">
-                                <p className="font-bold">{formatCurrency(closure.actual_total)}</p>
+                                <p className="font-bold">{formatCurrency(closure.actual_total, currencyCode, locale)}</p>
                                 <p className={`text-sm ${toNumber(closure.difference) === 0 ? 'text-green-600' : toNumber(closure.difference) > 0 ? 'text-orange-600' : 'text-red-600'}`}>
-                                    {toNumber(closure.difference) >= 0 ? '+' : ''}{formatCurrency(closure.difference)}
+                                    {toNumber(closure.difference) >= 0 ? '+' : ''}{formatCurrency(closure.difference, currencyCode, locale)}
                                 </p>
                             </div>
                             <Button variant="outline" size="sm" onClick={() => onViewClosure(closure.id)}>

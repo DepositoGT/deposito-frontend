@@ -28,6 +28,7 @@ import {
 import { AppLauncher } from './AppLauncher'
 import { appModules, getUserRole } from '@/config/appModules'
 import { useCriticalProducts } from '@/hooks/useCriticalProducts'
+import { useSystemSettings } from '@/hooks/useSystemSettings'
 import { useAuth } from '@/context/useAuth'
 import type { User as UserType } from '@/services/userService'
 import type { AuthUser } from '@/context/AuthContext'
@@ -41,6 +42,7 @@ export const TopBar = () => {
     const navigate = useNavigate()
     const { user: roleUser } = getUserRole()
     const { user: authUser, logout } = useAuth()
+    const { companyName } = useSystemSettings()
 
     // Obtener el usuario completo del contexto de autenticación
     const currentUser: CurrentUser = authUser || (roleUser as AuthUser | UserType | null)
@@ -78,7 +80,7 @@ export const TopBar = () => {
                     <div className='w-7 h-7 sm:w-8 sm:h-8 bg-primary rounded-lg flex items-center justify-center'>
                         <span className='text-primary-foreground font-bold text-xs sm:text-sm'>D</span>
                     </div>
-                    <span className='font-semibold text-base sm:text-lg hidden xs:inline'>Deposito</span>
+                    <span className='font-semibold text-base sm:text-lg hidden xs:inline'>{companyName}</span>
                 </div>
 
                 {/* Current Module Name - Hidden on mobile */}
