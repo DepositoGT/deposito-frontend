@@ -27,6 +27,7 @@ import { DashboardStat, RecentProduct } from "@/types";
 import useCriticalProducts from "@/hooks/useCriticalProducts";
 import useDashboardStats from "@/hooks/useDashboardStats";
 import { useAuthPermissions } from "@/hooks/useAuthPermissions";
+import { useSystemSettings } from "@/hooks/useSystemSettings";
 
 interface DashboardProps {
   onSectionChange?: (section: string) => void;
@@ -36,6 +37,7 @@ const Dashboard = ({ onSectionChange }: DashboardProps) => {
   const navigate = useNavigate();
   const { data: statsData, isLoading: statsLoading } = useDashboardStats();
   const { hasPermission } = useAuthPermissions();
+  const { companyName, currencyCode, locale } = useSystemSettings();
 
   const canViewAnalytics = hasPermission("analytics.view");
   const canViewReports = hasPermission("reports.view");
@@ -43,11 +45,15 @@ const Dashboard = ({ onSectionChange }: DashboardProps) => {
   const canCreateSales = hasPermission("sales.create");
   const canViewAlerts = hasPermission("alerts.view", "alerts.manage");
 
+  const loc = locale || 'es-GT'
+  const formatStatCurrency = (n: number) => new Intl.NumberFormat(loc, { style: 'currency', currency: currencyCode || 'GTQ', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n)
+  const formatStatNumber = (n: number) => n.toLocaleString(loc)
+
   // Formatear estadísticas desde la API
   const stats: DashboardStat[] = [
     {
       title: "Ventas Hoy",
-      value: statsData ? `Q ${statsData.ventasHoy.valor.toLocaleString('es-GT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "Q 0.00",
+      value: statsData ? formatStatCurrency(statsData.ventasHoy.valor) : formatStatCurrency(0),
       change: statsData ? `${statsData.ventasHoy.cambio > 0 ? '+' : ''}${statsData.ventasHoy.cambio}%` : "+0%",
       trending: statsData && statsData.ventasHoy.cambio >= 0 ? "up" : "down",
       icon: DollarSign,
@@ -55,7 +61,7 @@ const Dashboard = ({ onSectionChange }: DashboardProps) => {
     },
     {
       title: "Productos en Stock",
-      value: statsData ? statsData.productosEnStock.cantidad.toLocaleString('es-GT') : "0",
+      value: statsData ? formatStatNumber(statsData.productosEnStock.cantidad) : "0",
       change: statsData ? `${statsData.productosEnStock.cambio > 0 ? '+' : ''}${statsData.productosEnStock.cambio}%` : "0%",
       trending: statsData && statsData.productosEnStock.cambio >= 0 ? "up" : "down",
       icon: Package,
@@ -63,7 +69,7 @@ const Dashboard = ({ onSectionChange }: DashboardProps) => {
     },
     {
       title: "Valor Inventario",
-      value: statsData ? `Q ${statsData.valorInventario.valor.toLocaleString('es-GT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "Q 0.00",
+      value: statsData ? formatStatCurrency(statsData.valorInventario.valor) : formatStatCurrency(0),
       change: statsData ? `${statsData.valorInventario.cambio > 0 ? '+' : ''}${statsData.valorInventario.cambio}%` : "+0%",
       trending: statsData && statsData.valorInventario.cambio >= 0 ? "up" : "down",
       icon: TrendingUp,
@@ -135,7 +141,7 @@ const Dashboard = ({ onSectionChange }: DashboardProps) => {
         <div className="absolute inset-0 bg-black/40" />
         <div className="absolute inset-0 flex items-center justify-between p-8">
           <div className="text-white">
-            <h2 className="text-3xl font-bold mb-2">Bienvenido a Deposito</h2>
+            <h2 className="text-3xl font-bold mb-2">Bienvenido a {companyName}</h2>
             <p className="text-lg opacity-90">Control total de tu inventario de licores</p>
             <div className="flex items-center mt-4 space-x-4">
               <Badge variant="secondary" className="bg-liquor-gold text-liquor-bronze">

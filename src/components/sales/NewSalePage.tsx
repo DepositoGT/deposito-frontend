@@ -23,9 +23,12 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { ArrowLeft, Plus, Receipt, Search, ChevronLeft, ChevronRight } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
-import { useAllProducts } from '@/hooks/useProducts'
+import { useQueryClient } from '@tanstack/react-query'
+import { useAllProducts, PRODUCTS_QUERY_KEY } from '@/hooks/useProducts'
 import { usePaymentMethods, PaymentMethod as PaymentMethodType } from '@/hooks/usePaymentMethods'
 import { useAuthPermissions } from '@/hooks/useAuthPermissions'
+import { useSystemSettings } from '@/hooks/useSystemSettings'
+import { formatMoney } from '@/utils'
 import { createSale } from '@/services/saleService'
 import type { Product } from '@/types/product'
 
@@ -42,10 +45,12 @@ const ProductCard = ({
   product,
   onAdd,
   disabled,
+  formatPrice,
 }: {
   product: Product
   onAdd: () => void
   disabled?: boolean
+  formatPrice: (n: number) => string
 }) => (
   <Card className="overflow-hidden transition-shadow hover:shadow-md">
     <div className="aspect-square bg-muted relative">
@@ -66,7 +71,7 @@ const ProductCard = ({
         {product.name}
       </p>
       <p className="text-xs text-muted-foreground">
-        Q {Number(product.price).toFixed(2)} · Stock: {product.stock ?? 0}
+        {formatPrice(Number(product.price))} · Stock: {product.stock ?? 0}
       </p>
       <Button
         size="sm"
@@ -84,7 +89,10 @@ const ProductCard = ({
 export default function NewSalePage() {
   const navigate = useNavigate()
   const { toast } = useToast()
+  const queryClient = useQueryClient()
   const { hasPermission } = useAuthPermissions()
+  const { locale, currencyCode } = useSystemSettings()
+  const fmt = (n: number) => formatMoney(n, locale, currencyCode)
   const salesData = useSalesData()
 
   const paymentMethodsQuery = usePaymentMethods()
@@ -157,6 +165,17 @@ export default function NewSalePage() {
       return
     }
     const isCash = paymentMethod.name?.toLowerCase() === 'efectivo'
+    if (isCash) {
+      const received = parseFloat(amountReceived || '0')
+      if (Number.isNaN(received) || received < displayTotal) {
+        toast({
+          title: 'Monto insuficiente',
+          description: `El monto en efectivo (${fmt(received)}) no puede ser menor al total a pagar (${fmt(displayTotal)}).`,
+          variant: 'destructive',
+        })
+        return
+      }
+    }
     const payload = {
       customer,
       customer_nit: customerNit,
@@ -178,6 +197,7 @@ export default function NewSalePage() {
       await createSale(payload)
       toast({ title: 'Venta registrada correctamente' })
       salesData.refreshSales()
+      await queryClient.invalidateQueries({ queryKey: PRODUCTS_QUERY_KEY })
       cart.clearCart()
       promotions.clearPromotions()
       setCustomer('')
@@ -277,13 +297,19 @@ export default function NewSalePage() {
                     id="amount"
                     type="number"
                     placeholder="0.00"
+                    min={displayTotal}
                     value={amountReceived}
                     onChange={(e) => setAmountReceived(e.target.value)}
                     step="0.01"
                   />
                   {amountReceived && parseFloat(amountReceived) >= displayTotal && (
                     <p className="text-sm text-primary mt-1">
-                      Vuelto: Q {changeAmount.toFixed(2)}
+                      Vuelto: {fmt(changeAmount)}
+                    </p>
+                  )}
+                  {amountReceived && !Number.isNaN(parseFloat(amountReceived)) && parseFloat(amountReceived) < displayTotal && (
+                    <p className="text-sm text-destructive mt-1">
+                      El monto debe ser mayor o igual al total a pagar ({fmt(displayTotal)}).
                     </p>
                   )}
                 </div>
@@ -341,7 +367,7 @@ export default function NewSalePage() {
                           +
                         </Button>
                         <span className="w-24 text-right">
-                          Q {(item.qty * item.price).toFixed(2)}
+                          {fmt(item.qty * item.price)}
                         </span>
                         <Button
                           variant="ghost"
@@ -360,13 +386,13 @@ export default function NewSalePage() {
                 <div className="pt-2 border-t">
                   <p className="text-xs text-muted-foreground">Descuentos aplicados</p>
                   <p className="text-green-600 font-medium">
-                    -Q {(promotions.totalDiscount ?? 0).toFixed(2)}
+                    -{fmt(promotions.totalDiscount ?? 0)}
                   </p>
                 </div>
               ) : null}
               <div className="flex justify-between font-semibold text-lg pt-2">
                 <span>Total</span>
-                <span>Q {displayTotal.toFixed(2)}</span>
+                <span>{fmt(displayTotal)}</span>
               </div>
             </CardContent>
           </Card>
@@ -392,7 +418,13 @@ export default function NewSalePage() {
               className="flex-1 bg-primary"
               onClick={handleSubmit}
               disabled={
-                cart.cartItems.length === 0 || !paymentMethod || isProcessing
+                cart.cartItems.length === 0 ||
+                !paymentMethod ||
+                isProcessing ||
+                (paymentMethod?.name?.toLowerCase() === 'efectivo' &&
+                  (!amountReceived ||
+                    Number.isNaN(parseFloat(amountReceived)) ||
+                    parseFloat(amountReceived) < displayTotal))
               }
             >
               {isProcessing ? (
@@ -445,6 +477,7 @@ export default function NewSalePage() {
                         product={product}
                         onAdd={() => cart.addToCart(product)}
                         disabled={isProcessing}
+                        formatPrice={fmt}
                       />
                     ))}
                   </div>

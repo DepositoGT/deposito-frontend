@@ -28,6 +28,7 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { useToast } from '@/hooks/use-toast'
+import { useSystemSettings } from '@/hooks/useSystemSettings'
 import { useReturns, useCreateReturn, useUpdateReturnStatus } from '@/hooks/useReturns'
 import { Return } from '@/services/returnService'
 import { formatMoney, formatDateTime } from '@/utils'
@@ -36,6 +37,7 @@ type ReturnStatusName = 'Pendiente' | 'Aprobada' | 'Rechazada' | 'Completada'
 
 const ReturnsManagement = () => {
   const { toast } = useToast()
+  const { locale, currencyCode } = useSystemSettings()
 
   // Filters
   const [statusFilter, setStatusFilter] = useState<string>('all')
@@ -241,11 +243,11 @@ const ReturnsManagement = () => {
                     {filteredReturns.map((ret) => (
                       <tr key={ret.id} className="border-b hover:bg-muted/50">
                         <td className="p-3 font-mono text-sm">{ret.id.substring(0, 8)}...</td>
-                        <td className="p-3 text-sm">{formatDateTime(ret.return_date)}</td>
+                        <td className="p-3 text-sm">{formatDateTime(ret.return_date, undefined, locale)}</td>
                         <td className="p-3 font-mono text-sm">{ret.sale_id.substring(0, 8)}...</td>
                         <td className="p-3">{ret.sale?.customer || 'N/A'}</td>
                         <td className="p-3 text-center">{ret.items_count}</td>
-                        <td className="p-3 font-medium">{formatMoney(ret.total_refund)}</td>
+                        <td className="p-3 font-medium">{formatMoney(ret.total_refund, locale, currencyCode)}</td>
                         <td className="p-3">{getStatusBadge(ret.status.name)}</td>
                         <td className="p-3">
                           <div className="flex gap-2">
@@ -340,7 +342,7 @@ const ReturnsManagement = () => {
                 </div>
                 <div>
                   <Label>Fecha</Label>
-                  <div>{formatDateTime(selectedReturn.return_date)}</div>
+                  <div>{formatDateTime(selectedReturn.return_date, undefined, locale)}</div>
                 </div>
                 <div>
                   <Label>Venta Relacionada</Label>
@@ -356,7 +358,7 @@ const ReturnsManagement = () => {
                 </div>
                 <div>
                   <Label>Total Reembolso</Label>
-                  <div className="font-bold text-lg">{formatMoney(selectedReturn.total_refund)}</div>
+                  <div className="font-bold text-lg">{formatMoney(selectedReturn.total_refund, locale, currencyCode)}</div>
                 </div>
               </div>
 
@@ -389,9 +391,9 @@ const ReturnsManagement = () => {
                         )}
                       </div>
                       <div className="text-right">
-                        <div className="font-medium">{formatMoney(item.refund_amount)}</div>
+                        <div className="font-medium">{formatMoney(item.refund_amount, locale, currencyCode)}</div>
                         <div className="text-sm text-muted-foreground">
-                          {formatMoney(item.refund_amount / item.qty_returned)}/u
+                          {formatMoney(item.refund_amount / item.qty_returned, locale, currencyCode)}/u
                         </div>
                       </div>
                     </div>
@@ -401,7 +403,7 @@ const ReturnsManagement = () => {
 
               {selectedReturn.processed_at && (
                 <div className="text-sm text-muted-foreground">
-                  Procesado: {formatDateTime(selectedReturn.processed_at)}
+                  Procesado: {formatDateTime(selectedReturn.processed_at, undefined, locale)}
                 </div>
               )}
             </div>
