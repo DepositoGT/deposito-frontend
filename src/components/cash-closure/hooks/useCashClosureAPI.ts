@@ -13,10 +13,10 @@
  */
 import { useState, useCallback } from 'react'
 import { useToast } from '@/hooks/use-toast'
+import { useSystemSettings } from '@/hooks/useSystemSettings'
 import { getApiBaseUrl, getAuthToken } from '@/services/api'
 import type { CashClosure, TheoreticalData, PaymentMethodBreakdown, Denomination } from '../types'
 
-// Use centralized API URL
 const API_URL = getApiBaseUrl()
 
 interface FetchClosuresResponse {
@@ -38,11 +38,11 @@ interface SaveClosurePayload {
     denominations: Denomination[]
 }
 
-/** Formato ISO (UTC) a YYYY-MM-DDTHH:mm:ss en zona Guatemala para inputs datetime-local */
-function toGuatemalaLocalISO(iso: string): string {
+/** Formato ISO a YYYY-MM-DDTHH:mm:ss en la zona configurada para inputs datetime-local */
+function toLocalISO(iso: string, timeZone: string): string {
     const d = new Date(iso)
     const parts = new Intl.DateTimeFormat('en-CA', {
-        timeZone: 'America/Guatemala',
+        timeZone,
         year: 'numeric',
         month: '2-digit',
         day: '2-digit',
@@ -55,11 +55,11 @@ function toGuatemalaLocalISO(iso: string): string {
     return `${get('year')}-${get('month')}-${get('day')}T${get('hour')}:${get('minute')}:${get('second')}`
 }
 
-/** Fin del día de hoy en Guatemala como YYYY-MM-DDTHH:mm:ss */
-function endOfTodayGuatemala(): string {
+/** Fin del día de hoy en la zona configurada como YYYY-MM-DDTHH:mm:ss */
+function endOfTodayLocal(timeZone: string): string {
     const now = new Date()
     const parts = new Intl.DateTimeFormat('en-CA', {
-        timeZone: 'America/Guatemala',
+        timeZone,
         year: 'numeric',
         month: '2-digit',
         day: '2-digit'
@@ -98,6 +98,7 @@ interface UseCashClosureAPIReturn {
 
 export const useCashClosureAPI = (): UseCashClosureAPIReturn => {
     const { toast } = useToast()
+    const { timezone } = useSystemSettings()
 
     const [isCalculating, setIsCalculating] = useState(false)
     const [isSaving, setIsSaving] = useState(false)
@@ -119,14 +120,14 @@ export const useCashClosureAPI = (): UseCashClosureAPIReturn => {
             const response = await fetch(`${API_URL}/cash-closures/last-closure-date?${params.toString()}`, { headers: getAuthHeaders() })
             if (!response.ok) return null
             const data: LastClosureDateResponse = await response.json()
-            const suggestedStart = data.suggested_start ? toGuatemalaLocalISO(data.suggested_start) : ''
-            const suggestedEnd = endOfTodayGuatemala()
+            const suggestedStart = data.suggested_start ? toLocalISO(data.suggested_start, timezone) : ''
+            const suggestedEnd = endOfTodayLocal(timezone)
             return { suggestedStart, suggestedEnd }
         } catch (error) {
             console.error('Error fetching last closure date:', error)
             return null
         }
-    }, [])
+    }, [timezone])
 
     const calculateTheoretical = useCallback(async (startDate: string, endDate: string, cashierId?: string): Promise<TheoreticalData | null> => {
         setIsCalculating(true)

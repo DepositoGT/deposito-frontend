@@ -33,6 +33,7 @@ import { useSupplier } from '@/hooks/useSupplier'
 import { useIncomingMerchandise, useIncomingMerchandiseById } from '@/hooks/useIncomingMerchandise'
 import { useToast } from '@/hooks/use-toast'
 import { useAuthPermissions } from '@/hooks/useAuthPermissions'
+import { useSystemSettings } from '@/hooks/useSystemSettings'
 import { adaptApiSupplier } from '@/services/supplierService'
 import type { Supplier } from '@/types'
 import { generateSupplierPDF, type SupplierPDFOptions, type SupplierPDFMerchandiseEntry } from '@/components/suppliers/generateSupplierPDF'
@@ -75,29 +76,28 @@ const getStatusBadge = (status: string | undefined) =>
     <Badge variant="secondary">Inactivo</Badge>
   )
 
-const formatCurrency = (value: number) =>
-  new Intl.NumberFormat('es-GT', { style: 'currency', currency: 'GTQ' }).format(value)
-
-const formatDate = (dateString: string) => {
-  try {
-    const d = new Date(dateString)
-    if (isNaN(d.getTime())) return dateString
-    return new Intl.DateTimeFormat('es-GT', {
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: false,
-    }).format(d)
-  } catch {
-    return dateString
-  }
-}
-
 export default function SupplierDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const { locale, currencyCode } = useSystemSettings()
+  const formatCurrency = (value: number) =>
+    new Intl.NumberFormat(locale || 'es-GT', { style: 'currency', currency: currencyCode || 'GTQ' }).format(value)
+  const formatDate = (dateString: string) => {
+    try {
+      const d = new Date(dateString)
+      if (isNaN(d.getTime())) return dateString
+      return new Intl.DateTimeFormat(locale || 'es-GT', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false,
+      }).format(d)
+    } catch {
+      return dateString
+    }
+  }
   const { toast } = useToast()
   const { hasPermission } = useAuthPermissions()
 
@@ -729,7 +729,7 @@ export default function SupplierDetailPage() {
                 </div>
                 <div className="text-center">
                   <p className="text-2xl font-bold text-foreground">
-                    Q {Number(supplier.totalPurchases).toLocaleString()}
+                    {formatCurrency(Number(supplier.totalPurchases))}
                   </p>
                   <p className="text-sm text-muted-foreground">Total Compras</p>
                 </div>

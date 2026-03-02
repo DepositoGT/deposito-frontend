@@ -24,6 +24,7 @@ import { updateSaleStatus as apiUpdateSaleStatus } from '@/services/salesService
 import { useRealtimeSales } from '@/hooks/useRealtimeSales'
 import { useAuth } from '@/context/useAuth'
 import { useAuthPermissions } from '@/hooks/useAuthPermissions'
+import { useSystemSettings } from '@/hooks/useSystemSettings'
 
 // Feature imports
 import { useSalesData } from './hooks'
@@ -49,6 +50,7 @@ const SalesManagement = ({ onSectionChange }: SalesManagementProps) => {
     const { isAuthenticated } = useAuth()
     const { toast } = useToast()
     const { hasPermission } = useAuthPermissions()
+    const { locale, currencyCode } = useSystemSettings()
 
     const salesData = useSalesData()
 
@@ -179,6 +181,8 @@ const SalesManagement = ({ onSectionChange }: SalesManagementProps) => {
                 transactionCountToday={salesData.transactionCountToday}
                 averageTicketToday={salesData.averageTicketToday}
                 preferredPaymentMethod={salesData.preferredPaymentMethod}
+                locale={locale}
+                currencyCode={currencyCode}
             />
 
             {/* Filters */}
@@ -206,6 +210,8 @@ const SalesManagement = ({ onSectionChange }: SalesManagementProps) => {
                         onStatusChange={updateSaleStatus}
                         onViewSale={(sale) => { setSelectedSale(sale); setIsViewSaleOpen(true) }}
                         onDeleteSale={() => toast({ title: 'Funcionalidad en progreso' })}
+                        locale={locale}
+                        currencyCode={currencyCode}
                     />
                 ))}
             </div>
@@ -214,6 +220,8 @@ const SalesManagement = ({ onSectionChange }: SalesManagementProps) => {
                 open={isViewSaleOpen}
                 onOpenChange={setIsViewSaleOpen}
                 sale={selectedSale}
+                locale={locale}
+                currencyCode={currencyCode}
             />
 
             <NegativeStockDialog

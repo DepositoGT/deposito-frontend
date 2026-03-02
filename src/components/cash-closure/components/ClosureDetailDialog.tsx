@@ -15,6 +15,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Download, ThumbsUp, ThumbsDown } from 'lucide-react'
+import { useSystemSettings } from '@/hooks/useSystemSettings'
 import type { CashClosure } from '../types'
 import { formatCurrency, formatDateTime, toNumber } from '../types'
 
@@ -48,6 +49,7 @@ export const ClosureDetailDialog = ({
     onReject,
     onDownloadPDF
 }: ClosureDetailDialogProps) => {
+    const { currencyCode, locale } = useSystemSettings()
     if (!closure) return null
 
     return (
@@ -82,16 +84,16 @@ export const ClosureDetailDialog = ({
                         <div className="grid grid-cols-3 gap-4">
                             <div>
                                 <p className="text-sm text-muted-foreground">Total Teórico</p>
-                                <p className="text-xl font-bold">{formatCurrency(closure.theoretical_total)}</p>
+                                <p className="text-xl font-bold">{formatCurrency(closure.theoretical_total, currencyCode, locale)}</p>
                             </div>
                             <div>
                                 <p className="text-sm text-muted-foreground">Total Contado</p>
-                                <p className="text-xl font-bold">{formatCurrency(closure.actual_total)}</p>
+                                <p className="text-xl font-bold">{formatCurrency(closure.actual_total, currencyCode, locale)}</p>
                             </div>
                             <div>
                                 <p className="text-sm text-muted-foreground">Diferencia</p>
                                 <p className={`text-xl font-bold ${toNumber(closure.difference) === 0 ? 'text-green-600' : toNumber(closure.difference) > 0 ? 'text-orange-600' : 'text-red-600'}`}>
-                                    {toNumber(closure.difference) >= 0 ? '+' : ''}{formatCurrency(closure.difference)}
+                                    {toNumber(closure.difference) >= 0 ? '+' : ''}{formatCurrency(closure.difference, currencyCode, locale)}
                                 </p>
                             </div>
                         </div>
@@ -106,17 +108,17 @@ export const ClosureDetailDialog = ({
                                     <div className="flex justify-between items-center mb-2">
                                         <span className="font-medium">{item.payment_method?.name || item.payment_method_name}</span>
                                         <Badge variant={toNumber(item.difference) === 0 ? 'default' : toNumber(item.difference) > 0 ? 'secondary' : 'destructive'}>
-                                            {toNumber(item.difference) >= 0 ? '+' : ''}{formatCurrency(item.difference)}
+                                            {toNumber(item.difference) >= 0 ? '+' : ''}{formatCurrency(item.difference, currencyCode, locale)}
                                         </Badge>
                                     </div>
                                     <div className="grid grid-cols-2 gap-2 text-sm">
                                         <div>
                                             <span className="text-muted-foreground">Teórico: </span>
-                                            <span className="font-medium">{formatCurrency(item.theoretical_amount)}</span>
+                                            <span className="font-medium">{formatCurrency(item.theoretical_amount, currencyCode, locale)}</span>
                                         </div>
                                         <div>
                                             <span className="text-muted-foreground">Contado: </span>
-                                            <span className="font-medium">{formatCurrency(item.actual_amount)}</span>
+                                            <span className="font-medium">{formatCurrency(item.actual_amount, currencyCode, locale)}</span>
                                         </div>
                                     </div>
                                     {item.notes && (
@@ -143,7 +145,7 @@ export const ClosureDetailDialog = ({
                                         <div>Q {toNumber(denom.denomination).toFixed(2)}</div>
                                         <div className="text-muted-foreground">{denom.type}</div>
                                         <div>{denom.quantity}</div>
-                                        <div className="font-medium">{formatCurrency(denom.subtotal)}</div>
+                                        <div className="font-medium">{formatCurrency(denom.subtotal, currencyCode, locale)}</div>
                                     </div>
                                 ))}
                             </div>

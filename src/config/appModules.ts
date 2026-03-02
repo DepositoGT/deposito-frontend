@@ -26,7 +26,8 @@ import {
     PromocionesIcon,
     CatalogosIcon,
     UsuariosIcon,
-    MercanciaIcon
+    MercanciaIcon,
+    ConfiguracionIcon
 } from '@/components/icons/CustomIcons'
 import { ForwardRefExoticComponent, RefAttributes, SVGProps } from 'react'
 
@@ -170,6 +171,16 @@ export const appModules: AppModule[] = [
         iconColor: 'text-orange-600',
         adminOnly: true,
         permissions: ['users.view', 'roles.manage']
+    },
+    {
+        id: 'config',
+        label: 'Configuración',
+        path: '/configuracion',
+        icon: ConfiguracionIcon,
+        color: 'bg-orange-100',
+        iconColor: 'text-orange-600',
+        adminOnly: true,
+        permissions: ['settings.view', 'settings.manage']
     }
 ]
 

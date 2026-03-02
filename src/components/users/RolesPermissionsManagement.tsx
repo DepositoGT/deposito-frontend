@@ -21,6 +21,16 @@ import { useNavigate } from "react-router-dom";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Pagination } from "@/components/shared/Pagination";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 const RolesPermissionsManagement = () => {
   const { hasPermission, isAdmin } = useAuthPermissions();
@@ -35,6 +45,7 @@ const RolesPermissionsManagement = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(18);
   const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [roleToDelete, setRoleToDelete] = useState<Role | null>(null);
 
   const {
     data: rolesData,
@@ -64,12 +75,8 @@ const RolesPermissionsManagement = () => {
     return name === "admin" || name === "sin rol";
   };
 
-  const handleDeleteRole = async (
-    event: React.MouseEvent<HTMLButtonElement>,
-    role: Role,
-  ) => {
+  const handleDeleteClick = (event: React.MouseEvent<HTMLButtonElement>, role: Role) => {
     event.stopPropagation();
-
     if (isProtectedRole(role)) {
       toast({
         title: "Rol protegido",
@@ -78,17 +85,13 @@ const RolesPermissionsManagement = () => {
       });
       return;
     }
+    setRoleToDelete(role);
+  };
 
-    const confirmDelete = window.confirm(
-      `¿Eliminar el rol "${role.name}"?\n\nLos usuarios que lo tengan quedarán sin rol (asignados a un rol neutro sin permisos) y se eliminarán sus permisos asociados.`,
-    );
-
-    if (!confirmDelete) return;
-
+  const executeDeleteRole = async (role: Role) => {
     try {
       setDeletingId(role.id);
       const result = await deleteRole(role.id);
-
       toast({
         title: "Rol eliminado",
         description:
@@ -96,8 +99,8 @@ const RolesPermissionsManagement = () => {
             ? `Rol eliminado correctamente. ${result.reassignedUsers} usuario(s) fueron movidos a un rol neutro sin permisos.`
             : "Rol eliminado correctamente.",
       });
-
       await refetchRoles();
+      setRoleToDelete(null);
     } catch (error: unknown) {
       let message = "No se pudo eliminar el rol";
       if (error && typeof error === "object" && "message" in error) {
@@ -242,7 +245,7 @@ const RolesPermissionsManagement = () => {
                                   variant="destructive"
                                   size="icon"
                                   className="h-8 w-8"
-                                  onClick={(event) => handleDeleteRole(event, role)}
+                                  onClick={(event) => handleDeleteClick(event, role)}
                                   disabled={deletingId === role.id}
                                 >
                                   {deletingId === role.id ? (
@@ -282,7 +285,7 @@ const RolesPermissionsManagement = () => {
                             variant="destructive"
                             size="icon"
                             className="h-8 w-8"
-                            onClick={(event) => handleDeleteRole(event, role)}
+                            onClick={(event) => handleDeleteClick(event, role)}
                             disabled={deletingId === role.id}
                           >
                             {deletingId === role.id ? (
@@ -333,6 +336,28 @@ const RolesPermissionsManagement = () => {
           </div>
         </CardContent>
       </Card>
+
+      <AlertDialog open={!!roleToDelete} onOpenChange={(open) => !open && setRoleToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar rol?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta acción no se puede deshacer. Se eliminará el rol &quot;{roleToDelete?.name}&quot;.
+              Los usuarios que lo tengan quedarán sin rol (asignados a un rol neutro sin permisos) y se eliminarán sus permisos asociados.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={roleToDelete != null && deletingId === roleToDelete?.id}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={roleToDelete != null && deletingId === roleToDelete.id}
+              onClick={() => roleToDelete && executeDeleteRole(roleToDelete)}
+            >
+              {roleToDelete && deletingId === roleToDelete.id ? "Eliminando..." : "Eliminar"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
