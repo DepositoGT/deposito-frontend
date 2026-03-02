@@ -19,13 +19,19 @@ import { formatCurrency, formatDateTime, toNumber } from './types'
 /** Color naranja/ámbar de la plataforma para encabezados en PDF (RGB) */
 const PDF_HEADER_COLOR: [number, number, number] = [217, 119, 6] // amber / liquor-amber
 
-export const generateClosurePDF = (closure: CashClosure) => {
+export const generateClosurePDF = (closure: CashClosure, companyName?: string, currencyCode?: string, locale?: string) => {
+    const fmt = (amount: number | string) => formatCurrency(amount, currencyCode, locale)
     const doc = new jsPDF() as jsPDFDocument
     const pageWidth = doc.internal.pageSize.getWidth()
     const margin = 15
     let yPos = 20
 
-    // Header
+    if (companyName?.trim()) {
+      doc.setFontSize(12)
+      doc.setFont('helvetica', 'normal')
+      doc.text(companyName.trim(), pageWidth / 2, yPos, { align: 'center' })
+      yPos += 8
+    }
     doc.setFontSize(18)
     doc.setFont('helvetica', 'bold')
     doc.text('CIERRE DE CAJA', pageWidth / 2, yPos, { align: 'center' })
@@ -73,14 +79,14 @@ export const generateClosurePDF = (closure: CashClosure) => {
     yPos += 10
 
     const summaryData = [
-        ['Total Teórico', formatCurrency(closure.theoretical_total)],
-        ['Ventas Brutas', formatCurrency(closure.theoretical_sales)],
-        ['Devoluciones', formatCurrency(closure.theoretical_returns)],
-        ['Total Contado', formatCurrency(closure.actual_total)],
-        ['Diferencia', `${toNumber(closure.difference) >= 0 ? '+' : ''}${formatCurrency(closure.difference)} (${toNumber(closure.difference_percentage).toFixed(2)}%)`],
+        ['Total Teórico', fmt(closure.theoretical_total)],
+        ['Ventas Brutas', fmt(closure.theoretical_sales)],
+        ['Devoluciones', fmt(closure.theoretical_returns)],
+        ['Total Contado', fmt(closure.actual_total)],
+        ['Diferencia', `${toNumber(closure.difference) >= 0 ? '+' : ''}${fmt(closure.difference)} (${toNumber(closure.difference_percentage).toFixed(2)}%)`],
         ['Transacciones', closure.total_transactions.toString()],
         ['Clientes', closure.total_customers.toString()],
-        ['Ticket Promedio', formatCurrency(closure.average_ticket)]
+        ['Ticket Promedio', fmt(closure.average_ticket)]
     ]
 
     autoTable(doc, {
@@ -105,9 +111,9 @@ export const generateClosurePDF = (closure: CashClosure) => {
 
     const paymentData = (closure.payment_breakdowns || []).map(item => [
         item.payment_method?.name || item.payment_method_name || 'N/A',
-        formatCurrency(item.theoretical_amount),
-        formatCurrency(item.actual_amount),
-        `${toNumber(item.difference) >= 0 ? '+' : ''}${formatCurrency(item.difference)}`,
+        fmt(item.theoretical_amount),
+        fmt(item.actual_amount),
+        `${toNumber(item.difference) >= 0 ? '+' : ''}${fmt(item.difference)}`,
         item.notes || '-'
     ])
 
@@ -142,7 +148,7 @@ export const generateClosurePDF = (closure: CashClosure) => {
             `Q ${toNumber(denom.denomination).toFixed(2)}`,
             denom.type,
             denom.quantity.toString(),
-            formatCurrency(denom.subtotal)
+            fmt(denom.subtotal)
         ])
 
         autoTable(doc, {

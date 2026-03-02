@@ -20,13 +20,17 @@ interface SalesKPICardsProps {
     transactionCountToday: number
     averageTicketToday: number
     preferredPaymentMethod: string
+    locale?: string
+    currencyCode?: string
 }
 
 export const SalesKPICards = ({
     totalSalesToday,
     transactionCountToday,
     averageTicketToday,
-    preferredPaymentMethod
+    preferredPaymentMethod,
+    locale,
+    currencyCode
 }: SalesKPICardsProps) => {
     return (
         <div className='grid grid-cols-1 md:grid-cols-4 gap-6'>
@@ -35,7 +39,7 @@ export const SalesKPICards = ({
                     <div className='flex items-center justify-between'>
                         <div>
                             <p className='text-sm text-muted-foreground'>Ventas Hoy</p>
-                            <p className='text-2xl font-bold text-foreground'>{formatMoney(totalSalesToday)}</p>
+                            <p className='text-2xl font-bold text-foreground'>{formatMoney(totalSalesToday, locale, currencyCode)}</p>
                         </div>
                     </div>
                 </CardContent>
@@ -56,7 +60,7 @@ export const SalesKPICards = ({
                     <div className='flex items-center justify-between'>
                         <div>
                             <p className='text-sm text-muted-foreground'>Ticket Promedio</p>
-                            <p className='text-2xl font-bold text-foreground'>{formatMoney(averageTicketToday)}</p>
+                            <p className='text-2xl font-bold text-foreground'>{formatMoney(averageTicketToday, locale, currencyCode)}</p>
                         </div>
                         <Receipt className='w-8 h-8 text-accent' />
                     </div>

@@ -25,6 +25,8 @@ interface SaleDetailDialogProps {
     open: boolean
     onOpenChange: (open: boolean) => void
     sale: Sale | null
+    locale?: string
+    currencyCode?: string
 }
 
 const getStatusBadge = (status: SaleStatus) => {
@@ -40,7 +42,9 @@ const getStatusBadge = (status: SaleStatus) => {
 export const SaleDetailDialog = ({
     open,
     onOpenChange,
-    sale
+    sale,
+    locale,
+    currencyCode
 }: SaleDetailDialogProps) => {
     const navigate = useNavigate()
     const { hasPermission } = useAuthPermissions()
@@ -59,7 +63,7 @@ export const SaleDetailDialog = ({
                     <div className='grid grid-cols-2 gap-4'>
                         <div><Label>Cliente</Label><div className='font-medium'>{sale.customer}</div></div>
                         <div><Label>NIT / Tipo</Label><div className='font-medium'>{sale.isFinalConsumer ? 'Consumidor Final' : sale.customerNit}</div></div>
-                        <div><Label>Fecha</Label><div className='font-medium'>{formatDateTime(sale.date)}</div></div>
+                        <div><Label>Fecha</Label><div className='font-medium'>{formatDateTime(sale.date, undefined, locale)}</div></div>
                         <div><Label>Método de Pago</Label><div className='font-medium'>{sale.payment}</div></div>
                         <div><Label>Estado</Label><div>{getStatusBadge(sale.status)}</div></div>
                         <div>
@@ -77,7 +81,7 @@ export const SaleDetailDialog = ({
                             <div>
                                 <p className='text-sm font-medium text-orange-900'>Esta venta tiene devoluciones</p>
                                 <p className='text-xs text-orange-700 mt-1'>
-                                    Se han devuelto productos por un valor de {formatMoney(sale.totalReturned || 0)}
+                                    Se han devuelto productos por un valor de {formatMoney(sale.totalReturned || 0, locale, currencyCode)}
                                 </p>
                             </div>
                         </div>
@@ -94,8 +98,8 @@ export const SaleDetailDialog = ({
                                         <div className='text-sm text-muted-foreground'>Cantidad: {p.qty}</div>
                                     </div>
                                     <div className='text-right'>
-                                        <div className='font-medium'>Q {(p.price * p.qty).toFixed(2)}</div>
-                                        <div className='text-sm text-muted-foreground'>Q {p.price.toFixed(2)} c/u</div>
+                                        <div className='font-medium'>{formatMoney(p.price * p.qty, locale, currencyCode)}</div>
+                                        <div className='text-sm text-muted-foreground'>{formatMoney(p.price, locale, currencyCode)} c/u</div>
                                     </div>
                                 </div>
                             ))}
@@ -127,7 +131,7 @@ export const SaleDetailDialog = ({
                                             )}
                                         </div>
                                         <div className='text-right font-medium text-green-700'>
-                                            -{formatMoney(promo.discount_applied)}
+                                            -{formatMoney(promo.discount_applied, locale, currencyCode)}
                                         </div>
                                     </div>
                                 ))}
@@ -160,12 +164,12 @@ export const SaleDetailDialog = ({
                                             {ret.items.map((item, itemIdx) => (
                                                 <div key={itemIdx} className='flex justify-between text-xs bg-white/50 p-2 rounded'>
                                                     <span>{item.productName} × {item.qty}</span>
-                                                    <span className='font-medium text-orange-700'>-{formatMoney(item.refund)}</span>
+                                                    <span className='font-medium text-orange-700'>-{formatMoney(item.refund, locale, currencyCode)}</span>
                                                 </div>
                                             ))}
                                         </div>
                                         <div className='text-right text-sm font-bold text-orange-900 border-t pt-1'>
-                                            Total devuelto: {formatMoney(ret.totalRefund)}
+                                            Total devuelto: {formatMoney(ret.totalRefund, locale, currencyCode)}
                                         </div>
                                     </div>
                                 ))}
@@ -180,28 +184,28 @@ export const SaleDetailDialog = ({
                             <>
                                 <div className='flex justify-between'>
                                     <span>Subtotal:</span>
-                                    <span>{formatMoney(sale.subtotal || sale.total + sale.discountTotal)}</span>
+                                    <span>{formatMoney(sale.subtotal || sale.total + sale.discountTotal, locale, currencyCode)}</span>
                                 </div>
                                 <div className='flex justify-between text-green-700'>
                                     <span>(-) Descuentos:</span>
-                                    <span>-{formatMoney(sale.discountTotal)}</span>
+                                    <span>-{formatMoney(sale.discountTotal, locale, currencyCode)}</span>
                                 </div>
                             </>
                         ) : (
                             <div className='flex justify-between'>
                                 <span>Subtotal Original:</span>
-                                <span>{formatMoney(sale.total)}</span>
+                                <span>{formatMoney(sale.total, locale, currencyCode)}</span>
                             </div>
                         )}
                         {sale.hasReturns && (
                             <>
                                 <div className='flex justify-between text-orange-700'>
                                     <span>(-) Devoluciones:</span>
-                                    <span>-{formatMoney(sale.totalReturned || 0)}</span>
+                                    <span>-{formatMoney(sale.totalReturned || 0, locale, currencyCode)}</span>
                                 </div>
                                 <div className='flex justify-between text-lg font-bold border-t pt-2 text-green-700'>
                                     <span>Total Neto:</span>
-                                    <span>{formatMoney(sale.adjustedTotal || sale.total)}</span>
+                                    <span>{formatMoney(sale.adjustedTotal || sale.total, locale, currencyCode)}</span>
                                 </div>
                             </>
                         )}
@@ -209,18 +213,18 @@ export const SaleDetailDialog = ({
                             <>
                                 <div className='flex justify-between'>
                                     <span>Monto Recibido:</span>
-                                    <span>{formatMoney(sale.amountReceived)}</span>
+                                    <span>{formatMoney(sale.amountReceived, locale, currencyCode)}</span>
                                 </div>
                                 <div className='flex justify-between font-bold'>
                                     <span>Vuelto:</span>
-                                    <span>{formatMoney(sale.change)}</span>
+                                    <span>{formatMoney(sale.change, locale, currencyCode)}</span>
                                 </div>
                             </>
                         )}
                         {!sale.hasReturns && (
                             <div className='flex justify-between text-lg font-bold border-t pt-2'>
                                 <span>Total:</span>
-                                <span>{formatMoney(sale.total)}</span>
+                                <span>{formatMoney(sale.total, locale, currencyCode)}</span>
                             </div>
                         )}
                     </div>

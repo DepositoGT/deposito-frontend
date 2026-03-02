@@ -13,31 +13,48 @@
  */
 
 /**
- * Formats a number or string as Guatemalan Quetzales currency
+ * Formats a number or string as currency.
  * @param value - The value to format
- * @returns Formatted currency string (e.g., "Q 123.45")
+ * @param locale - Optional locale (e.g. 'es-GT', 'en-GB'). If not provided uses 'es-GT'
+ * @param currencyCode - Optional currency code (e.g. 'GTQ', 'USD'). If not provided uses 'Q 0.00' fallback
  */
-export const formatMoney = (value: number | string | unknown): string => {
-  if (value === null || value === undefined) return 'Q 0.00'
+export const formatMoney = (
+  value: number | string | unknown,
+  locale?: string,
+  currencyCode?: string
+): string => {
+  if (value === null || value === undefined) {
+    if (locale && currencyCode) {
+      return new Intl.NumberFormat(locale, { style: 'currency', currency: currencyCode }).format(0)
+    }
+    return 'Q 0.00'
+  }
 
   const numValue = typeof value === 'number' ? value : parseFloat(String(value))
 
   if (!Number.isFinite(numValue) || isNaN(numValue)) {
+    if (locale && currencyCode) {
+      return new Intl.NumberFormat(locale, { style: 'currency', currency: currencyCode }).format(0)
+    }
     return 'Q 0.00'
   }
 
+  if (locale && currencyCode) {
+    return new Intl.NumberFormat(locale, { style: 'currency', currency: currencyCode }).format(numValue)
+  }
   return `Q ${numValue.toFixed(2)}`
 }
 
 /**
- * Formats a date string or Date object to Guatemala locale format
+ * Formats a date string or Date object.
  * @param dateStr - ISO date string or Date object
  * @param options - Intl.DateTimeFormatOptions for customization
- * @returns Formatted date string
+ * @param locale - Optional locale (e.g. 'es-GT', 'en-GB'). If not provided uses 'es-GT'
  */
 export const formatDateTime = (
   dateStr?: string | Date | null,
-  options?: Intl.DateTimeFormatOptions
+  options?: Intl.DateTimeFormatOptions,
+  locale?: string
 ): string => {
   if (!dateStr) return 'N/A'
 
@@ -51,24 +68,21 @@ export const formatDateTime = (
     const isoMatch = cleanDateStr.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})/)
 
     if (isoMatch) {
-      // Create date with local interpretation of the components
       const [, year, month, day, hour, minute, second] = isoMatch
       date = new Date(
         parseInt(year),
-        parseInt(month) - 1, // Month is 0-indexed
+        parseInt(month) - 1,
         parseInt(day),
         parseInt(hour),
         parseInt(minute),
         parseInt(second)
       )
     } else {
-      // Fallback for simpler date formats (e.g., "2026-01-26")
       const simpleMatch = cleanDateStr.match(/^(\d{4})-(\d{2})-(\d{2})$/)
       if (simpleMatch) {
         const [, year, month, day] = simpleMatch
         date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day))
       } else {
-        // Last resort: let JavaScript parse it
         date = new Date(dateStr)
       }
     }
@@ -88,48 +102,44 @@ export const formatDateTime = (
     ...options
   }
 
-  return new Intl.DateTimeFormat('es-GT', defaultOptions).format(date)
+  const loc = (locale && locale.trim()) || 'es-GT'
+  return new Intl.DateTimeFormat(loc, defaultOptions).format(date)
 }
 
 /**
  * Formats a date to short format (date only, no time)
- * @param dateStr - ISO date string or Date object
- * @returns Formatted date string
  */
-export const formatDate = (dateStr?: string | Date | null): string => {
+export const formatDate = (dateStr?: string | Date | null, locale?: string): string => {
   return formatDateTime(dateStr, {
     day: '2-digit',
     month: 'short',
     year: 'numeric'
-  })
+  }, locale)
 }
 
 /**
  * Formats a date to time only
- * @param dateStr - ISO date string or Date object
- * @returns Formatted time string
  */
-export const formatTime = (dateStr?: string | Date | null): string => {
+export const formatTime = (dateStr?: string | Date | null, locale?: string): string => {
   return formatDateTime(dateStr, {
     hour: '2-digit',
     minute: '2-digit',
     hour12: false
-  })
+  }, locale)
 }
 
 /**
  * Formats a number with thousand separators
- * @param value - The number to format
- * @returns Formatted number string
+ * @param locale - Optional locale (e.g. 'es-GT'). If not provided uses 'es-GT'
  */
-export const formatNumber = (value: number | string): string => {
+export const formatNumber = (value: number | string, locale?: string): string => {
   const numValue = typeof value === 'number' ? value : parseFloat(String(value))
 
   if (!Number.isFinite(numValue) || isNaN(numValue)) {
     return '0'
   }
 
-  return numValue.toLocaleString('es-GT')
+  return numValue.toLocaleString((locale && locale.trim()) || 'es-GT')
 }
 
 /**

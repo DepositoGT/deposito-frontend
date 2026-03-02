@@ -106,9 +106,13 @@ export const toNumber = (value: number | string): number => {
     return typeof value === 'string' ? parseFloat(value) : value
 }
 
-/** Format currency in Quetzales */
-export const formatCurrency = (amount: number | string) => {
+/** Format currency; uses locale/currency from config when provided. */
+export const formatCurrency = (amount: number | string, currencyCode?: string, locale?: string) => {
     const numAmount = toNumber(amount)
+    const loc = (locale && String(locale).trim()) || 'es-GT'
+    if (currencyCode && String(currencyCode).trim()) {
+        return new Intl.NumberFormat(loc, { style: 'currency', currency: currencyCode.trim() }).format(numAmount)
+    }
     return `Q ${numAmount.toFixed(2)}`
 }
 

@@ -31,6 +31,8 @@ interface SalesStatusTableProps {
     onStatusChange: (saleId: string, newStatus: SaleStatus) => void
     onViewSale: (sale: Sale) => void
     onDeleteSale: (saleId: string) => void
+    locale?: string
+    currencyCode?: string
 }
 
 const getStatusBadge = (status: SaleStatus) => {
@@ -51,7 +53,9 @@ export const SalesStatusTable = ({
     canChangeStatus,
     onStatusChange,
     onViewSale,
-    onDeleteSale
+    onDeleteSale,
+    locale,
+    currencyCode
 }: SalesStatusTableProps) => {
     return (
         <Card className='animate-slide-up'>
@@ -104,7 +108,7 @@ export const SalesStatusTable = ({
                                             </div>
                                         </td>
                                         <td className='p-3'>
-                                            <div className='text-sm text-foreground'>{formatDateTime(sale.date)}</div>
+                                            <div className='text-sm text-foreground'>{formatDateTime(sale.date, undefined, locale)}</div>
                                         </td>
                                         <td className='p-3'>
                                             <div className='font-medium text-foreground'>{sale.customer}</div>
@@ -120,14 +124,14 @@ export const SalesStatusTable = ({
                                                 {sale.hasReturns ? (
                                                     <>
                                                         <span className='font-medium text-green-700'>
-                                                            {formatMoney(sale.adjustedTotal || sale.total)}
+                                                            {formatMoney(sale.adjustedTotal || sale.total, locale, currencyCode)}
                                                         </span>
                                                         <span className='text-xs text-muted-foreground line-through'>
-                                                            {formatMoney(sale.total)}
+                                                            {formatMoney(sale.total, locale, currencyCode)}
                                                         </span>
                                                     </>
                                                 ) : (
-                                                    <span className='font-medium text-foreground'>{formatMoney(sale.total)}</span>
+                                                    <span className='font-medium text-foreground'>{formatMoney(sale.total, locale, currencyCode)}</span>
                                                 )}
                                             </div>
                                         </td>

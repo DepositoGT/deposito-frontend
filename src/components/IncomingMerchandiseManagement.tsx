@@ -49,12 +49,14 @@ import { useSuppliers } from '@/hooks/useSuppliers'
 import { Pagination } from '@/components/shared/Pagination'
 import { generateMerchandiseReport } from '@/services/incomingMerchandiseService'
 import { useAuthPermissions } from '@/hooks/useAuthPermissions'
+import { useSystemSettings } from '@/hooks/useSystemSettings'
 import type { IncomingMerchandise } from '@/services/incomingMerchandiseService'
 
 const IncomingMerchandiseManagement = () => {
   const navigate = useNavigate()
   const { toast } = useToast()
   const { hasPermission } = useAuthPermissions()
+  const { currencyCode, locale } = useSystemSettings()
 
   // State
   const [searchTerm, setSearchTerm] = useState('')
@@ -143,15 +145,16 @@ const IncomingMerchandiseManagement = () => {
     setCurrentPage(1)
   }
 
+  const loc = locale || 'es-GT'
   const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('es-GT', {
+    return new Intl.NumberFormat(loc, {
       style: 'currency',
-      currency: 'GTQ',
+      currency: currencyCode || 'GTQ',
     }).format(value)
   }
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('es-GT', {
+    return new Date(dateString).toLocaleDateString(loc, {
       year: 'numeric',
       month: 'short',
       day: 'numeric',
