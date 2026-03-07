@@ -140,8 +140,28 @@ export const normalizeRawSale = (raw: unknown): Sale => {
     const createdByName = createdByRaw?.name ? String(createdByRaw.name) : undefined
     const createdByEmail = createdByRaw?.email ? String(createdByRaw.email) : undefined
 
+    // Facturación electrónica (InFile/SAT) - se reenvía tal cual cuando venga del API
+    const saleDtesRaw = Array.isArray(r.sale_dtes) ? r.sale_dtes : []
+    const sale_dtes = saleDtesRaw.map((d: unknown) => {
+        const dte = d as Record<string, unknown>
+        return {
+            id: dte.id != null ? String(dte.id) : undefined,
+            authorization: dte.authorization != null ? String(dte.authorization) : undefined,
+            series: dte.series != null ? String(dte.series) : undefined,
+            number: dte.number != null ? String(dte.number) : undefined,
+            emission_date: dte.emission_date != null ? String(dte.emission_date) : undefined,
+            status: dte.status != null ? String(dte.status) : undefined,
+            provider: dte.provider != null ? String(dte.provider) : undefined,
+            xml_url: dte.xml_url != null ? String(dte.xml_url) : undefined,
+            pdf_url: dte.pdf_url != null ? String(dte.pdf_url) : undefined,
+        }
+    })
+
+    const reference = r.reference != null ? String(r.reference) : undefined
+
     return {
         id: String(r.id ?? ''),
+        reference: reference || undefined,
         date: String(r.sold_at ?? r.date ?? ''),
         customer: String(r.customer ?? ''),
         customerNit,
@@ -163,6 +183,7 @@ export const normalizeRawSale = (raw: unknown): Sale => {
         createdById,
         createdByName,
         createdByEmail,
+        sale_dtes: sale_dtes.length > 0 ? sale_dtes : undefined,
     } as Sale
 }
 
@@ -219,7 +240,7 @@ export const useSalesData = (): UseSalesDataReturn => {
     // Filter client-side
     const filterClient = (items: Sale[] = []) => items.filter(sale => {
         const term = searchTerm.toLowerCase()
-        const matchesSearch = !term || [sale.id, sale.customer || '', sale.customerNit || '']
+        const matchesSearch = !term || [sale.id, sale.reference || '', sale.customer || '', sale.customerNit || '']
             .some(v => String(v).toLowerCase().includes(term))
         const matchesPayment = paymentFilter === 'all' || sale.payment === paymentFilter
         const matchesStatus = statusFilter === 'all' || sale.status === statusFilter
