@@ -30,8 +30,17 @@ export const useAuthPermissions = () => {
       ? user!.permissions!
       : [];
 
+    // Normalizar: el backend puede enviar strings ('sales.view') u objetos ({ code: 'sales.view' })
     const set = new Set<string>(
-      rawPerms.map((p) => String(p)).filter((p) => p.length > 0),
+      rawPerms
+        .map((p) => {
+          if (p == null) return '';
+          if (typeof p === 'object' && 'code' in (p as object)) {
+            return String((p as { code: unknown }).code);
+          }
+          return String(p);
+        })
+        .filter((code) => code.length > 0),
     );
 
     // Los permisos están "listos" cuando ya terminó de cargar el estado de auth.

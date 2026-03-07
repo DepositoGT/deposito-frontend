@@ -27,6 +27,19 @@ export interface ReturnDetail {
   }>;
 }
 
+/** Documento tributario electrónico (InFile/SAT) vinculado a la venta */
+export interface SaleDte {
+  id?: string;
+  authorization?: string;
+  series?: string;
+  number?: string;
+  emission_date?: string;
+  status?: string;
+  provider?: string;
+  xml_url?: string;
+  pdf_url?: string;
+}
+
 // Interfaz de promoción aplicada a venta
 export interface SalePromotion {
   id: number;
@@ -44,6 +57,8 @@ export interface SalePromotion {
 
 // Interfaz principal de venta
 export interface Sale extends BaseEntity {
+  /** Referencia legible (ej. V-000001). Se usa en UI y ticket; el id sigue siendo el UUID para la API. */
+  reference?: string;
   date: string;
   customer: string;
   customerNit?: string; // NIT del cliente (opcional)
@@ -66,6 +81,8 @@ export interface Sale extends BaseEntity {
   createdById?: string;
   createdByName?: string;
   createdByEmail?: string;
+  // Facturación electrónica (InFile/SAT) - cuando esté conectada
+  sale_dtes?: SaleDte[];
 }
 
 // Interfaz para nueva venta (form)

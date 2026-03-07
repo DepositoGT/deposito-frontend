@@ -36,6 +36,7 @@ import ProductManagement from "@/components/ProductManagement";
 import Analytics from "@/components/Analytics";
 import SalesManagement from "@/components/SalesManagement";
 import NewSalePage from "@/components/sales/NewSalePage";
+import { SaleInvoicePage } from "@/components/sales/SaleInvoicePage";
 import SuppliersManagement from "@/components/SuppliersManagement";
 import SupplierDetailPage from "./components/suppliers/SupplierDetailPage";
 import SupplierCreatePage from "./components/suppliers/SupplierCreatePage";
@@ -107,6 +108,14 @@ const App = () => (
                   element={
                     <PermissionRoute any={["sales.create"]}>
                       <NewSalePage />
+                    </PermissionRoute>
+                  }
+                />
+                <Route
+                  path="/ventas/:id/factura"
+                  element={
+                    <PermissionRoute any={["sales.view_invoice", "sales.view_detail"]}>
+                      <SaleInvoicePage />
                     </PermissionRoute>
                   }
                 />

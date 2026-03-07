@@ -29,7 +29,9 @@ import { usePaymentMethods, PaymentMethod as PaymentMethodType } from '@/hooks/u
 import { useAuthPermissions } from '@/hooks/useAuthPermissions'
 import { useSystemSettings } from '@/hooks/useSystemSettings'
 import { formatMoney } from '@/utils'
-import { createSale } from '@/services/saleService'
+import { createSale, fetchSaleById, type CreateSaleResponse } from '@/services/saleService'
+import { getCompanyNamePublic } from '@/services/settingsService'
+import { generateSaleTicket } from './documents/generateSaleTicket'
 import type { Product } from '@/types/product'
 
 import { useCart, useSalesData } from './hooks'
@@ -91,7 +93,7 @@ export default function NewSalePage() {
   const { toast } = useToast()
   const queryClient = useQueryClient()
   const { hasPermission } = useAuthPermissions()
-  const { locale, currencyCode } = useSystemSettings()
+  const { locale, currencyCode, companyName } = useSystemSettings()
   const fmt = (n: number) => formatMoney(n, locale, currencyCode)
   const salesData = useSalesData()
 
@@ -194,7 +196,23 @@ export default function NewSalePage() {
     }
     setIsProcessing(true)
     try {
-      await createSale(payload)
+      const created: CreateSaleResponse = await createSale(payload)
+      const saleId = created?.id
+      if (saleId) {
+        const fullSale = await fetchSaleById(saleId)
+        let nameForTicket = companyName
+        try {
+          const { company_name } = await getCompanyNamePublic()
+          if (company_name) nameForTicket = company_name
+        } catch {
+          // usar companyName del contexto
+        }
+        generateSaleTicket(fullSale, {
+          companyName: nameForTicket,
+          locale,
+          currencyCode,
+        })
+      }
       toast({ title: 'Venta registrada correctamente' })
       salesData.refreshSales()
       await queryClient.invalidateQueries({ queryKey: PRODUCTS_QUERY_KEY })

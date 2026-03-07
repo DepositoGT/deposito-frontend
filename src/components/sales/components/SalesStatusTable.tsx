@@ -15,7 +15,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Eye, Trash2, ChevronLeft, ChevronRight, AlertTriangle } from 'lucide-react'
+import { Eye, FileText, ChevronLeft, ChevronRight, AlertTriangle } from 'lucide-react'
 import { Sale, SaleStatus } from '@/types'
 import { formatMoney, formatDateTime } from '@/utils'
 import { SaleStatusKey, STATUS_LABELS } from '../types'
@@ -30,7 +30,9 @@ interface SalesStatusTableProps {
     canChangeStatus: boolean
     onStatusChange: (saleId: string, newStatus: SaleStatus) => void
     onViewSale: (sale: Sale) => void
-    onDeleteSale: (saleId: string) => void
+    onViewInvoice: (sale: Sale) => void
+    canViewDetail: boolean
+    canViewInvoice: boolean
     locale?: string
     currencyCode?: string
 }
@@ -53,7 +55,9 @@ export const SalesStatusTable = ({
     canChangeStatus,
     onStatusChange,
     onViewSale,
-    onDeleteSale,
+    onViewInvoice,
+    canViewDetail,
+    canViewInvoice,
     locale,
     currencyCode
 }: SalesStatusTableProps) => {
@@ -85,8 +89,12 @@ export const SalesStatusTable = ({
                                     <th className='text-left p-3 font-medium text-muted-foreground'>Cliente</th>
                                     <th className='text-center p-3 font-medium text-muted-foreground'>Items</th>
                                     <th className='text-right p-3 font-medium text-muted-foreground'>Total</th>
-                                    <th className='text-center p-3 font-medium text-muted-foreground'>Pago</th>
-                                    <th className='text-center p-3 font-medium text-muted-foreground'>Estado</th>
+                                    <th className='p-3 font-medium text-muted-foreground w-[7rem]'>
+                                        <div className='flex justify-center'>Pago</div>
+                                    </th>
+                                    <th className='p-3 font-medium text-muted-foreground w-[8.5rem]'>
+                                        <div className='flex justify-center'>Estado</div>
+                                    </th>
                                     <th className='text-center p-3 font-medium text-muted-foreground'>Acciones</th>
                                 </tr>
                             </thead>
@@ -99,7 +107,7 @@ export const SalesStatusTable = ({
                                     >
                                         <td className='p-3'>
                                             <div className='flex items-center gap-2'>
-                                                <span className='font-medium text-primary'>{sale.id}</span>
+                                                <span className='font-medium text-primary'>{sale.reference ?? sale.id}</span>
                                                 {sale.hasReturns && (
                                                     <span title='Tiene devoluciones'>
                                                         <AlertTriangle className='w-4 h-4 text-orange-500' />
@@ -135,17 +143,20 @@ export const SalesStatusTable = ({
                                                 )}
                                             </div>
                                         </td>
-                                        <td className='p-3 text-center'>
-                                            <Badge variant='outline'>{sale.payment}</Badge>
+                                        <td className='p-3 w-[7rem]'>
+                                            <div className='flex justify-center'>
+                                                <Badge variant='outline'>{sale.payment}</Badge>
+                                            </div>
                                         </td>
-                                        <td className='p-3 text-center'>
-                                            <Select
-                                                value={sale.status}
-                                                onValueChange={(v: SaleStatus) => onStatusChange(sale.id, v)}
-                                                disabled={updatingSaleIds.has(sale.id) || !canChangeStatus}
-                                            >
-                                                <SelectTrigger className='w-32'>
-                                                    {updatingSaleIds.has(sale.id)
+                                        <td className='p-3 w-[8.5rem]'>
+                                            <div className='flex justify-center'>
+                                                <Select
+                                                    value={sale.status}
+                                                    onValueChange={(v: SaleStatus) => onStatusChange(sale.reference ?? sale.id, v)}
+                                                    disabled={updatingSaleIds.has(sale.reference ?? sale.id) || !canChangeStatus}
+                                                >
+                                                    <SelectTrigger className='w-32'>
+                                                    {updatingSaleIds.has(sale.reference ?? sale.id)
                                                         ? '...'
                                                         : getStatusBadge(sale.status)}
                                                 </SelectTrigger>
@@ -154,20 +165,30 @@ export const SalesStatusTable = ({
                                                     <SelectItem value='cancelled'>Cancelado</SelectItem>
                                                 </SelectContent>
                                             </Select>
+                                            </div>
                                         </td>
                                         <td className='p-3 text-center'>
-                                            <div className='flex justify-center space-x-1'>
-                                                <Button variant='ghost' size='sm' onClick={() => onViewSale(sale)}>
-                                                    <Eye className='w-4 h-4' />
-                                                </Button>
-                                                <Button
-                                                    variant='ghost'
-                                                    size='sm'
-                                                    className='text-destructive'
-                                                    onClick={() => onDeleteSale(sale.id)}
-                                                >
-                                                    <Trash2 className='w-4 h-4' />
-                                                </Button>
+                                            <div className='flex justify-center gap-1'>
+                                                {canViewDetail && (
+                                                    <Button
+                                                        variant='ghost'
+                                                        size='sm'
+                                                        onClick={() => onViewSale(sale)}
+                                                        title='Ver detalle'
+                                                    >
+                                                        <Eye className='w-4 h-4' />
+                                                    </Button>
+                                                )}
+                                                {canViewInvoice && (
+                                                    <Button
+                                                        variant='ghost'
+                                                        size='sm'
+                                                        onClick={() => onViewInvoice(sale)}
+                                                        title='Ver factura'
+                                                    >
+                                                        <FileText className='w-4 h-4' />
+                                                    </Button>
+                                                )}
                                             </div>
                                         </td>
                                     </tr>

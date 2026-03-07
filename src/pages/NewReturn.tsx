@@ -216,7 +216,7 @@ const NewReturn = () => {
         </Button>
         <div>
           <h2 className="text-2xl font-bold">Procesar Devolución</h2>
-          <p className="text-muted-foreground">Venta: {sale.id}</p>
+          <p className="text-muted-foreground">Venta: {sale.reference ?? sale.id}</p>
         </div>
       </div>
 

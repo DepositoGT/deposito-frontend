@@ -56,22 +56,14 @@ export const SaleDetailDialog = ({
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className='max-w-3xl max-h-[90vh] overflow-hidden flex flex-col'>
                 <DialogHeader>
-                    <DialogTitle>Detalle de Venta {sale.id}</DialogTitle>
+                    <DialogTitle>Detalle de Venta {sale.reference ?? sale.id}</DialogTitle>
                 </DialogHeader>
                 <div className='space-y-4 overflow-y-auto pr-2'>
-                    {/* Basic Info */}
-                    <div className='grid grid-cols-2 gap-4'>
-                        <div><Label>Cliente</Label><div className='font-medium'>{sale.customer}</div></div>
-                        <div><Label>NIT / Tipo</Label><div className='font-medium'>{sale.isFinalConsumer ? 'Consumidor Final' : sale.customerNit}</div></div>
-                        <div><Label>Fecha</Label><div className='font-medium'>{formatDateTime(sale.date, undefined, locale)}</div></div>
-                        <div><Label>Método de Pago</Label><div className='font-medium'>{sale.payment}</div></div>
-                        <div><Label>Estado</Label><div>{getStatusBadge(sale.status)}</div></div>
-                        <div>
-                            <Label>Registrada por</Label>
-                            <div className='font-medium'>
-                                {sale.createdByName || 'No disponible'}
-                            </div>
-                        </div>
+                    {/* Resumen rápido: fecha, estado, método de pago*/}
+                    <div className='flex flex-wrap items-center gap-4 text-sm'>
+                        <div><Label className='text-muted-foreground'>Fecha</Label><div className='font-medium'>{formatDateTime(sale.date, undefined, locale)}</div></div>
+                        <div><Label className='text-muted-foreground'>Estado</Label><div>{getStatusBadge(sale.status)}</div></div>
+                        <div><Label className='text-muted-foreground'>Método de pago</Label><div className='font-medium'>{sale.payment}</div></div>
                     </div>
 
                     {/* Returns Alert */}
@@ -191,12 +183,7 @@ export const SaleDetailDialog = ({
                                     <span>-{formatMoney(sale.discountTotal, locale, currencyCode)}</span>
                                 </div>
                             </>
-                        ) : (
-                            <div className='flex justify-between'>
-                                <span>Subtotal Original:</span>
-                                <span>{formatMoney(sale.total, locale, currencyCode)}</span>
-                            </div>
-                        )}
+                        ) : null}
                         {sale.hasReturns && (
                             <>
                                 <div className='flex justify-between text-orange-700'>
@@ -223,7 +210,7 @@ export const SaleDetailDialog = ({
                         )}
                         {!sale.hasReturns && (
                             <div className='flex justify-between text-lg font-bold border-t pt-2'>
-                                <span>Total:</span>
+                                <span>Total</span>
                                 <span>{formatMoney(sale.total, locale, currencyCode)}</span>
                             </div>
                         )}
@@ -237,7 +224,7 @@ export const SaleDetailDialog = ({
                                 className='w-full text-orange-600 border-orange-300 hover:bg-orange-50'
                                 onClick={() => {
                                     onOpenChange(false)
-                                    navigate(`/returns/new?sale_id=${sale.id}`)
+                                    navigate(`/returns/new?sale_id=${sale.reference ?? sale.id}`)
                                 }}
                             >
                                 <RotateCcw className='w-4 h-4 mr-2' />Procesar Devolución
