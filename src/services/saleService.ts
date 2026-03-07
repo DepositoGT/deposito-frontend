@@ -37,6 +37,21 @@ export interface SaleItem {
   qty: number;
 }
 
+/** Documento tributario electrónico (certificación SAT/InFile) vinculado a la venta */
+export interface SaleDte {
+  id: string;
+  sale_id: string;
+  document_type?: string;
+  authorization?: string;
+  series?: string;
+  number?: string;
+  emission_date?: string;
+  status?: string;
+  provider?: string;
+  xml_url?: string;
+  pdf_url?: string;
+}
+
 export interface ReturnDetail {
   id: string;
   return_date: string;
@@ -60,14 +75,20 @@ export interface ReturnDetail {
 
 export interface Sale {
   id: string;
+  /** Referencia legible (ej. V-000001). Generada en backend al crear la venta. */
+  reference?: string;
   date: string;
   customer?: string;
   customer_nit?: string;
   is_final_consumer: boolean;
+  subtotal?: number;
+  discount_total?: number;
   total: number;
   total_returned?: number;
   adjusted_total?: number;
   items: number;
+  amount_received?: number;
+  change?: number;
   created_by?: string;
   createdBy?: {
     id: string;
@@ -83,10 +104,17 @@ export interface Sale {
     name: string;
   };
   sale_items: SaleItem[];
+  sale_dtes?: SaleDte[];
   returns?: ReturnDetail[];
 }
 
-export const createSale = async (payload: CreateSalePayload) => {
+/** Respuesta mínima del backend al crear una venta (incluye al menos id) */
+export interface CreateSaleResponse {
+  id: string;
+  [key: string]: unknown;
+}
+
+export const createSale = async (payload: CreateSalePayload): Promise<CreateSaleResponse> => {
   return await apiFetch("/api/sales", {
     method: "POST",
     body: JSON.stringify(payload),

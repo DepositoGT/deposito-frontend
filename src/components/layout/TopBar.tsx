@@ -27,6 +27,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { AppLauncher } from './AppLauncher'
 import { appModules, getUserRole } from '@/config/appModules'
+import { useAuthPermissions } from '@/hooks/useAuthPermissions'
 import { useCriticalProducts } from '@/hooks/useCriticalProducts'
 import { useSystemSettings } from '@/hooks/useSystemSettings'
 import { useAuth } from '@/context/useAuth'
@@ -43,6 +44,8 @@ export const TopBar = () => {
     const { user: roleUser } = getUserRole()
     const { user: authUser, logout } = useAuth()
     const { companyName } = useSystemSettings()
+    const { hasPermission } = useAuthPermissions()
+    const canViewAlerts = hasPermission('alerts.view') || hasPermission('alerts.manage')
 
     // Obtener el usuario completo del contexto de autenticación
     const currentUser: CurrentUser = authUser || (roleUser as AuthUser | UserType | null)
@@ -98,23 +101,25 @@ export const TopBar = () => {
                 {/* Spacer */}
                 <div className='flex-1' />
 
-                {/* Alerts Button */}
-                <Button
-                    variant='ghost'
-                    size='icon'
-                    className='relative'
-                    onClick={() => navigate('/alertas')}
-                >
-                    <Bell className='w-5 h-5' />
-                    {criticalProducts.length > 0 && (
-                        <Badge
-                            variant='destructive'
-                            className='absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-xs'
-                        >
-                            {criticalProducts.length > 9 ? '9+' : criticalProducts.length}
-                        </Badge>
-                    )}
-                </Button>
+                {/* Alerts Button - solo si tiene acceso al módulo de alertas */}
+                {canViewAlerts && (
+                    <Button
+                        variant='ghost'
+                        size='icon'
+                        className='relative'
+                        onClick={() => navigate('/alertas')}
+                    >
+                        <Bell className='w-5 h-5' />
+                        {criticalProducts.length > 0 && (
+                            <Badge
+                                variant='destructive'
+                                className='absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-xs'
+                            >
+                                {criticalProducts.length > 9 ? '9+' : criticalProducts.length}
+                            </Badge>
+                        )}
+                    </Button>
+                )}
 
                 {/* User Menu */}
                 <DropdownMenu>
