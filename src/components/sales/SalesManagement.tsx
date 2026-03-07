@@ -65,6 +65,8 @@ const SalesManagement = ({ onSectionChange }: SalesManagementProps) => {
     const canCreateSale = hasPermission('sales.create')
     const canChangeSaleStatus = hasPermission('sales.cancel', 'sales.create')
     const canAccessCashClosure = hasPermission('cashclosure.view', 'cashclosure.create')
+    const canViewDetail = hasPermission('sales.view_detail')
+    const canViewInvoice = hasPermission('sales.view_invoice')
 
     // Realtime updates
     useRealtimeSales((newSale: { id: string; customer?: string | null; total?: number | string }) => {
@@ -209,7 +211,9 @@ const SalesManagement = ({ onSectionChange }: SalesManagementProps) => {
                         canChangeStatus={canChangeSaleStatus}
                         onStatusChange={updateSaleStatus}
                         onViewSale={(sale) => { setSelectedSale(sale); setIsViewSaleOpen(true) }}
-                        onDeleteSale={() => toast({ title: 'Funcionalidad en progreso' })}
+                        onViewInvoice={(sale) => navigate(`/ventas/${sale.reference ?? sale.id}/factura`)}
+                        canViewDetail={canViewDetail}
+                        canViewInvoice={canViewInvoice}
                         locale={locale}
                         currencyCode={currencyCode}
                     />
