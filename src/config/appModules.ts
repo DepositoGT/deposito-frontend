@@ -22,17 +22,16 @@ import {
     AnalyticsIcon,
     ReportesIcon,
     AlertasIcon,
-    ScannerIcon,
     PromocionesIcon,
     CatalogosIcon,
     UsuariosIcon,
     MercanciaIcon,
-    ConfiguracionIcon
+    ConfiguracionIcon,
+    type ModuleIconProps
 } from '@/components/icons/CustomIcons'
-import { ForwardRefExoticComponent, RefAttributes, SVGProps } from 'react'
+import { ForwardRefExoticComponent, RefAttributes } from 'react'
 
-// Type for custom SVG icon components
-type IconComponent = ForwardRefExoticComponent<SVGProps<SVGSVGElement> & RefAttributes<SVGSVGElement>>
+type IconComponent = ForwardRefExoticComponent<ModuleIconProps & RefAttributes<HTMLSpanElement>>
 
 export interface AppModule {
     id: string
