@@ -108,14 +108,11 @@ export interface Sale {
   returns?: ReturnDetail[];
 }
 
-/** Respuesta mínima del backend al crear una venta (incluye al menos id) */
-export interface CreateSaleResponse {
-  id: string;
-  [key: string]: unknown;
-}
+/** Misma forma que GET /sales/:id — el POST devuelve la venta completa para evitar un GET extra (ticket, etc.). */
+export type CreateSaleResponse = Sale;
 
-export const createSale = async (payload: CreateSalePayload): Promise<CreateSaleResponse> => {
-  return await apiFetch("/api/sales", {
+export const createSale = async (payload: CreateSalePayload): Promise<Sale> => {
+  return await apiFetch<Sale>("/api/sales", {
     method: "POST",
     body: JSON.stringify(payload),
   });
