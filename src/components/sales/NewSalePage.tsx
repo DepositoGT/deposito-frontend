@@ -29,7 +29,7 @@ import { usePaymentMethods, PaymentMethod as PaymentMethodType } from '@/hooks/u
 import { useAuthPermissions } from '@/hooks/useAuthPermissions'
 import { useSystemSettings } from '@/hooks/useSystemSettings'
 import { formatMoney } from '@/utils'
-import { createSale, fetchSaleById, type CreateSaleResponse } from '@/services/saleService'
+import { createSale } from '@/services/saleService'
 import { getCompanyNamePublic } from '@/services/settingsService'
 import { generateSaleTicket } from './documents/generateSaleTicket'
 import type { Product } from '@/types/product'
@@ -196,18 +196,15 @@ export default function NewSalePage() {
     }
     setIsProcessing(true)
     try {
-      const created: CreateSaleResponse = await createSale(payload)
+      // POST devuelve la venta completa; getCompanyNamePublic en paralelo (antes era secuencial + GET extra)
+      const [{ company_name: companyNameFromApi }, created] = await Promise.all([
+        getCompanyNamePublic().catch(() => ({ company_name: '' })),
+        createSale(payload),
+      ])
       const saleId = created?.id
       if (saleId) {
-        const fullSale = await fetchSaleById(saleId)
-        let nameForTicket = companyName
-        try {
-          const { company_name } = await getCompanyNamePublic()
-          if (company_name) nameForTicket = company_name
-        } catch {
-          // usar companyName del contexto
-        }
-        generateSaleTicket(fullSale, {
+        const nameForTicket = (companyNameFromApi && String(companyNameFromApi).trim()) || companyName
+        generateSaleTicket(created, {
           companyName: nameForTicket,
           locale,
           currencyCode,

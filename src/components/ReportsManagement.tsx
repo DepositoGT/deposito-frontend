@@ -91,7 +91,7 @@ const ReportsManagement = () => {
     {
       id: "financial",
       name: "Reporte Financiero",
-      description: "Estado financiero y rentabilidad",
+      description: "P&L del período, inventario actual, compras y margen por categoría",
       icon: DollarSign,
       color: "text-liquor-burgundy",
       bgColor: "bg-liquor-burgundy/10",
@@ -101,7 +101,7 @@ const ReportsManagement = () => {
     {
       id: "alerts",
       name: "Reporte de Alertas",
-      description: "Stock bajo y productos críticos",
+      description: "Reposición priorizada, concentración por categoría y tickets del sistema",
       icon: AlertTriangle,
       color: "text-destructive",
       bgColor: "bg-destructive/10",
@@ -111,7 +111,7 @@ const ReportsManagement = () => {
     {
       id: "products",
       name: "Análisis de Productos",
-      description: "Rendimiento por categorías y productos",
+      description: "Márgenes, mix por categoría y proveedor, rankings de valor",
       icon: BarChart3,
       color: "text-liquor-amber",
       bgColor: "bg-liquor-amber/10",
