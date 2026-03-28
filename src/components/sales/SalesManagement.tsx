@@ -14,9 +14,10 @@
  * This component orchestrates the sales management feature.
  * All UI components and business logic are extracted to sub-modules.
  */
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
-import { Plus, Calendar, Calculator } from 'lucide-react'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import { Plus, Calendar, Calculator, PauseCircle } from 'lucide-react'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useToast } from '@/hooks/use-toast'
 import { Sale, SaleStatus } from '@/types'
@@ -36,8 +37,9 @@ import {
     SaleDetailDialog,
 } from './components'
 import { STATUS_DB_NAMES, NegativeStockDialogState, SaleStatusKey } from './types'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { getApiBaseUrl } from '@/services/api'
+import { hasNewSaleDraft } from '@/services/saleDraftStorage'
 
 const API_URL = getApiBaseUrl()
 
@@ -47,7 +49,18 @@ interface SalesManagementProps {
 
 const SalesManagement = ({ onSectionChange }: SalesManagementProps) => {
     const navigate = useNavigate()
-    const { isAuthenticated } = useAuth()
+    const location = useLocation()
+    const { isAuthenticated, user } = useAuth()
+    const [hasPendingSaleDraft, setHasPendingSaleDraft] = useState(false)
+
+    useEffect(() => {
+        const uid = user?.id
+        if (!uid) {
+            setHasPendingSaleDraft(false)
+            return
+        }
+        setHasPendingSaleDraft(hasNewSaleDraft(uid))
+    }, [user?.id, location.pathname])
     const { toast } = useToast()
     const { hasPermission } = useAuthPermissions()
     const { locale, currencyCode } = useSystemSettings()
@@ -176,6 +189,28 @@ const SalesManagement = ({ onSectionChange }: SalesManagementProps) => {
                     )}
                 </div>
             </div>
+
+            {canCreateSale && hasPendingSaleDraft && (
+                <Alert className="border-amber-500/50 bg-amber-500/5">
+                    <PauseCircle className="h-4 w-4 text-amber-700" />
+                    <AlertTitle className="text-amber-900 dark:text-amber-100">
+                        Venta pendiente
+                    </AlertTitle>
+                    <AlertDescription className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                        <span>
+                            Tienes una venta guardada para continuar después. Ábrela desde Nueva venta.
+                        </span>
+                        <Button
+                            size="sm"
+                            variant="outline"
+                            className="border-amber-700 text-amber-900 shrink-0"
+                            onClick={() => navigate('/ventas/nueva?recuperar=1')}
+                        >
+                            Continuar venta
+                        </Button>
+                    </AlertDescription>
+                </Alert>
+            )}
 
             {/* KPI Cards */}
             <SalesKPICards

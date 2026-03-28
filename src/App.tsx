@@ -59,6 +59,9 @@ import PromotionCreatePage from "@/components/promotions/PromotionCreatePage";
 import PromotionEditPage from "@/components/promotions/PromotionEditPage";
 import IncomingMerchandiseManagement from "@/components/IncomingMerchandiseManagement";
 import ConfigManagement from "@/components/config/ConfigManagement";
+import InventoryCountListPage from "@/components/inventoryCounts/InventoryCountListPage";
+import InventoryCountNewPage from "@/components/inventoryCounts/InventoryCountNewPage";
+import InventoryCountSessionPage from "@/components/inventoryCounts/InventoryCountSessionPage";
 
 const queryClient = new QueryClient();
 
@@ -142,6 +145,39 @@ const App = () => (
                   element={
                     <PermissionRoute any={["products.create", "products.view"]}>
                       <ProductCreatePage />
+                    </PermissionRoute>
+                  }
+                />
+                <Route
+                  path="/inventario/inventariado/nuevo"
+                  element={
+                    <PermissionRoute any={["inventory_count.create"]}>
+                      <InventoryCountNewPage />
+                    </PermissionRoute>
+                  }
+                />
+                <Route
+                  path="/inventario/inventariado/:sessionId"
+                  element={
+                    <PermissionRoute
+                      any={[
+                        "inventory_count.view",
+                        "inventory_count.count",
+                        "inventory_count.submit",
+                        "inventory_count.approve",
+                      ]}
+                    >
+                      <InventoryCountSessionPage />
+                    </PermissionRoute>
+                  }
+                />
+                <Route
+                  path="/inventario/inventariado"
+                  element={
+                    <PermissionRoute
+                      any={["inventory_count.view", "inventory_count.create", "inventory_count.count"]}
+                    >
+                      <InventoryCountListPage />
                     </PermissionRoute>
                   }
                 />

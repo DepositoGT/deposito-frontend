@@ -53,6 +53,8 @@ export const DashboardIcon = createModuleIcon(`${base}/dashboard.svg`, 'Dashboar
 export const VentasIcon = createModuleIcon(`${base}/ventas.svg`, 'VentasIcon')
 // Papirus mimetypes: package.svg (caja / productos)
 export const InventarioIcon = createModuleIcon(`${base}/inventario.svg`, 'InventarioIcon')
+// Mismo asset que analytics.svg (gráfico de barras / cuadre de cantidades)
+export const InventariadoIcon = createModuleIcon(`${base}/inventariado.svg`, 'InventariadoIcon')
 // Papirus actions: edit-undo.svg (24px)
 export const DevolucionesIcon = createModuleIcon(`${base}/devoluciones.svg`, 'DevolucionesIcon')
 // Papirus apps: org.gnome.Calculator.svg (cuadre / aritmética de caja)

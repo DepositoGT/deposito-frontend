@@ -16,6 +16,7 @@ import {
     DashboardIcon,
     VentasIcon,
     InventarioIcon,
+    InventariadoIcon,
     DevolucionesIcon,
     CierreCajaIcon,
     ProveedoresIcon,
@@ -76,6 +77,20 @@ export const appModules: AppModule[] = [
         color: 'bg-orange-100',
         iconColor: 'text-orange-600',
         permissions: ['products.view']
+    },
+    {
+        id: 'inventory-count',
+        label: 'Inventariado',
+        path: '/inventario/inventariado',
+        icon: InventariadoIcon,
+        color: 'bg-orange-100',
+        iconColor: 'text-orange-600',
+        sellerAllowed: true,
+        permissions: [
+            'inventory_count.view',
+            'inventory_count.create',
+            'inventory_count.count',
+        ]
     },
     {
         id: 'returns',

@@ -9,7 +9,7 @@
  */
 
 import { useState } from "react";
-import { getApiBaseUrl } from '@/services/api';
+import { getApiBaseUrl, getAuthToken } from '@/services/api';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
@@ -77,6 +77,16 @@ const ReportsManagement = () => {
       bgColor: "bg-primary/10",
       lastGenerated: "2024-01-10 08:15",
       size: "1.8 MB"
+    },
+    {
+      id: "inventory-counts",
+      name: "Historial de inventariados",
+      description: "Sesiones de conteo físico en el período: diferencias y mermas por sesión",
+      icon: ClipboardList,
+      color: "text-teal-600",
+      bgColor: "bg-teal-500/10",
+      lastGenerated: "—",
+      size: "—"
     },
     {
       id: "suppliers",
@@ -229,7 +239,10 @@ const ReportsManagement = () => {
                     if (fPeriod === 'quarter' && fMonth) params.set('quarter', String(Math.ceil(fMonth / 3)))
                     if (fPeriod === 'semester') params.set('semester', String(fSem))
                     params.set('format', fFormat)
-                    const res = await fetch(`${getApiBaseUrl()}/reports/${pendingReport.id}?${params.toString()}`)
+                    const token = getAuthToken()
+                    const res = await fetch(`${getApiBaseUrl()}/reports/${pendingReport.id}?${params.toString()}`, {
+                      headers: token ? { Authorization: `Bearer ${token}` } : {},
+                    })
                     if (!res.ok) throw new Error('Error al generar el reporte')
                     const blob = await res.blob()
                     const url = window.URL.createObjectURL(blob)
