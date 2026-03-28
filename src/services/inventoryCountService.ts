@@ -1,0 +1,170 @@
+/**
+ * Copyright (c) 2026 Diego Patzán. All Rights Reserved.
+ *
+ * API inventariado (sesiones de conteo físico).
+ */
+
+import { apiFetch, getApiBaseUrl, getAuthToken } from "./api";
+
+export type InventoryCountSessionStatus =
+  | "DRAFT"
+  | "IN_PROGRESS"
+  | "IN_REVIEW"
+  | "APPROVED"
+  | "CANCELLED";
+
+export type InventoryCountScope = {
+  categoryIds?: number[];
+  supplierIds?: string[];
+};
+
+export type InventoryCountSessionSummary = {
+  id: string;
+  name: string | null;
+  status: InventoryCountSessionStatus;
+  scope_json: InventoryCountScope | null;
+  notes: string | null;
+  created_at: string;
+  started_at: string | null;
+  submitted_at: string | null;
+  approved_at: string | null;
+  cancelled_at: string | null;
+  cancel_reason: string | null;
+  createdBy: { id: string; name: string; email: string };
+  approvedBy?: { id: string; name: string; email: string } | null;
+  _count?: { lines: number };
+  progress?: { totalLines: number; countedLines: number; pct: number };
+  totals?: { sumStockSnapshot: number; valueDeltaApprox: number };
+};
+
+export type InventoryCountLineRow = {
+  id: string;
+  session_id: string;
+  product_id: string;
+  stock_snapshot: number;
+  qty_counted: number | null;
+  counted_at: string | null;
+  counted_by_id: string | null;
+  note: string | null;
+  product: {
+    id: string;
+    name: string;
+    barcode: string | null;
+    stock: number;
+    cost: string | number;
+    category: { id: number; name: string };
+  };
+  countedBy?: { id: string; name: string } | null;
+  difference: number | null;
+  valueDifference: number | null;
+};
+
+const path = (p: string) => `/inventory-counts${p}`;
+
+export async function listInventorySessions(params?: {
+  status?: string;
+  offset?: number;
+  limit?: number;
+}): Promise<{ data: InventoryCountSessionSummary[]; total: number }> {
+  const sp = new URLSearchParams();
+  if (params?.status) sp.set("status", params.status);
+  if (params?.offset != null) sp.set("offset", String(params.offset));
+  if (params?.limit != null) sp.set("limit", String(params.limit));
+  const q = sp.toString();
+  return apiFetch(q ? `${path("")}?${q}` : path(""));
+}
+
+export async function getInventorySession(id: string): Promise<InventoryCountSessionSummary> {
+  return apiFetch(path(`/${id}`));
+}
+
+export async function createInventorySession(body: {
+  name?: string;
+  scope?: InventoryCountScope;
+  notes?: string;
+}): Promise<InventoryCountSessionSummary> {
+  return apiFetch(path(""), { method: "POST", body: JSON.stringify(body) });
+}
+
+export async function startInventorySession(id: string): Promise<InventoryCountSessionSummary> {
+  return apiFetch(path(`/${id}/start`), { method: "POST", body: JSON.stringify({}) });
+}
+
+export async function listInventorySessionLines(
+  sessionId: string,
+  opts?: { q?: string; offset?: number; limit?: number }
+): Promise<{ data: InventoryCountLineRow[]; total: number }> {
+  const sp = new URLSearchParams();
+  if (opts?.q) sp.set("q", opts.q);
+  if (opts?.offset != null) sp.set("offset", String(opts.offset));
+  if (opts?.limit != null) sp.set("limit", String(opts.limit));
+  const q = sp.toString();
+  return apiFetch(q ? `${path(`/${sessionId}/lines`)}?${q}` : path(`/${sessionId}/lines`));
+}
+
+export async function updateInventoryLine(
+  sessionId: string,
+  lineId: string,
+  body: { qty_counted: number; note?: string }
+): Promise<InventoryCountLineRow> {
+  return apiFetch(path(`/${sessionId}/lines/${lineId}`), {
+    method: "PATCH",
+    body: JSON.stringify(body),
+  });
+}
+
+export async function submitInventorySession(id: string): Promise<InventoryCountSessionSummary> {
+  return apiFetch(path(`/${id}/submit`), { method: "POST", body: JSON.stringify({}) });
+}
+
+export async function approveInventorySession(id: string): Promise<InventoryCountSessionSummary> {
+  return apiFetch(path(`/${id}/approve`), { method: "POST", body: JSON.stringify({}) });
+}
+
+export async function cancelInventorySession(
+  id: string,
+  reason: string
+): Promise<InventoryCountSessionSummary> {
+  return apiFetch(path(`/${id}/cancel`), {
+    method: "POST",
+    body: JSON.stringify({ reason }),
+  });
+}
+
+/** Descarga PDF o CSV del reporte de la sesión (requiere token). */
+export async function downloadInventorySessionReport(
+  sessionId: string,
+  format: "pdf" | "csv"
+): Promise<void> {
+  const token = getAuthToken();
+  const url = `${getApiBaseUrl()}/reports/inventory-count-session/${sessionId}?format=${format}`;
+  const res = await fetch(url, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  if (!res.ok) {
+    const t = await res.text();
+    throw new Error(t || `Error ${res.status}`);
+  }
+  const blob = await res.blob();
+  const dispo = res.headers.get("Content-Disposition");
+  let filename = `inventariado-${sessionId.slice(0, 8)}.${format === "pdf" ? "pdf" : "csv"}`;
+  const m = dispo?.match(/filename="?([^";]+)"?/i);
+  if (m) filename = m[1];
+  const href = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = href;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(href);
+}
+
+export function statusLabel(s: InventoryCountSessionStatus): string {
+  const map: Record<InventoryCountSessionStatus, string> = {
+    DRAFT: "Borrador",
+    IN_PROGRESS: "En conteo",
+    IN_REVIEW: "En revisión",
+    APPROVED: "Aprobado",
+    CANCELLED: "Cancelado",
+  };
+  return map[s] || s;
+}

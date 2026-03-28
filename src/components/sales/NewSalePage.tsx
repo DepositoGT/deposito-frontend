@@ -14,14 +14,15 @@
  * Derecha: productos en cards con imagen y opción de agregar a la venta.
  * Al registrar, la venta queda en estado Completada y se descuenta stock.
  */
-import { useState, useMemo } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useState, useMemo, useEffect, useCallback, useRef } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { ArrowLeft, Plus, Receipt, Search, ChevronLeft, ChevronRight } from 'lucide-react'
+import { ArrowLeft, Plus, Receipt, Search, ChevronLeft, ChevronRight, PauseCircle, RotateCcw } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { useQueryClient } from '@tanstack/react-query'
 import { useAllProducts, PRODUCTS_QUERY_KEY } from '@/hooks/useProducts'
@@ -30,6 +31,14 @@ import { useAuthPermissions } from '@/hooks/useAuthPermissions'
 import { useSystemSettings } from '@/hooks/useSystemSettings'
 import { formatMoney } from '@/utils'
 import { createSale } from '@/services/saleService'
+import {
+  saveNewSaleDraft,
+  loadNewSaleDraft,
+  clearNewSaleDraft,
+  hasNewSaleDraft,
+  type NewSaleDraft,
+} from '@/services/saleDraftStorage'
+import { useAuth } from '@/context/useAuth'
 import { getCompanyNamePublic } from '@/services/settingsService'
 import { generateSaleTicket } from './documents/generateSaleTicket'
 import type { Product } from '@/types/product'
@@ -90,9 +99,12 @@ const ProductCard = ({
 
 export default function NewSalePage() {
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
   const { toast } = useToast()
   const queryClient = useQueryClient()
+  const { user } = useAuth()
   const { hasPermission } = useAuthPermissions()
+  const userId = user?.id ?? ''
   const { locale, currencyCode, companyName } = useSystemSettings()
   const fmt = (n: number) => formatMoney(n, locale, currencyCode)
   const salesData = useSalesData()
@@ -111,6 +123,9 @@ export default function NewSalePage() {
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethodType | null>(null)
   const [amountReceived, setAmountReceived] = useState('')
   const [isProcessing, setIsProcessing] = useState(false)
+  const [promoCodesToRestore, setPromoCodesToRestore] = useState<string[] | null>(null)
+  /** Fuerza recomputar si hay borrador en localStorage (React no observa el storage). */
+  const [storedDraftRevision, setStoredDraftRevision] = useState(0)
 
   const cart = useCart({ availableProducts })
   const promotionCartItems = useMemo(
@@ -152,6 +167,232 @@ export default function NewSalePage() {
       : 0
 
   const canCreate = hasPermission('sales.create')
+
+  const [hasStoredDraft, setHasStoredDraft] = useState(false)
+  useEffect(() => {
+    setHasStoredDraft(userId ? hasNewSaleDraft(userId) : false)
+  }, [userId, storedDraftRevision])
+
+  const applyDraftToForm = useCallback(
+    (draft: NewSaleDraft) => {
+      promotions.clearPromotions()
+      setCustomer(draft.customer ?? '')
+      setCustomerNit(draft.customerNit ?? '')
+      setIsFinalConsumer(Boolean(draft.isFinalConsumer))
+      setAmountReceived(draft.amountReceived ?? '')
+      if (draft.productPageSize && [9, 18, 36, 54].includes(draft.productPageSize)) {
+        setProductPageSize(draft.productPageSize)
+      }
+
+      if (draft.paymentMethodId != null) {
+        const pm = paymentMethods.find((p) => p.id === draft.paymentMethodId)
+        if (pm) setPaymentMethod(pm)
+      } else {
+        setPaymentMethod(null)
+      }
+
+      const lines = draft.lines ?? []
+      if (lines.length > 0) {
+        const { missingProductIds, qtyAdjustedIds } = cart.hydrateFromLines(
+          lines.map((l) => ({ productId: l.productId, qty: l.qty })),
+          draft.adminAuthorizedProductIds ?? []
+        )
+        const promos = (draft.promotionCodes ?? []).filter((c) => String(c).trim().length > 0)
+        if (promos.length) setPromoCodesToRestore(promos)
+
+        if (missingProductIds.length > 0) {
+          toast({
+            title: 'Venta recuperada',
+            description: `${missingProductIds.length} producto(s) ya no están en el catálogo o sin stock.`,
+          })
+        } else {
+          toast({
+            title: 'Venta recuperada',
+            description: 'Continúa con el registro o pagos.',
+          })
+        }
+        if (qtyAdjustedIds.length > 0) {
+          toast({
+            title: 'Cantidades ajustadas',
+            description: 'Algunas líneas se ajustaron al stock disponible (sin autorización admin).',
+          })
+        }
+      } else {
+        cart.clearCart()
+        toast({
+          title: 'Venta recuperada',
+          description: 'Se restauraron datos del cliente y pago.',
+        })
+      }
+    },
+    [cart, paymentMethods, promotions, toast]
+  )
+
+  const recoverDraftIfReady = useCallback(
+    (draft: NewSaleDraft): boolean => {
+      const lines = draft.lines ?? []
+      if (!productsQuery.isSuccess) {
+        toast({
+          title: 'Espera un momento',
+          description: 'Aún se cargan los productos.',
+          variant: 'destructive',
+        })
+        return false
+      }
+      if (lines.length > 0 && availableProducts.length === 0) {
+        toast({
+          title: 'Sin productos',
+          description: 'No hay productos en catálogo para armar el carrito.',
+          variant: 'destructive',
+        })
+        return false
+      }
+      if (draft.paymentMethodId != null && paymentMethods.length === 0) {
+        toast({
+          title: 'Espera un momento',
+          description: 'Aún se cargan los métodos de pago.',
+          variant: 'destructive',
+        })
+        return false
+      }
+      applyDraftToForm(draft)
+      return true
+    },
+    [
+      productsQuery.isSuccess,
+      availableProducts.length,
+      paymentMethods.length,
+      applyDraftToForm,
+      toast,
+    ]
+  )
+
+  const handleRecoverSavedSale = useCallback(() => {
+    if (!userId) {
+      toast({ title: 'Inicia sesión', variant: 'destructive' })
+      return
+    }
+    const draft = loadNewSaleDraft(userId)
+    if (!draft) {
+      toast({
+        title: 'No hay venta guardada',
+        variant: 'destructive',
+      })
+      setStoredDraftRevision((r) => r + 1)
+      return
+    }
+    recoverDraftIfReady(draft)
+  }, [userId, recoverDraftIfReady, toast])
+
+  const recuperarQueryHandledRef = useRef(false)
+  const applyDraftRef = useRef(applyDraftToForm)
+  applyDraftRef.current = applyDraftToForm
+
+  useEffect(() => {
+    if (searchParams.get('recuperar') !== '1') {
+      recuperarQueryHandledRef.current = false
+      return
+    }
+    if (!userId) return
+    if (recuperarQueryHandledRef.current) return
+
+    const draft = loadNewSaleDraft(userId)
+    if (!draft) {
+      toast({
+        title: 'No hay venta guardada',
+        description: 'Primero guarda una venta con «Continuar después».',
+        variant: 'destructive',
+      })
+      setSearchParams({}, { replace: true })
+      return
+    }
+
+    const lines = draft.lines ?? []
+    if (!productsQuery.isSuccess) return
+    if (lines.length > 0 && availableProducts.length === 0) return
+    if (draft.paymentMethodId != null && paymentMethods.length === 0) return
+
+    applyDraftRef.current(draft)
+    recuperarQueryHandledRef.current = true
+    setSearchParams({}, { replace: true })
+  }, [
+    searchParams,
+    userId,
+    productsQuery.isSuccess,
+    availableProducts.length,
+    paymentMethods.length,
+    setSearchParams,
+    toast,
+  ])
+
+  useEffect(() => {
+    if (!promoCodesToRestore?.length) return
+    if (cart.cartItems.length === 0) {
+      setPromoCodesToRestore(null)
+      return
+    }
+    const codes = [...promoCodesToRestore]
+    setPromoCodesToRestore(null)
+    let cancelled = false
+    void (async () => {
+      for (const code of codes) {
+        if (cancelled) break
+        await promotions.applyCode(code)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- applyCode al restaurar códigos del borrador
+  }, [promoCodesToRestore, cart.cartItems.length])
+
+  const handleSaveForLater = () => {
+    if (!userId) {
+      toast({
+        title: 'No se puede guardar',
+        description: 'Debes iniciar sesión.',
+        variant: 'destructive',
+      })
+      return
+    }
+    const hasCart = cart.cartItems.length > 0
+    const hasCustomer = customer.trim().length > 0
+    if (!hasCart && !hasCustomer) {
+      toast({
+        title: 'Nada que guardar',
+        description: 'Agrega productos o al menos el nombre del cliente.',
+        variant: 'destructive',
+      })
+      return
+    }
+    saveNewSaleDraft(userId, {
+      customer,
+      customerNit,
+      isFinalConsumer,
+      paymentMethodId: paymentMethod?.id ?? null,
+      amountReceived,
+      lines: cart.cartItems.map((item) => ({ productId: item.id, qty: item.qty })),
+      adminAuthorizedProductIds: [...cart.adminAuthorizedProducts],
+      promotionCodes: promotions.promotionCodes,
+      productPageSize,
+    })
+    cart.clearCart()
+    promotions.clearPromotions()
+    setCustomer('')
+    setCustomerNit('')
+    setIsFinalConsumer(false)
+    setPaymentMethod(null)
+    setAmountReceived('')
+    setProductSearch('')
+    setProductPage(1)
+    setPromoCodesToRestore(null)
+    setStoredDraftRevision((r) => r + 1)
+    toast({
+      title: 'Venta guardada',
+      description:
+        'Puedes empezar otra venta aquí. Recupera la guardada con «Recuperar venta guardada» o desde el listado de Ventas.',
+    })
+  }
 
   const handleSubmit = async () => {
     if (!canCreate) {
@@ -213,6 +454,10 @@ export default function NewSalePage() {
       toast({ title: 'Venta registrada correctamente' })
       salesData.refreshSales()
       await queryClient.invalidateQueries({ queryKey: PRODUCTS_QUERY_KEY })
+      if (userId) {
+        clearNewSaleDraft(userId)
+        setStoredDraftRevision((r) => r + 1)
+      }
       cart.clearCart()
       promotions.clearPromotions()
       setCustomer('')
@@ -243,6 +488,31 @@ export default function NewSalePage() {
           </p>
         </div>
       </div>
+
+      {hasStoredDraft && (
+        <Alert className="mb-6 border-amber-500/50 bg-amber-500/5">
+          <RotateCcw className="h-4 w-4 text-amber-700" />
+          <AlertTitle className="text-amber-900 dark:text-amber-100">
+            Tienes una venta guardada
+          </AlertTitle>
+          <AlertDescription className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <span>
+              No se carga sola: pulsa recuperar para continuar con esa venta o empieza otra abajo.
+            </span>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="border-amber-700 text-amber-900 shrink-0"
+              onClick={handleRecoverSavedSale}
+              disabled={isProcessing}
+            >
+              <RotateCcw className="w-4 h-4 mr-2" />
+              Recuperar venta guardada
+            </Button>
+          </AlertDescription>
+        </Alert>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
         {/* Columna izquierda: información de la venta */}
@@ -420,14 +690,16 @@ export default function NewSalePage() {
             onRemovePromotion={promotions.removePromotion}
           />
 
-          <div className="flex gap-2">
+          <div className="flex flex-col sm:flex-row gap-2">
             <Button
-              variant="outline"
-              className="flex-1"
-              onClick={() => navigate('/ventas')}
-              disabled={isProcessing}
+              type="button"
+              variant="secondary"
+              className="flex-1 border-dashed"
+              onClick={handleSaveForLater}
+              disabled={isProcessing || (!cart.cartItems.length && !customer.trim())}
             >
-              Volver a ventas
+              <PauseCircle className="w-4 h-4 mr-2" />
+              Guardar y continuar después
             </Button>
             <Button
               className="flex-1 bg-primary"
