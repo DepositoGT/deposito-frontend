@@ -177,7 +177,7 @@ export default function ImportPage() {
             try {
                 const [catData, supData] = await Promise.all([
                     apiFetch<unknown>('/api/catalogs/product-categories?page=1&pageSize=1000'),
-                    apiFetch<unknown>('/api/suppliers?page=1&pageSize=1000')
+                    apiFetch<unknown>('/api/suppliers?page=1&pageSize=1000&party_type=SUPPLIER')
                 ])
 
                 if (catData) {

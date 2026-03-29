@@ -17,6 +17,7 @@ export * from "./alert";
 export * from "./auth";
 
 import type { ComponentType, SVGProps } from "react";
+import type { ModuleIconComponent } from "@/components/icons/CustomIcons";
 
 export type IconComponent = ComponentType<SVGProps<SVGSVGElement>>;
 
@@ -31,7 +32,7 @@ export interface Report {
   id: string;
   name: string;
   description: string;
-  icon: IconComponent;
+  icon: ModuleIconComponent;
   color: string;
   bgColor: string;
   size: string;

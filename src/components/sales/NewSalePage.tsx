@@ -49,6 +49,7 @@ import {
   AvailabilityDialog,
   AdminAuthDialog,
   PromotionCodeInput,
+  SavedCustomerMany2One,
 } from './components'
 import type { CartProduct } from './types'
 
@@ -119,6 +120,7 @@ export default function NewSalePage() {
   const [productPageSize, setProductPageSize] = useState(9)
   const [customer, setCustomer] = useState('')
   const [customerNit, setCustomerNit] = useState('')
+  const [pickedCustomerId, setPickedCustomerId] = useState<string>('__none__')
   const [isFinalConsumer, setIsFinalConsumer] = useState(false)
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethodType | null>(null)
   const [amountReceived, setAmountReceived] = useState('')
@@ -137,6 +139,9 @@ export default function NewSalePage() {
       })),
     [cart.cartItems]
   )
+  const canPickSavedCustomer = hasPermission('contacts.clients.view')
+  const canCreateClientContact = hasPermission('contacts.clients.create')
+
   const promotions = usePromotions({
     cartItems: promotionCartItems,
     cartTotal: cart.cartTotal,
@@ -178,6 +183,11 @@ export default function NewSalePage() {
       promotions.clearPromotions()
       setCustomer(draft.customer ?? '')
       setCustomerNit(draft.customerNit ?? '')
+      setPickedCustomerId(
+        draft.pickedCustomerId && String(draft.pickedCustomerId).trim()
+          ? String(draft.pickedCustomerId)
+          : '__none__'
+      )
       setIsFinalConsumer(Boolean(draft.isFinalConsumer))
       setAmountReceived(draft.amountReceived ?? '')
       if (draft.productPageSize && [9, 18, 36, 54].includes(draft.productPageSize)) {
@@ -368,6 +378,7 @@ export default function NewSalePage() {
     saveNewSaleDraft(userId, {
       customer,
       customerNit,
+      pickedCustomerId: pickedCustomerId === '__none__' ? undefined : pickedCustomerId,
       isFinalConsumer,
       paymentMethodId: paymentMethod?.id ?? null,
       amountReceived,
@@ -380,6 +391,7 @@ export default function NewSalePage() {
     promotions.clearPromotions()
     setCustomer('')
     setCustomerNit('')
+    setPickedCustomerId('__none__')
     setIsFinalConsumer(false)
     setPaymentMethod(null)
     setAmountReceived('')
@@ -462,6 +474,7 @@ export default function NewSalePage() {
       promotions.clearPromotions()
       setCustomer('')
       setCustomerNit('')
+      setPickedCustomerId('__none__')
       setPaymentMethod(null)
       setAmountReceived('')
     } catch (e) {
@@ -522,22 +535,44 @@ export default function NewSalePage() {
               <CardTitle className="text-base">Información de la venta</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
+              {canPickSavedCustomer && (
+                <SavedCustomerMany2One
+                  valueId={pickedCustomerId}
+                  linkedDisplayName={customer}
+                  onPick={(row) => {
+                    setPickedCustomerId(String(row.id))
+                    setCustomer(row.name)
+                    setCustomerNit(row.taxId ?? '')
+                    setIsFinalConsumer(false)
+                  }}
+                  onClear={() => {
+                    setPickedCustomerId('__none__')
+                  }}
+                  canCreateContact={canCreateClientContact}
+                />
+              )}
               <div>
                 <Label htmlFor="customer">Cliente *</Label>
                 <Input
                   id="customer"
-                  placeholder="Nombre del cliente"
+                  placeholder="Nombre o razón social"
                   value={customer}
-                  onChange={(e) => setCustomer(e.target.value)}
+                  onChange={(e) => {
+                    setCustomer(e.target.value)
+                    setPickedCustomerId('__none__')
+                  }}
                 />
               </div>
               <div>
-                <Label htmlFor="nit">NIT</Label>
+                <Label htmlFor="nit">ID fiscal</Label>
                 <Input
                   id="nit"
-                  placeholder="12345678-9"
+                  placeholder="NIT, VAT, RFC, etc."
                   value={customerNit}
-                  onChange={(e) => setCustomerNit(e.target.value)}
+                  onChange={(e) => {
+                    setCustomerNit(e.target.value)
+                    setPickedCustomerId('__none__')
+                  }}
                   disabled={isFinalConsumer}
                 />
               </div>

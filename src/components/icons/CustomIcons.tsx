@@ -13,6 +13,10 @@ export type ModuleIconProps = {
     id?: string
 }
 
+export type ModuleIconComponent = ForwardRefExoticComponent<
+    ModuleIconProps & RefAttributes<HTMLSpanElement>
+>
+
 function createModuleIcon(
     src: string,
     displayName: string
@@ -65,6 +69,8 @@ export const ProveedoresIcon = createModuleIcon(`${base}/proveedores.svg`, 'Prov
 export const AnalyticsIcon = createModuleIcon(`${base}/analytics.svg`, 'AnalyticsIcon')
 // Papirus mimetypes: x-office-spreadsheet.svg
 export const ReportesIcon = createModuleIcon(`${base}/reportes.svg`, 'ReportesIcon')
+// Papirus apps: libreoffice-calc.svg (P&L / cuadros financieros)
+export const ReporteFinancieroIcon = createModuleIcon(`${base}/reporte-financiero.svg`, 'ReporteFinancieroIcon')
 // Papirus apps: gnome-warning.svg
 export const AlertasIcon = createModuleIcon(`${base}/alertas.svg`, 'AlertasIcon')
 // Papirus apps: org.gnome.SimpleScan.svg

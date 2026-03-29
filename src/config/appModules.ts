@@ -112,13 +112,13 @@ export const appModules: AppModule[] = [
         permissions: ['cashclosure.view']
     },
     {
-        id: 'suppliers',
-        label: 'Proveedores',
-        path: '/proveedores',
+        id: 'contacts',
+        label: 'Contactos',
+        path: '/contactos',
         icon: ProveedoresIcon,
         color: 'bg-orange-100',
         iconColor: 'text-orange-600',
-        permissions: ['suppliers.view']
+        permissions: ['contacts.suppliers.view', 'contacts.clients.view']
     },
     {
         id: 'merchandise',

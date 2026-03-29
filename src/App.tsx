@@ -12,7 +12,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useParams } from "react-router-dom";
 import NotFound from "./pages/NotFound";
 import PublicRoute from "@/routes/PublicRoute";
 import PrivateRoute from "@/routes/PrivateRoute";
@@ -62,6 +62,11 @@ import ConfigManagement from "@/components/config/ConfigManagement";
 import InventoryCountListPage from "@/components/inventoryCounts/InventoryCountListPage";
 import InventoryCountNewPage from "@/components/inventoryCounts/InventoryCountNewPage";
 import InventoryCountSessionPage from "@/components/inventoryCounts/InventoryCountSessionPage";
+
+function LegacyProveedorIdRedirect() {
+  const { id } = useParams<{ id: string }>();
+  return <Navigate to={`/contactos/${id ?? ""}`} replace />;
+}
 
 const queryClient = new QueryClient();
 
@@ -234,35 +239,39 @@ const App = () => (
                   }
                 />
 
-                {/* Suppliers */}
+                {/* Contactos (API /suppliers; rutas antiguas /proveedores redirigen) */}
+                <Route path="/proveedores" element={<Navigate to="/contactos" replace />} />
+                <Route path="/proveedores/nuevo" element={<Navigate to="/contactos/nuevo" replace />} />
+                <Route path="/proveedores/importar" element={<Navigate to="/contactos/importar" replace />} />
+                <Route path="/proveedores/:id" element={<LegacyProveedorIdRedirect />} />
                 <Route
-                  path="/proveedores"
+                  path="/contactos"
                   element={
-                    <PermissionRoute any={["suppliers.view"]}>
+                    <PermissionRoute any={["contacts.suppliers.view", "contacts.clients.view"]}>
                       <SuppliersManagement />
                     </PermissionRoute>
                   }
                 />
                 <Route
-                  path="/proveedores/nuevo"
+                  path="/contactos/nuevo"
                   element={
-                    <PermissionRoute any={["suppliers.create", "suppliers.view"]}>
+                    <PermissionRoute any={["contacts.suppliers.create", "contacts.clients.create"]}>
                       <SupplierCreatePage />
                     </PermissionRoute>
                   }
                 />
                 <Route
-                  path="/proveedores/importar"
+                  path="/contactos/importar"
                   element={
-                    <PermissionRoute any={["suppliers.import"]}>
+                    <PermissionRoute any={["contacts.suppliers.import"]}>
                       <SupplierImportPage />
                     </PermissionRoute>
                   }
                 />
                 <Route
-                  path="/proveedores/:id"
+                  path="/contactos/:id"
                   element={
-                    <PermissionRoute any={["suppliers.view"]}>
+                    <PermissionRoute any={["contacts.suppliers.view", "contacts.clients.view"]}>
                       <SupplierDetailPage />
                     </PermissionRoute>
                   }

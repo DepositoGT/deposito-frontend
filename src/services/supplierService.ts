@@ -33,6 +33,9 @@ export interface ApiSupplier {
   categoryNames?: string[] | null;
   payment_term?: { id: number | string; name: string } | null;
   productsList?: ApiProduct[] | null;
+  party_type?: string | null;
+  tax_id?: string | null;
+  entity_kind?: string | null;
   [key: string]: unknown;
 }
 
@@ -101,9 +104,16 @@ export const adaptApiSupplier = (s: ApiSupplier): Supplier => {
     ? s.productsList.map(adaptApiProduct)
     : undefined;
 
+  const pt = s.party_type === "CUSTOMER" ? "CUSTOMER" : "SUPPLIER";
+  const entityKind = s.entity_kind === "PERSON" ? "PERSON" : "ORGANIZATION";
+  const taxId =
+    s.tax_id != null && String(s.tax_id).trim() !== "" ? String(s.tax_id).trim() : undefined;
   return {
     id: String(s.id),
+    party_type: pt,
+    entityKind,
     name: s.name,
+    taxId,
     contact: s.contact ?? "",
     phone: s.phone ?? "",
     email: s.email ?? "",
@@ -127,6 +137,8 @@ export interface SuppliersQueryParams {
   pageSize?: number;
   search?: string;
   category_id?: number | string;
+  /** Filtra por tipo de contacto en API (SUPPLIER | CUSTOMER) */
+  party_type?: string;
 }
 
 export interface SuppliersResponse {
@@ -145,7 +157,8 @@ export const fetchSuppliers = async (params?: SuppliersQueryParams): Promise<Sup
   if (params?.pageSize) queryParams.append("pageSize", String(params.pageSize));
   if (params?.search) queryParams.append("search", params.search);
   if (params?.category_id) queryParams.append("category_id", String(params.category_id));
-  
+  if (params?.party_type) queryParams.append("party_type", String(params.party_type));
+
   const url = `/api/suppliers${queryParams.toString() ? `?${queryParams.toString()}` : ""}`;
   const data = await apiFetch<{
     items: ApiSupplier[];
@@ -170,7 +183,7 @@ export const fetchSuppliers = async (params?: SuppliersQueryParams): Promise<Sup
 
 // Helper function to fetch all suppliers (for components that need the full list)
 export const fetchAllSuppliers = async (): Promise<Supplier[]> => {
-  const response = await fetchSuppliers({ page: 1, pageSize: 1000 });
+  const response = await fetchSuppliers({ page: 1, pageSize: 1000, party_type: "SUPPLIER" });
   return response.items;
 };
 
@@ -180,12 +193,17 @@ export interface CreateSupplierPayload {
   phone?: string;
   email?: string;
   address?: string;
+  party_type?: "SUPPLIER" | "CUSTOMER";
   // Nuevo contrato: enviar múltiples categorías (ids numéricos o string)
   category_ids?: Array<number | string>;
   /** 0 = inactivo, 1 = activo */
   estado?: number;
   payment_terms_id?: number | string;
   rating?: number;
+  /** ID fiscal (NIT, VAT, RFC, …); opcional */
+  tax_id?: string | null;
+  /** Persona individual vs empresa */
+  entity_kind?: "PERSON" | "ORGANIZATION";
 }
 
 export const createSupplier = async (payload: CreateSupplierPayload): Promise<ApiSupplier> => {

@@ -91,14 +91,25 @@ const SuppliersManagement = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(18);
   const [viewMode, setViewMode] = useState<"table" | "cards">("cards");
+  const [partyFilter, setPartyFilter] = useState<"all" | "SUPPLIER" | "CUSTOMER">("all");
   const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(null);
   const [isImportOpen, setIsImportOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
+
+  const { toast } = useToast();
+  const { hasPermission } = useAuthPermissions();
+  const location = useLocation();
+
+  const canViewSup = hasPermission("contacts.suppliers.view");
+  const canViewCli = hasPermission("contacts.clients.view");
+  const showPartyTabs = canViewSup && canViewCli;
 
   const { data: suppliersData, isLoading, isError } = useSuppliers({
     page: currentPage,
     pageSize,
     search: searchTerm || undefined,
+    party_type:
+      showPartyTabs && partyFilter !== "all" ? partyFilter : undefined,
   });
   
   const suppliers: Supplier[] = suppliersData?.items ?? [];
@@ -121,31 +132,34 @@ const SuppliersManagement = () => {
     return paymentTermsData?.items ?? [];
   }, [paymentTermsData]);
 
-  const { toast } = useToast();
-  const { hasPermission } = useAuthPermissions();
-  const location = useLocation();
+  const canCreate =
+    hasPermission("contacts.suppliers.create") || hasPermission("contacts.clients.create");
+  const canEditSup = hasPermission("contacts.suppliers.edit");
+  const canEditCli = hasPermission("contacts.clients.edit");
+  const canDeleteSup = hasPermission("contacts.suppliers.delete");
+  const canDeleteCli = hasPermission("contacts.clients.delete");
+  const canImport = hasPermission("contacts.suppliers.import");
 
-  const canCreate = hasPermission("suppliers.create");
-  const canEdit = hasPermission("suppliers.edit");
-  const canDelete = hasPermission("suppliers.delete");
-  const canImport = hasPermission("suppliers.import");
+  const canEditContact = (s: Supplier) =>
+    s.party_type === "CUSTOMER" ? canEditCli : canEditSup;
+  const canDeleteContact = (s: Supplier) =>
+    s.party_type === "CUSTOMER" ? canDeleteCli : canDeleteSup;
 
   // Reset page when search term or page size changes
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, pageSize]);
+  }, [searchTerm, pageSize, partyFilter]);
 
   // Abrir modal de edición si venimos desde el detalle con un id específico
   useEffect(() => {
-    if (!canEdit) return;
     const state = location.state as { editSupplierId?: string } | null;
     const editId = state?.editSupplierId;
     if (!editId || !suppliers.length) return;
     const supplierToEdit = suppliers.find((s) => String(s.id) === String(editId));
-    if (supplierToEdit) {
+    if (supplierToEdit && canEditContact(supplierToEdit)) {
       editSupplier(supplierToEdit);
     }
-  }, [location.state, suppliers, canEdit]);
+  }, [location.state, suppliers, canEditSup, canEditCli]);
 
   const stats: SupplierStats = {
     totalSuppliers: totalItems,
@@ -163,6 +177,7 @@ const SuppliersManagement = () => {
   const [editCategoryIds, setEditCategoryIds] = useState<string[]>([]);
   const [editPaymentTermId, setEditPaymentTermId] = useState<string | undefined>(undefined);
   const [editAddress, setEditAddress] = useState<string>("");
+  const [editTaxId, setEditTaxId] = useState<string>("");
 
   // fetch supplier details when editing
   const supplierIdToLoad = selectedSupplier?.id;
@@ -189,6 +204,8 @@ const SuppliersManagement = () => {
       setEditCategoryIds([]);
     }
     setEditPaymentTermId(supplierData.payment_terms_id ? String(supplierData.payment_terms_id) : undefined);
+    const rawTax = supplierData as { tax_id?: string | null };
+    setEditTaxId(rawTax.tax_id != null && String(rawTax.tax_id).trim() ? String(rawTax.tax_id).trim() : "");
     const raw = supplierData as { estado?: number };
     setEditEstado(raw.estado !== undefined && raw.estado !== null ? Number(raw.estado) : 1);
   }, [supplierData]);
@@ -199,7 +216,7 @@ const SuppliersManagement = () => {
   const updateIsLoading = updateMutation.isPending;
 
   const viewSupplier = (supplier: Supplier) => {
-    navigate(`/proveedores/${supplier.id}`);
+    navigate(`/contactos/${supplier.id}`);
   };
 
   const editSupplier = (supplier: Supplier) => {
@@ -215,14 +232,14 @@ const SuppliersManagement = () => {
   const deleteSupplier = async (supplierId: string) => {
     try {
       await deleteMutateAsync(supplierId);
-      toast({ title: "Proveedor eliminado", description: "El proveedor ha sido eliminado correctamente" });
+      toast({ title: "Contacto eliminado", description: "Se eliminó correctamente" });
       
       // If current page becomes empty after deletion, go to previous page
       if (suppliers.length === 1 && currentPage > 1) {
         setCurrentPage(currentPage - 1);
       }
     } catch (err: unknown) {
-      let message = "No se pudo eliminar el proveedor";
+      let message = "No se pudo eliminar el contacto";
       if (err && typeof err === "object" && "message" in err) {
         const m = (err as { message?: unknown }).message;
         if (m !== undefined) message = String(m) || message;
@@ -243,8 +260,8 @@ const SuppliersManagement = () => {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-foreground">Gestión de Proveedores</h2>
-          <p className="text-muted-foreground">Administra tus socios comerciales</p>
+          <h2 className="text-2xl font-bold text-foreground">Contactos</h2>
+          <p className="text-muted-foreground">Proveedores y clientes</p>
         </div>
 
         <div className="flex gap-2">
@@ -261,9 +278,9 @@ const SuppliersManagement = () => {
             </>
           )}
           {canCreate && (
-            <Button className="bg-liquor-amber hover:bg-liquor-amber/90 text-white" onClick={() => navigate("/proveedores/nuevo")}>
+            <Button className="bg-liquor-amber hover:bg-liquor-amber/90 text-white" onClick={() => navigate("/contactos/nuevo")}>
               <Plus className="w-4 h-4 mr-2" />
-              Nuevo Proveedor
+              Nuevo contacto
             </Button>
           )}
         </div>
@@ -275,7 +292,7 @@ const SuppliersManagement = () => {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Total Proveedores</p>
+                <p className="text-sm text-muted-foreground">Total en vista</p>
                 <p className="text-2xl font-bold text-foreground">{stats.totalSuppliers}</p>
               </div>
               <Users className="w-8 h-8 text-primary" />
@@ -287,7 +304,7 @@ const SuppliersManagement = () => {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Proveedores Activos</p>
+                <p className="text-sm text-muted-foreground">Activos en vista</p>
                 <p className="text-2xl font-bold text-foreground">{stats.activeSuppliers}</p>
               </div>
               <TrendingUp className="w-8 h-8 text-liquor-gold" />
@@ -311,7 +328,36 @@ const SuppliersManagement = () => {
       {/* Filtros */}
       <Card>
         <CardContent className="p-4">
-          <div className="flex items-center gap-4">
+          <div className="flex flex-col gap-4">
+            {showPartyTabs && (
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={partyFilter === "all" ? "default" : "outline"}
+                  onClick={() => setPartyFilter("all")}
+                >
+                  Todos
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={partyFilter === "SUPPLIER" ? "default" : "outline"}
+                  onClick={() => setPartyFilter("SUPPLIER")}
+                >
+                  Proveedores
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={partyFilter === "CUSTOMER" ? "default" : "outline"}
+                  onClick={() => setPartyFilter("CUSTOMER")}
+                >
+                  Clientes
+                </Button>
+              </div>
+            )}
+            <div className="flex items-center gap-4">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input
@@ -343,23 +389,24 @@ const SuppliersManagement = () => {
                 <LayoutGrid className="w-4 h-4" />
               </Button>
             </div>
+            </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* Lista de Proveedores */}
+      {/* Lista de contactos */}
       {isLoading && (
-        <div className="p-6 text-muted-foreground">Cargando proveedores...</div>
+        <div className="p-6 text-muted-foreground">Cargando contactos...</div>
       )}
       {isError && !isLoading && (
-        <div className="p-6 text-destructive">Error al cargar proveedores.</div>
+        <div className="p-6 text-destructive">Error al cargar contactos.</div>
       )}
       {!isLoading && !isError && (
         <>
           {suppliers.length === 0 ? (
             <Card>
               <CardContent className="p-6 text-center text-muted-foreground">
-                No hay proveedores para mostrar.
+                No hay contactos para mostrar.
               </CardContent>
             </Card>
           ) : viewMode === "table" ? (
@@ -369,7 +416,8 @@ const SuppliersManagement = () => {
                   <table className="w-full">
                     <thead>
                       <tr className="border-b">
-                        <th className="text-left p-4 font-medium">Proveedor</th>
+                        <th className="text-left p-4 font-medium">Nombre</th>
+                        <th className="text-left p-4 font-medium">Tipo</th>
                         <th className="text-left p-4 font-medium">Categoría</th>
                         <th className="text-left p-4 font-medium">Contacto</th>
                         <th className="text-left p-4 font-medium">Teléfono</th>
@@ -386,8 +434,15 @@ const SuppliersManagement = () => {
                             <div className="font-medium">{supplier.name}</div>
                           </td>
                           <td className="p-4">
+                            <Badge variant="secondary" className="text-xs">
+                              {supplier.party_type === "CUSTOMER" ? "Cliente" : "Proveedor"}
+                            </Badge>
+                          </td>
+                          <td className="p-4">
                             <span className="text-sm text-muted-foreground">
-                              {supplier.categoriesLabel || String(supplier.category)}
+                              {supplier.party_type === "CUSTOMER"
+                                ? "—"
+                                : supplier.categoriesLabel || String(supplier.category)}
                             </span>
                           </td>
                           <td className="p-4">
@@ -434,7 +489,7 @@ const SuppliersManagement = () => {
                                     variant="outline"
                                     size="sm"
                                     className="text-destructive hover:text-destructive"
-                                    disabled={deleteIsLoading}
+                                    disabled={deleteIsLoading || !canDeleteContact(supplier)}
                                   >
                                     <Trash2 className="w-4 h-4 mr-1" />
                                     Eliminar
@@ -442,9 +497,9 @@ const SuppliersManagement = () => {
                                 </AlertDialogTrigger>
                                 <AlertDialogContent>
                                   <AlertDialogHeader>
-                                    <AlertDialogTitle>¿Eliminar Proveedor?</AlertDialogTitle>
+                                    <AlertDialogTitle>¿Eliminar contacto?</AlertDialogTitle>
                                     <AlertDialogDescription>
-                                      Esta acción no se puede deshacer. Se eliminará permanentemente el proveedor "{supplier.name}" y toda su información asociada.
+                                      Esta acción no se puede deshacer. Se eliminará el contacto &quot;{supplier.name}&quot;.
                                     </AlertDialogDescription>
                                   </AlertDialogHeader>
                                   <AlertDialogFooter>
@@ -490,9 +545,16 @@ const SuppliersManagement = () => {
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
                       <CardTitle className="text-base text-foreground">{supplier.name}</CardTitle>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        {supplier.categoriesLabel || String(supplier.category)}
-                      </p>
+                      <div className="flex flex-wrap items-center gap-2 mt-1">
+                        <Badge variant="outline" className="text-[10px]">
+                          {supplier.party_type === "CUSTOMER" ? "Cliente" : "Proveedor"}
+                        </Badge>
+                        <p className="text-xs text-muted-foreground">
+                          {supplier.party_type === "CUSTOMER"
+                            ? "—"
+                            : supplier.categoriesLabel || String(supplier.category)}
+                        </p>
+                      </div>
                     </div>
                     <div className="flex items-center space-x-2">
                       {getStatusBadge(String(supplier.status))}
@@ -538,7 +600,7 @@ const SuppliersManagement = () => {
                           variant="outline"
                           size="sm"
                           className="text-destructive hover:text-destructive h-7 text-xs"
-                          disabled={deleteIsLoading}
+                          disabled={deleteIsLoading || !canDeleteContact(supplier)}
                         >
                           <Trash2 className="w-3 h-3 mr-1" />
                           Eliminar
@@ -546,9 +608,9 @@ const SuppliersManagement = () => {
                       </AlertDialogTrigger>
                       <AlertDialogContent>
                         <AlertDialogHeader>
-                          <AlertDialogTitle>¿Eliminar Proveedor?</AlertDialogTitle>
+                          <AlertDialogTitle>¿Eliminar contacto?</AlertDialogTitle>
                           <AlertDialogDescription>
-                            Esta acción no se puede deshacer. Se eliminará permanentemente el proveedor "{supplier.name}" y toda su información asociada.
+                            Esta acción no se puede deshacer. Se eliminará el contacto &quot;{supplier.name}&quot;.
                           </AlertDialogDescription>
                         </AlertDialogHeader>
                         <AlertDialogFooter>
@@ -610,11 +672,11 @@ const SuppliersManagement = () => {
         </>
       )}
 
-      {/* Modal Editar Proveedor */}
+      {/* Modal editar contacto */}
       <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>Editar Proveedor</DialogTitle>
+            <DialogTitle>Editar contacto</DialogTitle>
           </DialogHeader>
           {selectedSupplier && (
             <div className="grid grid-cols-2 gap-4">
@@ -637,6 +699,7 @@ const SuppliersManagement = () => {
                 </div>
               </div>
               <div className="space-y-4">
+                {selectedSupplier?.party_type !== "CUSTOMER" && (
                 <div>
                   <Label htmlFor="edit-category">Categorías</Label>
                   <Popover>
@@ -713,6 +776,7 @@ const SuppliersManagement = () => {
                     </div>
                   )}
                 </div>
+                )}
                 <div>
                   <Label htmlFor="edit-terms">Términos de Pago</Label>
                   <Select value={editPaymentTermId} onValueChange={(v) => setEditPaymentTermId(v)}>
@@ -753,6 +817,15 @@ const SuppliersManagement = () => {
                   <Label htmlFor="edit-address">Dirección</Label>
                   <Textarea id="edit-address" value={editAddress} onChange={(e) => setEditAddress(e.target.value)} rows={3} />
                 </div>
+                <div>
+                  <Label htmlFor="edit-tax-id">ID fiscal (facturación)</Label>
+                  <Input
+                    id="edit-tax-id"
+                    value={editTaxId}
+                    onChange={(e) => setEditTaxId(e.target.value)}
+                    placeholder="NIT, VAT, RFC, etc."
+                  />
+                </div>
               </div>
             </div>
           )}
@@ -762,7 +835,7 @@ const SuppliersManagement = () => {
             </Button>
             <Button
               className="bg-liquor-amber hover:bg-liquor-amber/90 text-white"
-              disabled={updateIsLoading}
+              disabled={updateIsLoading || (selectedSupplier ? !canEditContact(selectedSupplier) : true)}
               onClick={async () => {
                 if (!selectedSupplier) return;
 
@@ -823,10 +896,22 @@ const SuppliersManagement = () => {
                   return;
                 }
 
-                if (!editCategoryIds || editCategoryIds.length === 0) {
+                if (
+                  selectedSupplier.party_type !== "CUSTOMER" &&
+                  (!editCategoryIds || editCategoryIds.length === 0)
+                ) {
                   toast({
                     title: "Campo requerido",
-                    description: "Debes seleccionar al menos una categoría",
+                    description: "Debes seleccionar al menos una categoría para un proveedor",
+                    variant: "destructive"
+                  });
+                  return;
+                }
+
+                if (!editPaymentTermId) {
+                  toast({
+                    title: "Campo requerido",
+                    description: "Los términos de pago son obligatorios",
                     variant: "destructive"
                   });
                   return;
@@ -840,15 +925,19 @@ const SuppliersManagement = () => {
                       phone: editPhone.trim(),
                       email: editEmail.trim(),
                       address: editAddress.trim(),
-                      category_ids: editCategoryIds.map((id) => Number(id)),
-                      payment_terms_id: editPaymentTermId ? Number(editPaymentTermId) : undefined,
+                      tax_id: editTaxId.trim() || null,
+                      category_ids:
+                        selectedSupplier.party_type === "CUSTOMER"
+                          ? undefined
+                          : editCategoryIds.map((id) => Number(id)),
+                      payment_terms_id: Number(editPaymentTermId),
                       estado: editEstado,
                     }
                   });
                   setIsEditOpen(false);
-                  toast({ title: "Proveedor Actualizado", description: "Los datos del proveedor han sido actualizados exitosamente" });
+                  toast({ title: "Contacto actualizado", description: "Los cambios se guardaron correctamente" });
                 } catch (err: unknown) {
-                  let message = "No se pudo actualizar el proveedor";
+                  let message = "No se pudo actualizar el contacto";
                   if (err && typeof err === "object" && "message" in err) {
                     const m = (err as { message?: unknown }).message;
                     if (m !== undefined) message = String(m) || message;
