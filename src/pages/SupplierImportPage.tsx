@@ -73,14 +73,20 @@ import { cn } from '@/lib/utils'
 
 // System fields available for mapping (Supplier fields)
 const SYSTEM_FIELDS = [
+    {
+        id: 'entity_kind',
+        label: 'Naturaleza (empresa / persona)',
+        required: false,
+        type: 'string',
+    },
     { id: 'name', label: 'Nombre', required: true, type: 'string' },
-    { id: 'contact', label: 'Contacto', required: true, type: 'string' },
+    { id: 'contact', label: 'Contacto', required: false, type: 'string' },
     { id: 'phone', label: 'Teléfono', required: true, type: 'string' },
     { id: 'email', label: 'Email', required: true, type: 'string' },
     { id: 'address', label: 'Dirección', required: true, type: 'string' },
     { id: 'category', label: 'Categoría', required: true, type: 'relation' },
-    { id: 'payment_terms', label: 'Términos de Pago', required: false, type: 'relation' },
-    { id: 'rating', label: 'Calificación', required: false, type: 'number' },
+    { id: 'payment_terms', label: 'Términos de Pago', required: true, type: 'relation' },
+    { id: 'tax_id', label: 'ID fiscal', required: false, type: 'string' },
 ]
 
 interface ColumnMapping {
@@ -152,10 +158,10 @@ export default function SupplierImportPage() {
                 sessionStorage.removeItem('import:fileData')
             } catch (err) {
                 console.error('Error loading file from sessionStorage:', err)
-                navigate('/proveedores')
+                navigate('/contactos')
             }
         } else {
-            navigate('/proveedores')
+            navigate('/contactos')
         }
     }, [navigate])
 
@@ -213,14 +219,26 @@ export default function SupplierImportPage() {
             const lowerCol = col.toLowerCase().trim()
             let autoField: string | null = null
 
-            if (lowerCol.includes('nombre') || lowerCol === 'name') autoField = 'name'
+            if (
+                lowerCol.includes('naturaleza') ||
+                lowerCol.includes('tipo_entidad') ||
+                lowerCol === 'entity_kind'
+            )
+                autoField = 'entity_kind'
+            else if (lowerCol.includes('nombre') || lowerCol === 'name') autoField = 'name'
             else if (lowerCol.includes('contacto') || lowerCol === 'contact') autoField = 'contact'
             else if (lowerCol.includes('telefono') || lowerCol === 'phone') autoField = 'phone'
             else if (lowerCol.includes('email') || lowerCol.includes('correo')) autoField = 'email'
             else if (lowerCol.includes('direccion') || lowerCol === 'address') autoField = 'address'
             else if (lowerCol.includes('categor')) autoField = 'category'
             else if (lowerCol.includes('pago') || lowerCol.includes('payment')) autoField = 'payment_terms'
-            else if (lowerCol.includes('calificacion') || lowerCol === 'rating') autoField = 'rating'
+            else if (
+                lowerCol.includes('fiscal') ||
+                lowerCol.includes('nit') ||
+                lowerCol === 'tax_id' ||
+                lowerCol === 'rfc'
+            )
+                autoField = 'tax_id'
 
             return { excelColumn: col, systemField: autoField, sampleData: samples }
         })
@@ -331,6 +349,13 @@ export default function SupplierImportPage() {
                         else if (error.includes('direccion')) fieldErrors.address = [...(fieldErrors.address || []), error]
                         else if (error.includes('categoria') || error.includes('Categoría')) fieldErrors.category = [...(fieldErrors.category || []), error]
                         else if (error.includes('terminos') || error.includes('Términos')) fieldErrors.payment_terms = [...(fieldErrors.payment_terms || []), error]
+                        else if (
+                            error.includes('entidad') ||
+                            error.includes('Tipo de entidad') ||
+                            error.includes('naturaleza')
+                        )
+                            fieldErrors.entity_kind = [...(fieldErrors.entity_kind || []), error]
+                        else if (error.includes('fiscal') || error.includes('tax')) fieldErrors.tax_id = [...(fieldErrors.tax_id || []), error]
                         else fieldErrors._general = [...(fieldErrors._general || []), error]
                     })
                     return { rowIndex: row.rowIndex, errors: row.errors, fieldErrors }
@@ -480,15 +505,21 @@ export default function SupplierImportPage() {
         if (!systemField) return []
 
         switch (systemField) {
+            case 'entity_kind':
+                return [
+                    'Opcional. Columna sugerida en plantilla: naturaleza_contacto.',
+                    'Valores: empresa o persona (vacío = empresa). También acepta tipo_entidad.',
+                    'Si es persona, la columna contacto puede ir vacía.',
+                ]
             case 'name':
                 return [
                     'Debe estar lleno en todas las filas.',
-                    'Usa el nombre comercial del proveedor, no abreviaturas confusas.',
+                    'Razón social si es empresa, o nombre completo si es persona.',
                 ]
             case 'contact':
                 return [
-                    'Persona de contacto o área responsable (por ejemplo, Ventas, Compras).',
-                    'Evita dejarlo vacío para facilitar la comunicación.',
+                    'Obligatorio si la naturaleza es empresa.',
+                    'Si es persona, puede omitirse; se usará el nombre.',
                 ]
             case 'phone':
                 return [
@@ -512,13 +543,12 @@ export default function SupplierImportPage() {
                 ]
             case 'payment_terms':
                 return [
-                    'Opcional. Debe coincidir con un término de pago existente (por ejemplo, Contado, 15 días).',
-                    'Si no existe, créalo primero en catálogos o asígnalo manualmente aquí.',
+                    'Obligatorio. Debe coincidir exactamente con un término de pago existente.',
+                    'Revisa la hoja Catálogos de la plantilla o los catálogos del sistema.',
                 ]
-            case 'rating':
+            case 'tax_id':
                 return [
-                    'Opcional. Usa un número entre 1 y 5, sin texto.',
-                    'Se usa para priorizar proveedores en reportes y análisis.',
+                    'Opcional. NIT, RFC, VAT u otro identificador fiscal.',
                 ]
             default:
                 return []
@@ -538,7 +568,7 @@ export default function SupplierImportPage() {
                             {importResult.skipped && importResult.skipped > 0 && ` ${importResult.skipped} fueron omitidos.`}
                         </p>
                         <div className="flex gap-3 justify-center">
-                            <Button variant="outline" onClick={() => navigate('/proveedores')}>Ir a Proveedores</Button>
+                            <Button variant="outline" onClick={() => navigate('/contactos')}>Ir a contactos</Button>
                             <Button onClick={() => { setStep('mapping'); setImportResult(null) }}>Importar Más</Button>
                         </div>
                     </CardContent>
@@ -557,7 +587,7 @@ export default function SupplierImportPage() {
                         <h3 className="text-xl font-semibold mb-2">Error</h3>
                         <p className="text-muted-foreground mb-4">{errorMessage}</p>
                         <div className="flex gap-3 justify-center">
-                            <Button variant="outline" onClick={() => navigate('/proveedores')}>Cancelar</Button>
+                            <Button variant="outline" onClick={() => navigate('/contactos')}>Cancelar</Button>
                             <Button onClick={() => setStep('mapping')}>Intentar de nuevo</Button>
                         </div>
                     </CardContent>
@@ -590,7 +620,7 @@ export default function SupplierImportPage() {
                 <div className="container mx-auto px-4 py-3">
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-4">
-                            <Button variant="ghost" size="icon" onClick={() => navigate('/proveedores')}>
+                            <Button variant="ghost" size="icon" onClick={() => navigate('/contactos')}>
                                 <ArrowLeft className="h-5 w-5" />
                             </Button>
                             <div className="flex items-center gap-2">
@@ -627,13 +657,13 @@ export default function SupplierImportPage() {
                                         <input type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={handleFileChange} />
                                     </label>
                                 </Button>
-                                <Button variant="ghost" size="sm" onClick={() => navigate('/proveedores')}>
+                                <Button variant="ghost" size="sm" onClick={() => navigate('/contactos')}>
                                     Cancelar
                                 </Button>
                             </div>
                         </div>
                         <div className="text-sm text-muted-foreground">
-                            Proveedores / Importar un archivo
+                            Contactos / Importar proveedores
                         </div>
                     </div>
                 </div>

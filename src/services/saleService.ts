@@ -111,6 +111,28 @@ export interface Sale {
 /** Misma forma que GET /sales/:id — el POST devuelve la venta completa para evitar un GET extra (ticket, etc.). */
 export type CreateSaleResponse = Sale;
 
+export interface SalesListResponse {
+  items: Sale[];
+  page: number;
+  pageSize: number;
+  totalPages: number;
+  totalItems: number;
+  nextPage: number | null;
+  prevPage: number | null;
+}
+
+/** Ventas asociadas a un contacto cliente (coincidencia por nombre o ID fiscal en la venta). */
+export const fetchSalesByCustomerContact = async (
+  customerContactId: string,
+  params?: { page?: number; pageSize?: number }
+): Promise<SalesListResponse> => {
+  const q = new URLSearchParams();
+  q.set("customer_contact_id", customerContactId);
+  if (params?.page != null) q.set("page", String(params.page));
+  if (params?.pageSize != null) q.set("pageSize", String(params.pageSize));
+  return apiFetch<SalesListResponse>(`/api/sales?${q.toString()}`, { method: "GET" });
+};
+
 export const createSale = async (payload: CreateSalePayload): Promise<Sale> => {
   return await apiFetch<Sale>("/api/sales", {
     method: "POST",

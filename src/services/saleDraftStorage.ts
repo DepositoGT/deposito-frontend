@@ -16,6 +16,8 @@ export interface NewSaleDraft {
   savedAt: string
   customer: string
   customerNit: string
+  /** UUID del contacto cliente si se eligió desde el listado guardado */
+  pickedCustomerId?: string
   isFinalConsumer: boolean
   paymentMethodId: number | null
   amountReceived: string

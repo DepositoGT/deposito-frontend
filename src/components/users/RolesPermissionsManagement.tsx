@@ -11,7 +11,7 @@
 import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { usePermissions, useRolesWithPermissions } from "@/hooks/usePermissions";
+import { useRolesWithPermissions } from "@/hooks/usePermissions";
 import { useToast } from "@/hooks/use-toast";
 import { useAuthPermissions } from "@/hooks/useAuthPermissions";
 import type { Role, Permission } from "@/services/userService";
@@ -40,7 +40,6 @@ const RolesPermissionsManagement = () => {
   const canViewRoles = isAdmin || hasPermission("roles.view") || hasPermission("roles.manage");
   const canManageRoles = isAdmin || hasPermission("roles.manage");
 
-  const { data: allPermissions = [] } = usePermissions();
   const [viewMode, setViewMode] = useState<"cards" | "table">("cards");
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(18);
@@ -55,18 +54,6 @@ const RolesPermissionsManagement = () => {
 
   const roles = rolesData?.items || [];
   const totalPages = rolesData?.totalPages ?? 1;
-
-  const groupPermissionsByModule = (permissions: Permission[]) => {
-    const groups: Record<string, Permission[]> = {};
-    permissions.forEach((perm) => {
-      const [module] = perm.code.split(".");
-      if (!groups[module]) groups[module] = [];
-      groups[module].push(perm);
-    });
-    return groups;
-  };
-
-  const permissionGroups = groupPermissionsByModule(allPermissions);
 
   const rolePermissionsCount = (role: Role) => role.permissions?.length ?? 0;
 

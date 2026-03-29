@@ -9,12 +9,13 @@
  */
 
 /**
- * Vista de detalle de un proveedor con pestañas:
- * - Detalles: información completa del proveedor (antes en modal).
- * - Entradas de mercancía: listado de ingresos asociados a este proveedor.
+ * Vista de detalle de contacto (proveedor o cliente):
+ * - Detalles: datos del contacto.
+ * - Proveedor: entradas de mercancía.
+ * - Cliente: historial de compras (ventas vinculadas por nombre o ID fiscal).
  */
 import { useMemo, useState, useEffect } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, Link } from 'react-router-dom'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -28,8 +29,10 @@ import {
   Calendar,
   Eye,
   Edit,
+  Receipt,
 } from 'lucide-react'
 import { useSupplier } from '@/hooks/useSupplier'
+import { useCustomerSales } from '@/hooks/useCustomerSales'
 import { useIncomingMerchandise, useIncomingMerchandiseById } from '@/hooks/useIncomingMerchandise'
 import { useToast } from '@/hooks/use-toast'
 import { useAuthPermissions } from '@/hooks/useAuthPermissions'
@@ -103,6 +106,8 @@ export default function SupplierDetailPage() {
 
   const [merchPage, setMerchPage] = useState(1)
   const [merchPageSize, setMerchPageSize] = useState(10)
+  const [salesPage, setSalesPage] = useState(1)
+  const [salesPageSize, setSalesPageSize] = useState(10)
   const [detailRecordId, setDetailRecordId] = useState<string | null>(null)
   const [isDetailOpen, setIsDetailOpen] = useState(false)
   const [isPdfOptionsOpen, setIsPdfOptionsOpen] = useState(false)
@@ -125,19 +130,51 @@ export default function SupplierDetailPage() {
     [rawSupplier]
   )
 
+  const partyType =
+    String((rawSupplier as { party_type?: string })?.party_type ?? 'SUPPLIER') === 'CUSTOMER'
+      ? 'CUSTOMER'
+      : 'SUPPLIER'
+  const isSupplierParty = partyType === 'SUPPLIER'
+
   const canViewMerchandise = hasPermission('merchandise.view')
+  const canViewCustomerSales = hasPermission('sales.view')
+  const canViewSaleInvoice = hasPermission('sales.view_invoice')
   const { data: merchData, isLoading: merchLoading } = useIncomingMerchandise({
     supplier_id: id ?? undefined,
     page: merchPage,
     pageSize: merchPageSize,
-    enabled: canViewMerchandise,
+    enabled:
+      Boolean(id) &&
+      canViewMerchandise &&
+      rawSupplier != null &&
+      String((rawSupplier as { party_type?: string }).party_type ?? 'SUPPLIER').toUpperCase() ===
+        'SUPPLIER',
   })
   const { data: detailData } = useIncomingMerchandiseById(detailRecordId ?? undefined)
 
   const records: IncomingMerchandise[] = merchData?.items ?? []
   const totalPages = merchData?.totalPages ?? 1
   const canDetails = hasPermission('merchandise.details')
-  const canEditSupplier = hasPermission('suppliers.edit')
+  const showMerchTab = isSupplierParty && canViewMerchandise
+  const showSalesHistoryTab = !isSupplierParty && canViewCustomerSales
+  const hasSecondaryTab = showMerchTab || showSalesHistoryTab
+
+  const { data: customerSalesData, isLoading: customerSalesLoading } = useCustomerSales(id, {
+    page: salesPage,
+    pageSize: salesPageSize,
+    enabled:
+      Boolean(id) &&
+      canViewCustomerSales &&
+      rawSupplier != null &&
+      String((rawSupplier as { party_type?: string }).party_type ?? 'SUPPLIER').toUpperCase() ===
+        'CUSTOMER',
+  })
+  const saleRows = customerSalesData?.items ?? []
+  const salesTotalPages = customerSalesData?.totalPages ?? 1
+  const canEditSupplier =
+    partyType === 'CUSTOMER'
+      ? hasPermission('contacts.clients.edit')
+      : hasPermission('contacts.suppliers.edit')
 
   const updateSupplierMutation = useUpdateSupplier()
   const { mutateAsync: updateSupplierAsync, isPending: isUpdating } = updateSupplierMutation
@@ -169,6 +206,8 @@ export default function SupplierDetailPage() {
   const [editCategoryIds, setEditCategoryIds] = useState<string[]>([])
   const [editPaymentTermId, setEditPaymentTermId] = useState<string | undefined>(undefined)
   const [editEstado, setEditEstado] = useState<number>(1)
+  const [editTaxId, setEditTaxId] = useState('')
+  const [editEntityKind, setEditEntityKind] = useState<'PERSON' | 'ORGANIZATION'>('ORGANIZATION')
 
   useEffect(() => {
     if (!supplier) return
@@ -177,9 +216,11 @@ export default function SupplierDetailPage() {
     setEditPhone(supplier.phone ?? '')
     setEditEmail(supplier.email ?? '')
     setEditAddress(supplier.address ?? '')
+    setEditTaxId(supplier.taxId ?? '')
     setEditCategoryIds([])
     setEditPaymentTermId(undefined)
     setEditEstado(supplier.estado !== undefined && supplier.estado !== null ? Number(supplier.estado) : 1)
+    setEditEntityKind(supplier.entityKind ?? 'ORGANIZATION')
   }, [supplier])
 
   const handleSave = async () => {
@@ -188,44 +229,47 @@ export default function SupplierDetailPage() {
       await updateSupplierAsync({
         id,
         payload: {
+          entity_kind: editEntityKind,
           name: editName,
-          contact: editContact,
+          contact: editEntityKind === 'PERSON' ? editName : editContact,
           phone: editPhone,
           email: editEmail,
           address: editAddress,
-          category_ids: editCategoryIds.length ? editCategoryIds : undefined,
+          tax_id: editTaxId.trim() || null,
+          category_ids:
+            isSupplierParty && editCategoryIds.length ? editCategoryIds : undefined,
           payment_terms_id: editPaymentTermId,
           estado: editEstado,
         },
       })
       await refetchSupplier()
       toast({
-        title: 'Proveedor actualizado',
+        title: 'Contacto actualizado',
         description: `Los datos de "${editName}" se guardaron correctamente`,
       })
       setIsEditing(false)
     } catch (e) {
       toast({
         title: 'Error al actualizar',
-        description: (e as Error)?.message ?? 'No se pudo actualizar el proveedor',
+        description: (e as Error)?.message ?? 'No se pudo actualizar el contacto',
         variant: 'destructive',
       })
     }
   }
 
   if (!id) {
-    navigate('/proveedores')
+    navigate('/contactos')
     return null
   }
 
   if (supplierError || (rawSupplier === null && !supplierLoading)) {
     return (
       <div className="p-6">
-        <Button variant="ghost" onClick={() => navigate('/proveedores')}>
+        <Button variant="ghost" onClick={() => navigate('/contactos')}>
           <ArrowLeft className="w-4 h-4 mr-2" />
           Volver
         </Button>
-        <div className="mt-6 text-center text-destructive">Proveedor no encontrado.</div>
+        <div className="mt-6 text-center text-destructive">Contacto no encontrado.</div>
       </div>
     )
   }
@@ -241,16 +285,21 @@ export default function SupplierDetailPage() {
     )
   }
 
+  const displayEntityKind: 'PERSON' | 'ORGANIZATION' =
+    isEditing && canEditSupplier ? editEntityKind : (supplier.entityKind ?? 'ORGANIZATION')
+
   return (
     <div className="p-6 space-y-6 animate-fade-in">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={() => navigate('/proveedores')}>
+          <Button variant="ghost" size="icon" onClick={() => navigate('/contactos')}>
             <ArrowLeft className="w-5 h-5" />
           </Button>
           <div>
             <h1 className="text-2xl font-bold text-foreground">{supplier.name}</h1>
-            <p className="text-sm text-muted-foreground">Detalle del proveedor</p>
+            <p className="text-sm text-muted-foreground">
+              {isSupplierParty ? 'Proveedor' : 'Cliente'} · Detalle del contacto
+            </p>
           </div>
         </div>
         <div className="flex gap-2">
@@ -282,7 +331,8 @@ export default function SupplierDetailPage() {
             <DialogTitle>Contenido del PDF</DialogTitle>
           </DialogHeader>
           <p className="text-sm text-muted-foreground">
-            Seleccione la información que desea incluir en el reporte del proveedor.
+            Seleccione la información que desea incluir en el reporte del{' '}
+            {isSupplierParty ? 'proveedor' : 'contacto'}.
           </p>
           <div className="space-y-4 py-4">
             <div className="flex items-center space-x-2">
@@ -297,7 +347,8 @@ export default function SupplierDetailPage() {
                 htmlFor="pdf-basic"
                 className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
               >
-                Información básica (empresa, contacto, dirección, categorías, estado, términos de pago)
+                Información básica (datos del contacto, dirección, estado, términos de pago
+                {isSupplierParty ? ', categorías' : ''})
               </label>
             </div>
             <div className="flex items-center space-x-2">
@@ -315,22 +366,24 @@ export default function SupplierDetailPage() {
                 Métricas (total productos, total compras, último pedido)
               </label>
             </div>
-            <div className="flex items-center space-x-2">
-              <Checkbox
-                id="pdf-products"
-                checked={pdfOptions.includeProducts ?? true}
-                onCheckedChange={(checked) =>
-                  setPdfOptions((o) => ({ ...o, includeProducts: checked === true }))
-                }
-              />
-              <label
-                htmlFor="pdf-products"
-                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-              >
-                Listado de productos que suministra
-              </label>
-            </div>
-            {canViewMerchandise && (
+            {isSupplierParty && (
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="pdf-products"
+                  checked={pdfOptions.includeProducts ?? true}
+                  onCheckedChange={(checked) =>
+                    setPdfOptions((o) => ({ ...o, includeProducts: checked === true }))
+                  }
+                />
+                <label
+                  htmlFor="pdf-products"
+                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                >
+                  Listado de productos que suministra
+                </label>
+              </div>
+            )}
+            {isSupplierParty && canViewMerchandise && (
               <div className="flex items-center space-x-2">
                 <Checkbox
                   id="pdf-merchandise"
@@ -354,18 +407,28 @@ export default function SupplierDetailPage() {
             </Button>
             <Button
               className="border-liquor-amber bg-liquor-amber/10 text-liquor-amber hover:bg-liquor-amber/20"
-              disabled={
-                (!(pdfOptions.includeBasic ?? true) &&
-                  !(pdfOptions.includeMetrics ?? true) &&
-                  !(pdfOptions.includeProducts ?? true) &&
-                  (!canViewMerchandise || !(pdfOptions.includeMerchandiseEntries ?? false))) ||
-                isGeneratingPdf
-              }
+              disabled={(() => {
+                const b = pdfOptions.includeBasic ?? true
+                const m = pdfOptions.includeMetrics ?? true
+                const p = pdfOptions.includeProducts ?? true
+                const me = pdfOptions.includeMerchandiseEntries ?? false
+                const anySel =
+                  b ||
+                  m ||
+                  (isSupplierParty && p) ||
+                  (isSupplierParty && canViewMerchandise && me)
+                return !anySel || isGeneratingPdf
+              })()}
               onClick={async () => {
                 setIsGeneratingPdf(true)
                 try {
                   let merchEntries: SupplierPDFMerchandiseEntry[] | undefined
-                  if (pdfOptions.includeMerchandiseEntries && canViewMerchandise && id) {
+                  if (
+                    isSupplierParty &&
+                    pdfOptions.includeMerchandiseEntries &&
+                    canViewMerchandise &&
+                    id
+                  ) {
                     const data = await fetchIncomingMerchandise({
                       supplier_id: id,
                       pageSize: 100,
@@ -378,10 +441,17 @@ export default function SupplierDetailPage() {
                       totalValue: entry.totalValue,
                     }))
                   }
-                  generateSupplierPDF(supplier, pdfOptions, merchEntries)
+                  const pdfOptsEffective: SupplierPDFOptions = {
+                    ...pdfOptions,
+                    includeProducts: isSupplierParty ? (pdfOptions.includeProducts ?? true) : false,
+                    includeMerchandiseEntries: isSupplierParty
+                      ? (pdfOptions.includeMerchandiseEntries ?? false)
+                      : false,
+                  }
+                  generateSupplierPDF(supplier, pdfOptsEffective, merchEntries)
                   toast({
                     title: 'PDF Generado',
-                    description: `Reporte del proveedor "${supplier.name}" descargado correctamente`,
+                    description: `Reporte de "${supplier.name}" descargado correctamente`,
                   })
                   setIsPdfOptionsOpen(false)
                 } catch (e) {
@@ -412,14 +482,28 @@ export default function SupplierDetailPage() {
       </Dialog>
 
       <Tabs defaultValue="detalles" className="w-full">
-        <TabsList className={canViewMerchandise ? 'grid w-full max-w-md grid-cols-2' : 'grid w-full max-w-md grid-cols-1'}>
+        <TabsList
+          className={
+            hasSecondaryTab ? 'grid w-full max-w-md grid-cols-2' : 'grid w-full max-w-md grid-cols-1'
+          }
+        >
           <TabsTrigger value="detalles">Detalles</TabsTrigger>
-          {canViewMerchandise && (
+          {showMerchTab && (
             <TabsTrigger value="entradas">
               Entradas de mercancía
               {merchData?.totalItems != null && merchData.totalItems > 0 && (
                 <Badge variant="secondary" className="ml-2">
                   {merchData.totalItems}
+                </Badge>
+              )}
+            </TabsTrigger>
+          )}
+          {showSalesHistoryTab && (
+            <TabsTrigger value="compras">
+              Historial de compras
+              {customerSalesData?.totalItems != null && customerSalesData.totalItems > 0 && (
+                <Badge variant="secondary" className="ml-2">
+                  {customerSalesData.totalItems}
                 </Badge>
               )}
             </TabsTrigger>
@@ -443,6 +527,7 @@ export default function SupplierDetailPage() {
                           setEditCategoryIds([])
                           setEditPaymentTermId(undefined)
                           setEditEstado(supplier.estado !== undefined && supplier.estado !== null ? Number(supplier.estado) : 1)
+                          setEditEntityKind(supplier.entityKind ?? 'ORGANIZATION')
                         }
                         setIsEditing(false)
                       }}
@@ -461,11 +546,15 @@ export default function SupplierDetailPage() {
               )}
 
               <div>
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3">Datos de la empresa</p>
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3">
+                  {displayEntityKind === 'PERSON' ? 'Datos del contacto' : 'Datos de la empresa'}
+                </p>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-4">
                   <div>
-                    <Label className="text-muted-foreground">Nombre de la Empresa</Label>
+                    <Label className="text-muted-foreground">
+                      {displayEntityKind === 'PERSON' ? 'Nombre completo' : 'Nombre de la empresa'}
+                    </Label>
                     {isEditing && canEditSupplier ? (
                       <Input
                         value={editName}
@@ -476,18 +565,20 @@ export default function SupplierDetailPage() {
                       <p className="text-foreground font-medium">{supplier.name}</p>
                     )}
                   </div>
-                  <div>
-                    <Label className="text-muted-foreground">Persona de Contacto</Label>
-                    {isEditing && canEditSupplier ? (
-                      <Input
-                        value={editContact}
-                        onChange={(e) => setEditContact(e.target.value)}
-                        className="mt-1"
-                      />
-                    ) : (
-                      <p className="text-foreground font-medium">{supplier.contact}</p>
-                    )}
-                  </div>
+                  {displayEntityKind === 'ORGANIZATION' && (
+                    <div>
+                      <Label className="text-muted-foreground">Persona de contacto</Label>
+                      {isEditing && canEditSupplier ? (
+                        <Input
+                          value={editContact}
+                          onChange={(e) => setEditContact(e.target.value)}
+                          className="mt-1"
+                        />
+                      ) : (
+                        <p className="text-foreground font-medium">{supplier.contact}</p>
+                      )}
+                    </div>
+                  )}
                   <div>
                     <Label className="text-muted-foreground">Teléfono</Label>
                     {isEditing && canEditSupplier ? (
@@ -515,6 +606,34 @@ export default function SupplierDetailPage() {
                   </div>
                 </div>
                 <div className="space-y-4">
+                  <div>
+                    <Label className="text-muted-foreground">Naturaleza</Label>
+                    {isEditing && canEditSupplier ? (
+                      <Select
+                        value={editEntityKind}
+                        onValueChange={(v) => setEditEntityKind(v === 'PERSON' ? 'PERSON' : 'ORGANIZATION')}
+                      >
+                        <SelectTrigger className="mt-1">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="ORGANIZATION">Empresa</SelectItem>
+                          <SelectItem value="PERSON">Persona individual</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <p className="text-foreground font-medium mt-1">
+                        {displayEntityKind === 'PERSON' ? 'Persona individual' : 'Empresa'}
+                      </p>
+                    )}
+                  </div>
+                  {!isSupplierParty && (
+                  <div>
+                    <Label className="text-muted-foreground">Tipo</Label>
+                    <p className="text-foreground font-medium mt-1">Cliente</p>
+                  </div>
+                  )}
+                  {isSupplierParty && (
                   <div>
                     <Label className="text-muted-foreground">Categorías</Label>
                     {isEditing && canEditSupplier ? (
@@ -581,6 +700,7 @@ export default function SupplierDetailPage() {
                       </p>
                     )}
                   </div>
+                  )}
                   <div>
                     <Label className="text-muted-foreground">Estado</Label>
                     {isEditing && canEditSupplier ? (
@@ -664,13 +784,26 @@ export default function SupplierDetailPage() {
                       <p className="text-foreground font-medium">{supplier.paymentTerms}</p>
                     )}
                   </div>
+                  <div>
+                    <Label className="text-muted-foreground">ID fiscal (facturación)</Label>
+                    {isEditing && canEditSupplier ? (
+                      <Input
+                        value={editTaxId}
+                        onChange={(e) => setEditTaxId(e.target.value)}
+                        placeholder="NIT, VAT, RFC, etc."
+                        className="mt-1"
+                      />
+                    ) : (
+                      <p className="text-foreground font-medium">{supplier.taxId || '—'}</p>
+                    )}
+                  </div>
                 </div>
               </div>
               </div>
 
               <Separator />
 
-              {!isEditing && (
+              {!isEditing && isSupplierParty && (
                 <div className="mt-6 space-y-3">
                   <Label className="text-lg font-medium">Productos que Suministra</Label>
                   <div className="border rounded-lg max-h-64 overflow-y-auto">
@@ -742,7 +875,7 @@ export default function SupplierDetailPage() {
           </Card>
         </TabsContent>
 
-        {canViewMerchandise && (
+        {showMerchTab && (
         <TabsContent value="entradas" className="mt-6">
           <Card>
             <CardHeader>
@@ -843,6 +976,112 @@ export default function SupplierDetailPage() {
             </CardContent>
           </Card>
         </TabsContent>
+        )}
+
+        {showSalesHistoryTab && (
+          <TabsContent value="compras" className="mt-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Historial de compras</CardTitle>
+                <p className="text-sm text-muted-foreground">
+                  Ventas donde el cliente coincide con este contacto (por nombre en la venta o por ID
+                  fiscal). Si no ves ventas recientes, verifica que en el punto de venta se use el mismo
+                  nombre o NIT que en la ficha del cliente.
+                </p>
+              </CardHeader>
+              <CardContent>
+                {customerSalesLoading ? (
+                  <div className="py-12 text-center text-muted-foreground">Cargando ventas...</div>
+                ) : saleRows.length === 0 ? (
+                  <div className="py-12 text-center">
+                    <Receipt className="w-12 h-12 mx-auto text-muted-foreground mb-3" />
+                    <p className="text-muted-foreground">No hay ventas registradas para este cliente</p>
+                  </div>
+                ) : (
+                  <>
+                    <div className="overflow-x-auto">
+                      <table className="w-full">
+                        <thead>
+                          <tr className="border-b">
+                            <th className="text-left p-3 font-medium text-muted-foreground">Fecha</th>
+                            <th className="text-left p-3 font-medium text-muted-foreground">Referencia</th>
+                            <th className="text-right p-3 font-medium text-muted-foreground">Total</th>
+                            <th className="text-center p-3 font-medium text-muted-foreground">Ítems</th>
+                            <th className="text-left p-3 font-medium text-muted-foreground">Estado</th>
+                            {canViewSaleInvoice && (
+                              <th className="text-center p-3 font-medium text-muted-foreground">
+                                Factura
+                              </th>
+                            )}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {saleRows.map((sale) => (
+                            <tr key={sale.id} className="border-b hover:bg-muted/50">
+                              <td className="p-3 text-sm">{formatDate(sale.date)}</td>
+                              <td className="p-3 text-sm font-medium">{sale.reference ?? sale.id}</td>
+                              <td className="p-3 text-right font-semibold">
+                                {formatCurrency(Number(sale.adjusted_total ?? sale.total))}
+                              </td>
+                              <td className="p-3 text-center">
+                                <Badge variant="secondary">{sale.items}</Badge>
+                              </td>
+                              <td className="p-3 text-sm">{sale.status?.name ?? '—'}</td>
+                              {canViewSaleInvoice && (
+                                <td className="p-3 text-center">
+                                  <Button variant="ghost" size="sm" asChild>
+                                    <Link
+                                      to={`/ventas/${sale.reference ?? sale.id}/factura`}
+                                      className="inline-flex items-center gap-1"
+                                    >
+                                      <Receipt className="w-4 h-4" />
+                                      Ver
+                                    </Link>
+                                  </Button>
+                                </td>
+                              )}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                    {salesTotalPages > 0 && (
+                      <div className="flex flex-wrap items-center justify-between gap-4 mt-4">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm text-muted-foreground">Items por página:</span>
+                          <Select
+                            value={String(salesPageSize)}
+                            onValueChange={(v) => {
+                              setSalesPageSize(Number(v))
+                              setSalesPage(1)
+                            }}
+                          >
+                            <SelectTrigger className="w-[72px] h-9">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {[5, 10, 25, 50].map((n) => (
+                                <SelectItem key={n} value={String(n)}>
+                                  {n}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        {salesTotalPages > 1 && (
+                          <Pagination
+                            currentPage={salesPage}
+                            totalPages={salesTotalPages}
+                            onPageChange={setSalesPage}
+                          />
+                        )}
+                      </div>
+                    )}
+                  </>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
         )}
       </Tabs>
 
