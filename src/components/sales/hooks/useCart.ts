@@ -36,6 +36,11 @@ interface UseCartReturn {
     removeFromCart: (productId: string) => void
     updateQuantity: (productId: string, newQty: number) => void
     clearCart: () => void
+    /** Restaura líneas desde borrador; devuelve productIds no encontrados en catálogo. */
+    hydrateFromLines: (
+        lines: { productId: string; qty: number }[],
+        adminAuthorizedIds: string[]
+    ) => { missingProductIds: string[]; qtyAdjustedIds: string[] }
     setAdditionalQty: (qty: string) => void
     setAdminUsername: (username: string) => void
     setAdminPassword: (password: string) => void
@@ -126,6 +131,40 @@ export const useCart = ({ availableProducts }: UseCartOptions): UseCartReturn =>
         setCartItems([])
         setAdminAuthorizedProducts(new Set())
     }, [])
+
+    const hydrateFromLines = useCallback(
+        (lines: { productId: string; qty: number }[], adminAuthorizedIds: string[]) => {
+            const adminSet = new Set(adminAuthorizedIds)
+            const missingProductIds: string[] = []
+            const qtyAdjustedIds: string[] = []
+            const built: CartProduct[] = []
+
+            for (const line of lines) {
+                const q = Math.max(1, Math.floor(Number(line.qty) || 1))
+                const p = availableProducts.find((x) => x.id === line.productId)
+                if (!p) {
+                    missingProductIds.push(line.productId)
+                    continue
+                }
+                const stock = Number(p.stock ?? 0)
+                let qty = q
+                if (!adminSet.has(line.productId) && qty > stock) {
+                    qty = Math.max(0, stock)
+                    if (qty === 0) {
+                        missingProductIds.push(line.productId)
+                        continue
+                    }
+                    qtyAdjustedIds.push(line.productId)
+                }
+                built.push({ ...p, qty })
+            }
+
+            setCartItems(built)
+            setAdminAuthorizedProducts(adminSet)
+            return { missingProductIds, qtyAdjustedIds }
+        },
+        [availableProducts]
+    )
 
     // Dialog handlers
     const handleConfirmAdditionalQty = useCallback(() => {
@@ -245,6 +284,7 @@ export const useCart = ({ availableProducts }: UseCartOptions): UseCartReturn =>
         removeFromCart,
         updateQuantity,
         clearCart,
+        hydrateFromLines,
         setAdditionalQty,
         setAdminUsername,
         setAdminPassword,

@@ -8,10 +8,6 @@
  * For licensing inquiries: GitHub @dpatzan2
  */
 
-/**
- * SaleInvoicePage - Vista de factura tipo Odoo (página dedicada)
- * Muestra los mismos datos que el modal de detalle de venta en formato documento.
- */
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
@@ -137,8 +133,9 @@ export const SaleInvoicePage = () => {
             <div className="space-y-2">
               <h3 className="text-base font-medium text-muted-foreground">Cliente</h3>
               <p className="text-lg font-medium">{sale.customer}</p>
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mt-2">ID fiscal</p>
               <p className="text-base text-muted-foreground">
-                {sale.isFinalConsumer ? 'Consumidor Final' : sale.customerNit || '—'}
+                {sale.isFinalConsumer ? 'Consumidor final' : sale.customerNit || '—'}
               </p>
             </div>
             <div className="space-y-4">

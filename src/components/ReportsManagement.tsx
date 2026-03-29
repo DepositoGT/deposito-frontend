@@ -9,19 +9,19 @@
  */
 
 import { useState } from "react";
-import { getApiBaseUrl } from '@/services/api';
+import { getApiBaseUrl, getAuthToken } from '@/services/api';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Download } from "lucide-react";
 import {
-  Download,
-  Calendar,
-  TrendingUp,
-  Package,
-  DollarSign,
-  Users,
-  AlertTriangle,
-  BarChart3
-} from "lucide-react";
+  VentasIcon,
+  InventarioIcon,
+  InventariadoIcon,
+  ProveedoresIcon,
+  ReporteFinancieroIcon,
+  AlertasIcon,
+  AnalyticsIcon,
+} from "@/components/icons/CustomIcons";
 import {
   Select,
   SelectContent,
@@ -62,7 +62,7 @@ const ReportsManagement = () => {
       id: "sales",
       name: "Reporte de Ventas",
       description: "Análisis detallado de ventas por período",
-      icon: TrendingUp,
+      icon: VentasIcon,
       color: "text-liquor-gold",
       bgColor: "bg-liquor-gold/10",
       lastGenerated: "2024-01-10 09:30",
@@ -72,17 +72,27 @@ const ReportsManagement = () => {
       id: "inventory",
       name: "Reporte de Inventario",
       description: "Estado actual del stock y movimientos",
-      icon: Package,
+      icon: InventarioIcon,
       color: "text-primary",
       bgColor: "bg-primary/10",
       lastGenerated: "2024-01-10 08:15",
       size: "1.8 MB"
     },
     {
+      id: "inventory-counts",
+      name: "Historial de inventariados",
+      description: "Sesiones de conteo físico en el período: diferencias y mermas por sesión",
+      icon: InventariadoIcon,
+      color: "text-teal-600",
+      bgColor: "bg-teal-500/10",
+      lastGenerated: "—",
+      size: "—"
+    },
+    {
       id: "suppliers",
       name: "Reporte de Proveedores",
       description: "Análisis de rendimiento de proveedores",
-      icon: Users,
+      icon: ProveedoresIcon,
       color: "text-accent",
       bgColor: "bg-accent/10",
       lastGenerated: "2024-01-09 16:45",
@@ -92,7 +102,7 @@ const ReportsManagement = () => {
       id: "financial",
       name: "Reporte Financiero",
       description: "P&L del período, inventario actual, compras y margen por categoría",
-      icon: DollarSign,
+      icon: ReporteFinancieroIcon,
       color: "text-liquor-burgundy",
       bgColor: "bg-liquor-burgundy/10",
       lastGenerated: "2024-01-10 07:20",
@@ -102,7 +112,7 @@ const ReportsManagement = () => {
       id: "alerts",
       name: "Reporte de Alertas",
       description: "Reposición priorizada, concentración por categoría y tickets del sistema",
-      icon: AlertTriangle,
+      icon: AlertasIcon,
       color: "text-destructive",
       bgColor: "bg-destructive/10",
       lastGenerated: "2024-01-10 10:00",
@@ -112,7 +122,7 @@ const ReportsManagement = () => {
       id: "products",
       name: "Análisis de Productos",
       description: "Márgenes, mix por categoría y proveedor, rankings de valor",
-      icon: BarChart3,
+      icon: AnalyticsIcon,
       color: "text-liquor-amber",
       bgColor: "bg-liquor-amber/10",
       lastGenerated: "2024-01-09 14:30",
@@ -229,7 +239,10 @@ const ReportsManagement = () => {
                     if (fPeriod === 'quarter' && fMonth) params.set('quarter', String(Math.ceil(fMonth / 3)))
                     if (fPeriod === 'semester') params.set('semester', String(fSem))
                     params.set('format', fFormat)
-                    const res = await fetch(`${getApiBaseUrl()}/reports/${pendingReport.id}?${params.toString()}`)
+                    const token = getAuthToken()
+                    const res = await fetch(`${getApiBaseUrl()}/reports/${pendingReport.id}?${params.toString()}`, {
+                      headers: token ? { Authorization: `Bearer ${token}` } : {},
+                    })
                     if (!res.ok) throw new Error('Error al generar el reporte')
                     const blob = await res.blob()
                     const url = window.URL.createObjectURL(blob)
@@ -292,7 +305,7 @@ const ReportsManagement = () => {
                 <CardContent className="p-6">
                   <div className="flex items-start space-x-4">
                     <div className={`p-3 rounded-lg ${report.bgColor}`}>
-                      <Icon className={`w-6 h-6 ${report.color}`} />
+                      <Icon className="h-6 w-6" />
                     </div>
                     <div className="flex-1">
                       <h4 className="font-semibold text-foreground mb-1">{report.name}</h4>

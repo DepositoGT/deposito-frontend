@@ -10,8 +10,8 @@ import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useAuth } from "@/context/useAuth";
-import type { Permission } from "@/services/userService";
 import { createRole } from "@/services/userService";
+import { groupPermissionsByModule } from "@/lib/permissionGroups";
 import { ArrowLeft, CheckSquare } from "lucide-react";
 
 const RoleCreatePage = () => {
@@ -46,16 +46,6 @@ const RoleCreatePage = () => {
   const [name, setName] = useState("");
   const [selectedPerms, setSelectedPerms] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
-
-  const groupPermissionsByModule = (permissions: Permission[]) => {
-    const groups: Record<string, Permission[]> = {};
-    permissions.forEach((perm) => {
-      const [module] = perm.code.split(".");
-      if (!groups[module]) groups[module] = [];
-      groups[module].push(perm);
-    });
-    return groups;
-  };
 
   const permissionGroups = groupPermissionsByModule(allPermissions);
 

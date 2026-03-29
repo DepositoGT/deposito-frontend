@@ -14,11 +14,15 @@ import { fetchSuppliers, fetchAllSuppliers, type SuppliersQueryParams, type Supp
 
 export const SUPPLIERS_QUERY_KEY = ["suppliers"] as const;
 
-export const useSuppliers = (params?: SuppliersQueryParams) => {
+export const useSuppliers = (
+  params?: SuppliersQueryParams,
+  options?: { enabled?: boolean },
+) => {
   return useQuery<SuppliersResponse>({
     queryKey: [...SUPPLIERS_QUERY_KEY, params],
     queryFn: () => fetchSuppliers(params),
     staleTime: 60 * 1000,
+    enabled: options?.enabled !== false,
   });
 };
 

@@ -11,13 +11,19 @@
 import { BaseEntity, ProductCategory, Status } from "./common";
 import type { Product } from "./product";
 
-// Interfaz principal de proveedor
+// Interfaz principal de proveedor / contacto (API: suppliers + party_type)
 export interface Supplier extends BaseEntity {
+  /** SUPPLIER = proveedor, CUSTOMER = cliente */
+  party_type?: "SUPPLIER" | "CUSTOMER";
+  /** Persona física vs empresa */
+  entityKind?: "PERSON" | "ORGANIZATION";
   name: string;
   contact: string;
   phone: string;
   email: string;
   address: string;
+  /** ID fiscal para facturas (NIT, VAT, RFC, etc.) */
+  taxId?: string;
   // Etiqueta principal (por compatibilidad). Para múltiples categorías se usará categories / categoriesLabel
   category: ProductCategory | string;
   // Nuevos campos para múltiples categorías

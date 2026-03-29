@@ -145,7 +145,7 @@ export const NewSaleDialog = ({
 
                     <div className='grid grid-cols-2 gap-4'>
                         <div>
-                            <Label htmlFor='customerNit'>NIT del Cliente</Label>
+                            <Label htmlFor='customerNit'>ID fiscal</Label>
                             <Input
                                 id='customerNit'
                                 placeholder='12345678-9'

@@ -13,6 +13,10 @@ export type ModuleIconProps = {
     id?: string
 }
 
+export type ModuleIconComponent = ForwardRefExoticComponent<
+    ModuleIconProps & RefAttributes<HTMLSpanElement>
+>
+
 function createModuleIcon(
     src: string,
     displayName: string
@@ -53,6 +57,8 @@ export const DashboardIcon = createModuleIcon(`${base}/dashboard.svg`, 'Dashboar
 export const VentasIcon = createModuleIcon(`${base}/ventas.svg`, 'VentasIcon')
 // Papirus mimetypes: package.svg (caja / productos)
 export const InventarioIcon = createModuleIcon(`${base}/inventario.svg`, 'InventarioIcon')
+// Mismo asset que analytics.svg (gráfico de barras / cuadre de cantidades)
+export const InventariadoIcon = createModuleIcon(`${base}/inventariado.svg`, 'InventariadoIcon')
 // Papirus actions: edit-undo.svg (24px)
 export const DevolucionesIcon = createModuleIcon(`${base}/devoluciones.svg`, 'DevolucionesIcon')
 // Papirus apps: org.gnome.Calculator.svg (cuadre / aritmética de caja)
@@ -63,6 +69,8 @@ export const ProveedoresIcon = createModuleIcon(`${base}/proveedores.svg`, 'Prov
 export const AnalyticsIcon = createModuleIcon(`${base}/analytics.svg`, 'AnalyticsIcon')
 // Papirus mimetypes: x-office-spreadsheet.svg
 export const ReportesIcon = createModuleIcon(`${base}/reportes.svg`, 'ReportesIcon')
+// Papirus apps: libreoffice-calc.svg (P&L / cuadros financieros)
+export const ReporteFinancieroIcon = createModuleIcon(`${base}/reporte-financiero.svg`, 'ReporteFinancieroIcon')
 // Papirus apps: gnome-warning.svg
 export const AlertasIcon = createModuleIcon(`${base}/alertas.svg`, 'AlertasIcon')
 // Papirus apps: org.gnome.SimpleScan.svg

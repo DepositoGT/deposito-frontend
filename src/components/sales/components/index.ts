@@ -18,4 +18,5 @@ export { SalesStatusTable } from './SalesStatusTable'
 export { SaleDetailDialog } from './SaleDetailDialog'
 export { NewSaleDialog } from './NewSaleDialog'
 export { PromotionCodeInput } from './PromotionCodeInput'
+export { SavedCustomerMany2One } from './SavedCustomerMany2One'
 
