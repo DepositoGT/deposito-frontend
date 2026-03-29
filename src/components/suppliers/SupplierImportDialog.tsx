@@ -119,7 +119,7 @@ export function SupplierImportDialog({ open, onOpenChange }: SupplierImportDialo
 
             // Close dialog and navigate to import page
             onOpenChange(false)
-            navigate('/proveedores/importar')
+            navigate('/contactos/importar')
         } catch (err) {
             setErrorMessage(err instanceof Error ? err.message : 'Error al procesar el archivo')
             setStep('error')

@@ -22,7 +22,8 @@ import { Badge } from '@/components/ui/badge'
 import { Label } from '@/components/ui/label'
 import {
     Plus, Search, Filter, Trash2, Eye, ScanLine, Download, MoreVertical,
-    QrCode, PackagePlus, ChevronLeft, ChevronRight, Upload, LayoutGrid, List, Package
+    QrCode, PackagePlus, ChevronLeft, ChevronRight, Upload, LayoutGrid, List, Package,
+    ClipboardList,
 } from 'lucide-react'
 import {
     DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger
@@ -165,6 +166,11 @@ const ProductManagement = () => {
     const canEdit = hasPermission('products.edit')
     const canDelete = hasPermission('products.delete')
     const canRegisterIncoming = hasPermission('products.register_incoming')
+    const canInventoryCount = hasPermission(
+        'inventory_count.view',
+        'inventory_count.count',
+        'inventory_count.create'
+    )
 
     // Export handler: pass selected fields for table PDF, or none for full card layout. If selectedIds.length > 0, only those products are exported.
     const handleExport = async (fields?: string[], ids?: string[], includeSummary?: boolean) => {
@@ -266,6 +272,16 @@ const ProductManagement = () => {
                             className="shrink-0"
                         >
                             <Package className="w-4 h-4 sm:mr-2" /><span className="hidden sm:inline">Registrar Ingreso</span>
+                        </Button>
+                    )}
+                    {canInventoryCount && (
+                        <Button
+                            variant="outline"
+                            onClick={() => navigate('/inventario/inventariado')}
+                            size="sm"
+                            className="shrink-0"
+                        >
+                            <ClipboardList className="w-4 h-4 sm:mr-2" /><span className="hidden sm:inline">Inventariado</span>
                         </Button>
                     )}
                     <Dialog open={isScannerOpen} onOpenChange={setIsScannerOpen}>

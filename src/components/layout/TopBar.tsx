@@ -55,7 +55,9 @@ export const TopBar = () => {
     const { data: criticalProducts = [] } = useCriticalProducts()
 
     // Find current module based on path
-    const currentModule = appModules.find(m => m.path === location.pathname)
+    const currentModule = appModules.find(
+        (m) => location.pathname === m.path || location.pathname.startsWith(`${m.path}/`),
+    )
 
     const handleLogout = () => {
         logout()

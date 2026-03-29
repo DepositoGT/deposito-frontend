@@ -68,6 +68,7 @@ export const generateSupplierPDF = (
   merchandiseEntries?: SupplierPDFMerchandiseEntry[]
 ) => {
   const opts = { ...defaultOptions, ...options }
+  const isPerson = supplier.entityKind === 'PERSON'
   const doc = new jsPDF() as jsPDFDocument
   const pageWidth = doc.internal.pageSize.getWidth()
   const margin = 15
@@ -107,16 +108,18 @@ export const generateSupplierPDF = (
     let rightY = yPos
 
     doc.setFont('helvetica', 'bold')
-    doc.text('Nombre de la Empresa:', leftCol, leftY)
+    doc.text(isPerson ? 'Nombre completo:' : 'Nombre de la empresa:', leftCol, leftY)
     doc.setFont('helvetica', 'normal')
     doc.text(supplier.name || 'N/A', leftCol + 50, leftY)
     leftY += 7
 
-    doc.setFont('helvetica', 'bold')
-    doc.text('Persona de Contacto:', leftCol, leftY)
-    doc.setFont('helvetica', 'normal')
-    doc.text(supplier.contact || 'N/A', leftCol + 50, leftY)
-    leftY += 7
+    if (!isPerson) {
+      doc.setFont('helvetica', 'bold')
+      doc.text('Persona de contacto:', leftCol, leftY)
+      doc.setFont('helvetica', 'normal')
+      doc.text(supplier.contact || 'N/A', leftCol + 50, leftY)
+      leftY += 7
+    }
 
     doc.setFont('helvetica', 'bold')
     doc.text('Teléfono:', leftCol, leftY)

@@ -11,8 +11,8 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { usePermissions, useRoleWithPermissions } from "@/hooks/usePermissions";
 import { useAuth } from "@/context/useAuth";
-import type { Permission } from "@/services/userService";
 import { updateRole } from "@/services/userService";
+import { groupPermissionsByModule } from "@/lib/permissionGroups";
 import { ArrowLeft, Shield, CheckSquare, Loader2 } from "lucide-react";
 
 const RolePermissionsDetail = () => {
@@ -53,16 +53,6 @@ const RolePermissionsDetail = () => {
 
   const [updating, setUpdating] = useState(false);
   const [selectedPerms, setSelectedPerms] = useState<string[]>([]);
-
-  const groupPermissionsByModule = (permissions: Permission[]) => {
-    const groups: Record<string, Permission[]> = {};
-    permissions.forEach((perm) => {
-      const [module] = perm.code.split(".");
-      if (!groups[module]) groups[module] = [];
-      groups[module].push(perm);
-    });
-    return groups;
-  };
 
   const permissionGroups = useMemo(
     () => groupPermissionsByModule(allPermissions),

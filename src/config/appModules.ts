@@ -16,6 +16,7 @@ import {
     DashboardIcon,
     VentasIcon,
     InventarioIcon,
+    InventariadoIcon,
     DevolucionesIcon,
     CierreCajaIcon,
     ProveedoresIcon,
@@ -78,6 +79,20 @@ export const appModules: AppModule[] = [
         permissions: ['products.view']
     },
     {
+        id: 'inventory-count',
+        label: 'Inventariado',
+        path: '/inventario/inventariado',
+        icon: InventariadoIcon,
+        color: 'bg-orange-100',
+        iconColor: 'text-orange-600',
+        sellerAllowed: true,
+        permissions: [
+            'inventory_count.view',
+            'inventory_count.create',
+            'inventory_count.count',
+        ]
+    },
+    {
         id: 'returns',
         label: 'Devoluciones',
         path: '/devoluciones',
@@ -97,13 +112,13 @@ export const appModules: AppModule[] = [
         permissions: ['cashclosure.view']
     },
     {
-        id: 'suppliers',
-        label: 'Proveedores',
-        path: '/proveedores',
+        id: 'contacts',
+        label: 'Contactos',
+        path: '/contactos',
         icon: ProveedoresIcon,
         color: 'bg-orange-100',
         iconColor: 'text-orange-600',
-        permissions: ['suppliers.view']
+        permissions: ['contacts.suppliers.view', 'contacts.clients.view']
     },
     {
         id: 'merchandise',

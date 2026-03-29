@@ -119,7 +119,7 @@ export function generateSaleTicket(sale: Sale, options: SaleTicketOptions = {}):
   if (companyNit?.trim()) {
     doc.setFontSize(BODY_FONT - 1)
     doc.setFont('helvetica', 'normal')
-    doc.text(`NIT: ${companyNit.trim()}`, WIDTH_MM / 2, y, { align: 'center' })
+    doc.text(`ID fiscal: ${companyNit.trim()}`, WIDTH_MM / 2, y, { align: 'center' })
     y += LINE_HEIGHT
   }
   doc.setFontSize(BODY_FONT)
@@ -170,7 +170,7 @@ export function generateSaleTicket(sale: Sale, options: SaleTicketOptions = {}):
   doc.text(`Cliente: ${customerLabel}`, X_LEFT, y)
   y += LINE_HEIGHT
   if (!sale.is_final_consumer && sale.customer_nit) {
-    doc.text(`NIT: ${sale.customer_nit}`, X_LEFT, y)
+    doc.text(`ID fiscal: ${sale.customer_nit}`, X_LEFT, y)
     y += LINE_HEIGHT
   }
   y += 1

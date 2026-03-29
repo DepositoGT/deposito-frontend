@@ -58,7 +58,7 @@ export function generateSaleInvoicePDF(
   doc.text(sale.customer || '—', MARGIN + 22, y)
   y += 6
   doc.setFont('helvetica', 'bold')
-  doc.text('NIT / Tipo:', MARGIN, y)
+  doc.text('ID fiscal:', MARGIN, y)
   doc.setFont('helvetica', 'normal')
   doc.text(sale.isFinalConsumer ? 'Consumidor Final' : (sale.customerNit || '—'), MARGIN + 22, y)
   y += 6

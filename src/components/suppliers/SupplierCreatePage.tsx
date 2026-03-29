@@ -20,7 +20,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
-import { ArrowLeft, Building, ChevronsUpDown, Check } from 'lucide-react'
+import { ArrowLeft, Building2, ChevronsUpDown, Check, Package, ShoppingBag, User } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { useCreateSupplier } from '@/hooks/useCreateSupplier'
 import { useCategories } from '@/hooks/useCategories'
@@ -29,6 +29,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { cn } from '@/lib/utils'
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 
 export default function SupplierCreatePage() {
   const navigate = useNavigate()
@@ -42,6 +43,9 @@ export default function SupplierCreatePage() {
   const [newPhone, setNewPhone] = useState('')
   const [newEmail, setNewEmail] = useState('')
   const [newAddress, setNewAddress] = useState('')
+  const [newTaxId, setNewTaxId] = useState('')
+  const [entityKind, setEntityKind] = useState<'PERSON' | 'ORGANIZATION'>('ORGANIZATION')
+  const [partyKind, setPartyKind] = useState<'SUPPLIER' | 'CUSTOMER'>('SUPPLIER')
   const [newCategoryIds, setNewCategoryIds] = useState<string[]>([])
   const [newPaymentTermId, setNewPaymentTermId] = useState<string | undefined>(undefined)
   const [categoryPopoverOpen, setCategoryPopoverOpen] = useState(false)
@@ -66,11 +70,18 @@ export default function SupplierCreatePage() {
 
   const handleSubmit = async () => {
     if (!newName?.trim()) {
-      toast({ title: 'Campo requerido', description: 'El nombre de la empresa es obligatorio', variant: 'destructive' })
+      toast({
+        title: 'Campo requerido',
+        description:
+          entityKind === 'ORGANIZATION'
+            ? 'El nombre o razón social es obligatorio'
+            : 'El nombre completo es obligatorio',
+        variant: 'destructive',
+      })
       return
     }
-    if (!newContact?.trim()) {
-      toast({ title: 'Campo requerido', description: 'La persona de contacto es obligatoria', variant: 'destructive' })
+    if (entityKind === 'ORGANIZATION' && !newContact?.trim()) {
+      toast({ title: 'Campo requerido', description: 'La persona de contacto es obligatoria para una empresa', variant: 'destructive' })
       return
     }
     if (!newPhone?.trim()) {
@@ -90,29 +101,36 @@ export default function SupplierCreatePage() {
       toast({ title: 'Campo requerido', description: 'La dirección es obligatoria', variant: 'destructive' })
       return
     }
-    if (!newCategoryIds.length) {
-      toast({ title: 'Campo requerido', description: 'Debes seleccionar al menos una categoría', variant: 'destructive' })
+    if (partyKind === 'SUPPLIER' && !newCategoryIds.length) {
+      toast({ title: 'Campo requerido', description: 'Debes seleccionar al menos una categoría para un proveedor', variant: 'destructive' })
+      return
+    }
+    if (!newPaymentTermId) {
+      toast({ title: 'Campo requerido', description: 'Los términos de pago son obligatorios', variant: 'destructive' })
       return
     }
 
     try {
       const supplier = await createSupplierMutation.mutateAsync({
+        party_type: partyKind,
+        entity_kind: entityKind,
         name: newName.trim(),
-        contact: newContact.trim(),
+        contact: entityKind === 'PERSON' ? newName.trim() : newContact.trim(),
         phone: newPhone.trim(),
         email: newEmail.trim(),
         address: newAddress.trim(),
-        category_ids: newCategoryIds.map((id) => Number(id)),
-        payment_terms_id: newPaymentTermId ? Number(newPaymentTermId) : undefined,
+        tax_id: newTaxId.trim() || null,
+        category_ids: partyKind === 'SUPPLIER' ? newCategoryIds.map((id) => Number(id)) : undefined,
+        payment_terms_id: Number(newPaymentTermId),
       })
-      toast({ title: 'Proveedor agregado', description: 'Proveedor creado correctamente' })
+      toast({ title: 'Contacto agregado', description: 'El contacto se creó correctamente' })
       const id = (supplier as { id?: string })?.id
-      if (id) navigate(`/proveedores/${id}`)
-      else navigate('/proveedores')
+      if (id) navigate(`/contactos/${id}`)
+      else navigate('/contactos')
     } catch (err: unknown) {
       const message = (err && typeof err === 'object' && 'message' in err)
         ? String((err as { message?: unknown }).message) || 'No se pudo crear el proveedor'
-        : 'No se pudo crear el proveedor'
+        : 'No se pudo crear el contacto'
       toast({ title: 'Error', description: message, variant: 'destructive' })
     }
   }
@@ -123,43 +141,159 @@ export default function SupplierCreatePage() {
     <div className="p-6 space-y-6 animate-fade-in">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={() => navigate('/proveedores')}>
+          <Button variant="ghost" size="icon" onClick={() => navigate('/contactos')}>
             <ArrowLeft className="w-5 h-5" />
           </Button>
           <div>
-            <h1 className="text-2xl font-bold text-foreground">Nuevo Proveedor</h1>
-            <p className="text-sm text-muted-foreground">Agregar un nuevo proveedor</p>
+            <h1 className="text-2xl font-bold text-foreground">Nuevo contacto</h1>
+            <p className="text-sm text-muted-foreground">Alta de proveedor o cliente</p>
           </div>
         </div>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>Información del proveedor</CardTitle>
+          <CardTitle>Información del contacto</CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
+          <div className="rounded-lg border bg-muted/20 p-4 space-y-5">
+            <div className="space-y-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Tipo de relación con el negocio
+              </p>
+              <RadioGroup
+                value={partyKind}
+                onValueChange={(v) => {
+                  const next = v === 'CUSTOMER' ? 'CUSTOMER' : 'SUPPLIER'
+                  setPartyKind(next)
+                  if (next === 'CUSTOMER') setNewCategoryIds([])
+                }}
+                className="grid grid-cols-1 sm:grid-cols-2 gap-3"
+              >
+                <label
+                  htmlFor="party-supplier"
+                  className={cn(
+                    'flex cursor-pointer items-start gap-3 rounded-lg border-2 p-4 transition-colors',
+                    partyKind === 'SUPPLIER'
+                      ? 'border-liquor-amber bg-liquor-amber/10 shadow-sm'
+                      : 'border-border bg-card hover:border-muted-foreground/30'
+                  )}
+                >
+                  <RadioGroupItem value="SUPPLIER" id="party-supplier" className="mt-0.5 shrink-0" />
+                  <div className="min-w-0 space-y-1">
+                    <span className="flex items-center gap-2 font-medium text-foreground">
+                      <Package className="h-4 w-4 shrink-0 text-liquor-amber" aria-hidden />
+                      Proveedor
+                    </span>
+                    <span className="text-xs text-muted-foreground leading-snug">
+                      Suministra productos; requiere al menos una categoría de proveedor.
+                    </span>
+                  </div>
+                </label>
+                <label
+                  htmlFor="party-customer"
+                  className={cn(
+                    'flex cursor-pointer items-start gap-3 rounded-lg border-2 p-4 transition-colors',
+                    partyKind === 'CUSTOMER'
+                      ? 'border-liquor-amber bg-liquor-amber/10 shadow-sm'
+                      : 'border-border bg-card hover:border-muted-foreground/30'
+                  )}
+                >
+                  <RadioGroupItem value="CUSTOMER" id="party-customer" className="mt-0.5 shrink-0" />
+                  <div className="min-w-0 space-y-1">
+                    <span className="flex items-center gap-2 font-medium text-foreground">
+                      <ShoppingBag className="h-4 w-4 shrink-0 text-liquor-amber" aria-hidden />
+                      Cliente
+                    </span>
+                    <span className="text-xs text-muted-foreground leading-snug">
+                      Compra en el punto de venta; sin categorías de proveedor.
+                    </span>
+                  </div>
+                </label>
+              </RadioGroup>
+            </div>
+
+            <div className="h-px bg-border" />
+
+            <div className="space-y-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Naturaleza del contacto
+              </p>
+              <RadioGroup
+                value={entityKind}
+                onValueChange={(v) => setEntityKind(v === 'PERSON' ? 'PERSON' : 'ORGANIZATION')}
+                className="grid grid-cols-1 sm:grid-cols-2 gap-3"
+              >
+                <label
+                  htmlFor="entity-org"
+                  className={cn(
+                    'flex cursor-pointer items-start gap-3 rounded-lg border-2 p-4 transition-colors',
+                    entityKind === 'ORGANIZATION'
+                      ? 'border-liquor-amber bg-liquor-amber/10 shadow-sm'
+                      : 'border-border bg-card hover:border-muted-foreground/30'
+                  )}
+                >
+                  <RadioGroupItem value="ORGANIZATION" id="entity-org" className="mt-0.5 shrink-0" />
+                  <div className="min-w-0 space-y-1">
+                    <span className="flex items-center gap-2 font-medium text-foreground">
+                      <Building2 className="h-4 w-4 shrink-0 text-liquor-amber" aria-hidden />
+                      Empresa
+                    </span>
+                    <span className="text-xs text-muted-foreground leading-snug">
+                      Razón social y persona de contacto para pedidos o facturación.
+                    </span>
+                  </div>
+                </label>
+                <label
+                  htmlFor="entity-person"
+                  className={cn(
+                    'flex cursor-pointer items-start gap-3 rounded-lg border-2 p-4 transition-colors',
+                    entityKind === 'PERSON'
+                      ? 'border-liquor-amber bg-liquor-amber/10 shadow-sm'
+                      : 'border-border bg-card hover:border-muted-foreground/30'
+                  )}
+                >
+                  <RadioGroupItem value="PERSON" id="entity-person" className="mt-0.5 shrink-0" />
+                  <div className="min-w-0 space-y-1">
+                    <span className="flex items-center gap-2 font-medium text-foreground">
+                      <User className="h-4 w-4 shrink-0 text-liquor-amber" aria-hidden />
+                      Persona individual
+                    </span>
+                    <span className="text-xs text-muted-foreground leading-snug">
+                      Una sola persona; el nombre completo se usa en facturas y comunicación.
+                    </span>
+                  </div>
+                </label>
+              </RadioGroup>
+            </div>
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-4">
               <div>
-                <Label htmlFor="name">Nombre de la Empresa *</Label>
+                <Label htmlFor="name">
+                  {entityKind === 'ORGANIZATION' ? 'Nombre de la empresa *' : 'Nombre completo *'}
+                </Label>
                 <Input
                   id="name"
                   value={newName}
                   onChange={(e) => setNewName(e.target.value)}
-                  placeholder="Ej: Diageo Guatemala"
+                  placeholder={entityKind === 'ORGANIZATION' ? 'Ej: Diageo Guatemala' : 'Nombre y apellidos'}
                   className="mt-1"
                 />
               </div>
-              <div>
-                <Label htmlFor="contact">Persona de Contacto *</Label>
-                <Input
-                  id="contact"
-                  value={newContact}
-                  onChange={(e) => setNewContact(e.target.value)}
-                  placeholder="Nombre completo"
-                  className="mt-1"
-                />
-              </div>
+              {entityKind === 'ORGANIZATION' && (
+                <div>
+                  <Label htmlFor="contact">Persona de contacto *</Label>
+                  <Input
+                    id="contact"
+                    value={newContact}
+                    onChange={(e) => setNewContact(e.target.value)}
+                    placeholder="Nombre de quien atiende pedidos o facturación"
+                    className="mt-1"
+                  />
+                </div>
+              )}
               <div>
                 <Label htmlFor="phone">Teléfono *</Label>
                 <Input
@@ -183,6 +317,7 @@ export default function SupplierCreatePage() {
               </div>
             </div>
             <div className="space-y-4">
+              {partyKind === 'SUPPLIER' && (
               <div>
                 <Label>Categorías *</Label>
                 <Popover open={categoryPopoverOpen} onOpenChange={setCategoryPopoverOpen}>
@@ -244,8 +379,9 @@ export default function SupplierCreatePage() {
                   </div>
                 )}
               </div>
+              )}
               <div>
-                <Label>Términos de Pago</Label>
+                <Label>Términos de pago *</Label>
                 <Popover open={paymentTermPopoverOpen} onOpenChange={setPaymentTermPopoverOpen}>
                   <PopoverTrigger asChild>
                     <Button variant="outline" role="combobox" className="w-full justify-between mt-1" id="terms">
@@ -314,11 +450,24 @@ export default function SupplierCreatePage() {
                   className="mt-1 resize-none"
                 />
               </div>
+              <div>
+                <Label htmlFor="tax-id">ID fiscal (opcional)</Label>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Para facturación: NIT, VAT, RFC u otro según el país.
+                </p>
+                <Input
+                  id="tax-id"
+                  value={newTaxId}
+                  onChange={(e) => setNewTaxId(e.target.value)}
+                  placeholder="Ej. 12345678-9, ESX1234567X"
+                  className="mt-1"
+                />
+              </div>
             </div>
           </div>
 
           <div className="flex flex-wrap items-center justify-end gap-2 pt-4 border-t">
-            <Button variant="outline" onClick={() => navigate('/proveedores')} disabled={isLoading}>
+            <Button variant="outline" onClick={() => navigate('/contactos')} disabled={isLoading}>
               Cancelar
             </Button>
             <Button
@@ -336,8 +485,8 @@ export default function SupplierCreatePage() {
                 </>
               ) : (
                 <>
-                  <Building className="w-4 h-4 mr-2" />
-                  Agregar Proveedor
+                  <Building2 className="w-4 h-4 mr-2" />
+                  Guardar contacto
                 </>
               )}
             </Button>

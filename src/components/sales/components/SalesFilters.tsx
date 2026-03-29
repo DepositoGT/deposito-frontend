@@ -41,7 +41,7 @@ export const SalesFilters = ({
                     <div className='flex-1 relative'>
                         <Search className='absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground' />
                         <Input
-                            placeholder='Buscar por ID, cliente o NIT...'
+                            placeholder='Buscar por ID, cliente o ID fiscal...'
                             value={searchTerm}
                             onChange={e => onSearchChange(e.target.value)}
                             className='pl-10'
