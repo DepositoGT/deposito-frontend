@@ -23,8 +23,13 @@ import { useSystemSettings } from '@/hooks/useSystemSettings'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { apiFetch } from '@/services/api'
 import { getFriendlyTypeName } from './getFriendlyTypeName'
-import { getTypeConfig, validatePayloadForType } from './promotionTypeConfig'
+import { getTypeConfig, validatePayloadForType, supportsProductCategoryScope } from './promotionTypeConfig'
 import { ProductCombobox } from './ProductCombobox'
+import {
+  PromotionApplicableScopeFields,
+  type ApplicableProductRef,
+  type ApplicableCategoryRef
+} from './PromotionApplicableScopeFields'
 import {
   ArrowLeft,
   Tag,
@@ -81,6 +86,8 @@ export default function PromotionCreatePage() {
   const [codePrefix, setCodePrefix] = useState('')
   const [manualCodes, setManualCodes] = useState<string[]>([])
   const [newManualCode, setNewManualCode] = useState('')
+  const [applicableProducts, setApplicableProducts] = useState<ApplicableProductRef[]>([])
+  const [applicableCategories, setApplicableCategories] = useState<ApplicableCategoryRef[]>([])
 
   const { data: promotionTypes = [] } = useQuery({
     queryKey: ['promotion-types'],
@@ -114,6 +121,9 @@ export default function PromotionCreatePage() {
   }
 
   const handleTypeChange = (newTypeId: number) => {
+    const nextType = promotionTypes.find((t) => t.id === newTypeId)
+    setApplicableProducts([])
+    setApplicableCategories([])
     setFormData((prev) => ({
       ...prev,
       type_id: newTypeId,
@@ -123,7 +133,9 @@ export default function PromotionCreatePage() {
       get_quantity: '',
       min_quantity: '',
       trigger_product_id: '',
-      target_product_id: ''
+      target_product_id: '',
+      applies_to_all:
+        nextType && supportsProductCategoryScope(nextType.name) ? prev.applies_to_all : true
     }))
   }
 
@@ -197,6 +209,28 @@ export default function PromotionCreatePage() {
       return
     }
 
+    if (supportsProductCategoryScope(selectedType.name) && !formData.applies_to_all) {
+      if (applicableProducts.length === 0 && applicableCategories.length === 0) {
+        toast({
+          title: 'Alcance de la promoción',
+          description:
+            'Si no aplica a todo el carrito, elija al menos un producto o una categoría.',
+          variant: 'destructive'
+        })
+        return
+      }
+    }
+
+    if (supportsProductCategoryScope(selectedType.name)) {
+      if (formData.applies_to_all) {
+        payload.product_ids = []
+        payload.category_ids = []
+      } else {
+        payload.product_ids = applicableProducts.map((p) => p.id)
+        payload.category_ids = applicableCategories.map((c) => c.id)
+      }
+    }
+
     if (codeMode === 'auto') {
       payload.code_count = parseInt(codeCount) || 1
       payload.code_prefix = codePrefix.toUpperCase()
@@ -220,7 +254,7 @@ export default function PromotionCreatePage() {
   const isLoading = createMutation.isPending
 
   return (
-    <div className="p-3 sm:p-6 space-y-6 animate-fade-in max-w-4xl mx-auto">
+    <div className="p-3 sm:p-6 space-y-4 sm:space-y-6 animate-fade-in w-full min-w-0">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <Button variant="ghost" size="icon" onClick={() => navigate('/promociones')}>
@@ -662,14 +696,35 @@ export default function PromotionCreatePage() {
                 />
               </div>
             </div>
-            <div className="flex items-center space-x-2">
-              <Switch
-                id="applies_to_all"
-                checked={formData.applies_to_all}
-                onCheckedChange={(v) => setFormData({ ...formData, applies_to_all: v })}
-              />
-              <Label htmlFor="applies_to_all">Aplica a todos los productos del carrito</Label>
-            </div>
+            {selectedType &&
+              (selectedType.name === 'PERCENTAGE' ||
+                selectedType.name === 'BUY_X_GET_Y' ||
+                selectedType.name === 'MIN_QTY_DISCOUNT') && (
+                <div className="flex items-center space-x-2">
+                  <Switch
+                    id="applies_to_all"
+                    checked={formData.applies_to_all}
+                    onCheckedChange={(v) => {
+                      setFormData({ ...formData, applies_to_all: v })
+                      if (v) {
+                        setApplicableProducts([])
+                        setApplicableCategories([])
+                      }
+                    }}
+                  />
+                  <Label htmlFor="applies_to_all">Aplica a todos los productos del carrito</Label>
+                </div>
+              )}
+            {selectedType &&
+              supportsProductCategoryScope(selectedType.name) &&
+              !formData.applies_to_all && (
+                <PromotionApplicableScopeFields
+                  products={applicableProducts}
+                  categories={applicableCategories}
+                  onProductsChange={setApplicableProducts}
+                  onCategoriesChange={setApplicableCategories}
+                />
+              )}
           </CardContent>
         </Card>
 
