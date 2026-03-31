@@ -18,7 +18,7 @@
  * - Real-time validation feedback
  */
 import { useState, useEffect, useMemo } from 'react'
-import { getApiBaseUrl } from '@/services/api'
+import { getApiBaseUrl, getAuthToken } from '@/services/api'
 import { useNavigate } from 'react-router-dom'
 import * as XLSX from 'xlsx'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -51,24 +51,8 @@ import {
     AlertCircle,
     Loader2,
     RefreshCw,
-    ChevronsUpDown,
-    Check,
 } from 'lucide-react'
-import {
-    Popover,
-    PopoverContent,
-    PopoverTrigger,
-} from '@/components/ui/popover'
-import {
-    Command,
-    CommandEmpty,
-    CommandGroup,
-    CommandInput,
-    CommandItem,
-    CommandList,
-} from '@/components/ui/command'
 import { useToast } from '@/hooks/use-toast'
-import { cn } from '@/lib/utils'
 
 // System fields available for mapping
 const SYSTEM_FIELDS = [
@@ -96,6 +80,12 @@ interface ValidationError {
     fieldErrors: Record<string, string[]>
 }
 
+interface ResolutionHint {
+    kind: 'role'
+    value: string
+    rowIndexes: number[]
+}
+
 const HR = () => <div className="border-t my-4" />
 
 export default function UserImportPage() {
@@ -121,11 +111,9 @@ export default function UserImportPage() {
     const [validRowCount, setValidRowCount] = useState(0)
     const [totalRowCount, setTotalRowCount] = useState(0)
 
-    // Catálogos auxiliares
-    const [roles, setRoles] = useState<{ id: number; name: string }[]>([])
-
-    // Overrides de valores inválidos -> valores válidos (por campo)
-    const [valueOverrides, setValueOverrides] = useState<Record<string, Record<string, string>>>({})
+    const [createRoles, setCreateRoles] = useState<string[]>([])
+    const [skipRowIndexes, setSkipRowIndexes] = useState<number[]>([])
+    const [resolutionHints, setResolutionHints] = useState<ResolutionHint[]>([])
 
     // Check for file in sessionStorage on mount
     useEffect(() => {
@@ -158,26 +146,6 @@ export default function UserImportPage() {
             navigate('/usuarios')
         }
     }, [navigate])
-
-    // Cargar roles desde la API para sugerencias de equivalencias
-    useEffect(() => {
-        const fetchRoles = async () => {
-            try {
-                const token = localStorage.getItem('auth:token')
-                const response = await fetch(`${getApiBaseUrl()}/auth/roles`, {
-                    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-                })
-                const data = await response.json()
-                if (Array.isArray(data)) {
-                    setRoles(data)
-                }
-            } catch (err) {
-                console.error('Error fetching roles for import suggestions:', err)
-            }
-        }
-
-        fetchRoles()
-    }, [])
 
     // Parse selected sheet
     useEffect(() => {
@@ -250,6 +218,9 @@ export default function UserImportPage() {
                 setFile(selectedFile)
                 setHasTestedOnce(false)
                 setValidationErrors([])
+                setCreateRoles([])
+                setSkipRowIndexes([])
+                setResolutionHints([])
             } catch (err) {
                 toast({ variant: 'destructive', title: 'Error', description: 'No se pudo leer el archivo' })
             }
@@ -257,8 +228,14 @@ export default function UserImportPage() {
         reader.readAsArrayBuffer(selectedFile)
     }
 
-    const handleTest = async () => {
+    const executeValidate = async (overrides?: {
+        createRoles?: string[]
+        skipRowIndexes?: number[]
+    }) => {
         if (!workbook || !selectedSheet) return
+
+        const rolesOpt = overrides?.createRoles ?? createRoles
+        const skips = overrides?.skipRowIndexes ?? skipRowIndexes
 
         setIsTesting(true)
         setStep('testing')
@@ -267,7 +244,7 @@ export default function UserImportPage() {
             const sheet = workbook.Sheets[selectedSheet]
             const data = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, {
                 header: useFirstRowAsHeader ? undefined : 1,
-                defval: ''
+                defval: '',
             })
 
             setTotalRowCount(data.length)
@@ -276,36 +253,56 @@ export default function UserImportPage() {
                 const mapped: Record<string, unknown> = {}
                 columnMappings.forEach(mapping => {
                     if (mapping.systemField) {
-                        let value = row[mapping.excelColumn]
-
-                        const overrides = valueOverrides[mapping.systemField]
-                        if (overrides && typeof value === 'string' && overrides[value]) {
-                            value = overrides[value]
-                        }
-
-                        mapped[mapping.systemField] = value
+                        mapped[mapping.systemField] = row[mapping.excelColumn]
                     }
                 })
                 return mapped
             })
 
-            const token = localStorage.getItem('auth:token')
-            const endpoint = `${getApiBaseUrl()}/auth/users/validate-import-mapped`
-
-            const response = await fetch(endpoint, {
+            const token = getAuthToken()
+            const response = await fetch(`${getApiBaseUrl()}/auth/users/validate-import-mapped`, {
                 method: 'POST',
-                headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-                body: JSON.stringify({ rows: mappedData })
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    rows: mappedData,
+                    importOptions: {
+                        createRoles: rolesOpt,
+                        skipRowIndexes: skips,
+                    },
+                }),
             })
 
-            const result = await response.json()
+            if (!response.ok) {
+                const text = await response.text()
+                let msg = 'Error al validar usuarios'
+                try {
+                    const j = JSON.parse(text) as { message?: string }
+                    msg = j.message || msg
+                } catch {
+                    msg = text || `Error ${response.status}`
+                }
+                throw new Error(msg)
+            }
+
+            const result = (await response.json()) as {
+                invalidRows?: Array<{ rowIndex: number; errors: string[] }>
+                totals?: { valid: number; invalid?: number; skipped?: number; total?: number }
+                resolutionHints?: ResolutionHint[]
+            }
+
+            const hints: ResolutionHint[] = Array.isArray(result.resolutionHints)
+                ? result.resolutionHints
+                : []
+            setResolutionHints(hints)
 
             if (result.invalidRows && result.invalidRows.length > 0) {
-                const processed: ValidationError[] = result.invalidRows.map((row: { rowIndex: number; errors: string[] }) => {
+                const processed: ValidationError[] = result.invalidRows.map(row => {
                     const fieldErrors: Record<string, string[]> = {}
                     row.errors.forEach(error => {
                         const lower = error.toLowerCase()
-
                         if (lower.includes('nombre')) {
                             fieldErrors.name = [...(fieldErrors.name || []), error]
                         } else if (lower.includes('email') || lower.includes('correo')) {
@@ -316,7 +313,11 @@ export default function UserImportPage() {
                             fieldErrors.role = [...(fieldErrors.role || []), error]
                         } else if (lower.includes('empleado') || lower.includes('es_empleado')) {
                             fieldErrors.is_employee = [...(fieldErrors.is_employee || []), error]
-                        } else if (lower.includes('fecha de contratación') || lower.includes('fecha de contratacion') || lower.includes('hire_date') || lower.includes('fecha de contratación inválida')) {
+                        } else if (
+                            lower.includes('fecha de contratación') ||
+                            lower.includes('fecha de contratacion') ||
+                            lower.includes('hire_date')
+                        ) {
                             fieldErrors.hire_date = [...(fieldErrors.hire_date || []), error]
                         } else {
                             fieldErrors._general = [...(fieldErrors._general || []), error]
@@ -325,22 +326,69 @@ export default function UserImportPage() {
                     return { rowIndex: row.rowIndex, errors: row.errors, fieldErrors }
                 })
                 setValidationErrors(processed)
-                setValidRowCount(result.totals.valid)
-                toast({ title: 'Validación completada', description: `${result.totals.invalid} usuarios con errores`, variant: 'destructive' })
+                setValidRowCount(result.totals?.valid ?? 0)
+                const hintCount = hints.length
+                toast({
+                    title: 'Hay errores en el archivo',
+                    description: hintCount > 0
+                        ? `${result.totals?.invalid ?? result.invalidRows.length} fila(s) con error. Use «Comentarios» o los botones globales.`
+                        : `${result.invalidRows.length} fila(s) con errores.`,
+                    variant: 'destructive',
+                })
             } else {
                 setValidationErrors([])
-                setValidRowCount(result.totals.valid)
-                toast({ title: '¡Validación exitosa!', description: `Todos los ${result.totals.total} usuarios son válidos.` })
+                setValidRowCount(result.totals?.valid ?? data.length)
+                const skipped = Number(result.totals?.skipped ?? 0)
+                toast({
+                    title: '¡Validación exitosa!',
+                    description: skipped > 0
+                        ? `${result.totals?.valid ?? 0} fila(s) lista(s); ${skipped} omitida(s) del archivo.`
+                        : `${result.totals?.valid ?? data.length} fila(s) válida(s).`,
+                })
             }
 
             setHasTestedOnce(true)
             setStep('mapping')
         } catch (err) {
-            toast({ title: 'Error de validación', description: err instanceof Error ? err.message : 'Error al validar', variant: 'destructive' })
+            const msg = err instanceof Error ? err.message : 'Error al validar usuarios'
+            toast({ title: 'Error de validación', description: msg, variant: 'destructive' })
+            setValidationErrors([{ rowIndex: -1, errors: [msg], fieldErrors: { _general: [msg] } }])
+            setValidRowCount(0)
+            setResolutionHints([])
             setStep('mapping')
         } finally {
             setIsTesting(false)
         }
+    }
+
+    const handleTest = () => {
+        void executeValidate()
+    }
+
+    const approveCreateRole = (h: ResolutionHint) => {
+        const next = Array.from(new Set([...createRoles, h.value]))
+        setCreateRoles(next)
+        void executeValidate({ createRoles: next, skipRowIndexes })
+    }
+
+    const omitRowsForHint = (h: ResolutionHint) => {
+        const nextSkip = Array.from(new Set([...skipRowIndexes, ...h.rowIndexes]))
+        setSkipRowIndexes(nextSkip)
+        void executeValidate({ createRoles, skipRowIndexes: nextSkip })
+    }
+
+    const approveAllUnknownRoles = () => {
+        const vals = resolutionHints.filter(r => r.kind === 'role').map(r => r.value)
+        const next = Array.from(new Set([...createRoles, ...vals]))
+        setCreateRoles(next)
+        void executeValidate({ createRoles: next, skipRowIndexes })
+    }
+
+    const omitAllRowsAffectedByUnknownRoles = () => {
+        const allRows = Array.from(new Set(resolutionHints.flatMap(h => h.rowIndexes)))
+        const nextSkip = Array.from(new Set([...skipRowIndexes, ...allRows]))
+        setSkipRowIndexes(nextSkip)
+        void executeValidate({ createRoles, skipRowIndexes: nextSkip })
     }
 
     const handleImport = async () => {
@@ -353,7 +401,7 @@ export default function UserImportPage() {
             const sheet = workbook.Sheets[selectedSheet]
             const data = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, {
                 header: useFirstRowAsHeader ? undefined : 1,
-                defval: ''
+                defval: '',
             })
 
             const total = data.length || 1
@@ -363,32 +411,31 @@ export default function UserImportPage() {
                 const mapped: Record<string, unknown> = {}
                 columnMappings.forEach(mapping => {
                     if (mapping.systemField) {
-                        let value = row[mapping.excelColumn]
-
-                        const overrides = valueOverrides[mapping.systemField]
-                        if (overrides && typeof value === 'string' && overrides[value]) {
-                            value = overrides[value]
-                        }
-
-                        mapped[mapping.systemField] = value
+                        mapped[mapping.systemField] = row[mapping.excelColumn]
                     }
                 })
                 mappedData.push(mapped)
 
-                // 10% -> 60% basado en filas ya mapeadas
                 if (index % 10 === 0) {
                     const progress = 10 + Math.round(((index + 1) / total) * 50)
                     setImportProgress(progress)
                 }
             })
 
-            const token = localStorage.getItem('auth:token')
-            const endpoint = `${getApiBaseUrl()}/auth/users/bulk-import-mapped`
-
-            const response = await fetch(endpoint, {
+            const token = getAuthToken()
+            const response = await fetch(`${getApiBaseUrl()}/auth/users/bulk-import-mapped`, {
                 method: 'POST',
-                headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-                body: JSON.stringify({ rows: mappedData })
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    rows: mappedData,
+                    importOptions: {
+                        createRoles,
+                        skipRowIndexes,
+                    },
+                }),
             })
 
             setImportProgress(80)
@@ -425,37 +472,6 @@ export default function UserImportPage() {
         return count
     }
 
-    // ¿Tiene errores de tipo "no existe"?
-    const hasNotExistsError = (systemField: string | null): boolean => {
-        if (!systemField) return false
-        const errors = getFieldErrors(systemField)
-        return errors.some(e => e.toLowerCase().includes('no existe') || e.toLowerCase().includes('not exist'))
-    }
-
-    // Extraer valores inválidos desde los mensajes de error (entre comillas "")
-    const getInvalidValues = (systemField: string | null): string[] => {
-        if (!systemField) return []
-        const errors = getFieldErrors(systemField)
-        const values: string[] = []
-        errors.forEach(err => {
-            const match = err.match(/"([^"]+)"/)
-            if (match && match[1] && !values.includes(match[1])) {
-                values.push(match[1])
-            }
-        })
-        return values
-    }
-
-    const setValueOverride = (fieldName: string, originalValue: string, replacement: string) => {
-        setValueOverrides(prev => ({
-            ...prev,
-            [fieldName]: {
-                ...(prev[fieldName] || {}),
-                [originalValue]: replacement,
-            },
-        }))
-    }
-
     // Hints / posibles errores por campo (para sección Comentarios)
     const getFieldHints = (systemField: string | null): string[] => {
         if (!systemField) return []
@@ -478,8 +494,8 @@ export default function UserImportPage() {
                 ]
             case 'role':
                 return [
-                    'Requerido. Debe coincidir exactamente con un rol existente.',
-                    'Si el valor no existe, usa "Asociar manualmente" para mapearlo a un rol real.',
+                    'Requerido. Si el nombre no está en el sistema, «Probar» fallará hasta «Crear» u «Omitir filas».',
+                    'Al crear un rol desde aquí queda sin permisos: asígnelos después en administración si hace falta.',
                 ]
             case 'is_employee':
                 return [
@@ -519,7 +535,19 @@ export default function UserImportPage() {
                         </p>
                         <div className="flex gap-3 justify-center">
                             <Button variant="outline" onClick={() => navigate('/usuarios')}>Ir a Usuarios</Button>
-                            <Button onClick={() => { setStep('mapping'); setImportResult(null) }}>Importar Más</Button>
+                            <Button
+                                onClick={() => {
+                                    setStep('mapping')
+                                    setImportResult(null)
+                                    setHasTestedOnce(false)
+                                    setValidationErrors([])
+                                    setCreateRoles([])
+                                    setSkipRowIndexes([])
+                                    setResolutionHints([])
+                                }}
+                            >
+                                Importar Más
+                            </Button>
                         </div>
                     </CardContent>
                 </Card>
@@ -661,6 +689,15 @@ export default function UserImportPage() {
                                 <HR />
 
                                 <div className="space-y-2">
+                                    <p className="text-xs font-medium text-muted-foreground">Roles</p>
+                                    <p className="text-[11px] text-muted-foreground leading-snug">
+                                        Si «Probar» detecta un rol inexistente, puede crearlo (quedará sin permisos hasta que los asigne) u omitir las filas del Excel.
+                                    </p>
+                                </div>
+
+                                <HR />
+
+                                <div className="space-y-2">
                                     <p className="text-xs font-medium text-muted-foreground">Estado del mapeo</p>
                                     {SYSTEM_FIELDS.filter(f => f.required).map(field => {
                                         const isMapped = columnMappings.some(m => m.systemField === field.id)
@@ -694,6 +731,36 @@ export default function UserImportPage() {
                                 </div>
                             </CardHeader>
                             <CardContent>
+                                {hasTestedOnce && resolutionHints.length > 0 && (
+                                    <div className="mb-4 space-y-2 rounded-md border border-orange-200 bg-orange-50/90 p-3">
+                                        <p className="text-sm font-medium text-orange-950">
+                                            ¿Qué hacer con roles que no existen en el sistema?
+                                        </p>
+                                        <p className="text-xs text-muted-foreground">
+                                            Aplique a todos los valores detectados, o use los botones por columna en «Comentarios».
+                                        </p>
+                                        <div className="flex flex-wrap gap-2 pt-1">
+                                            <Button
+                                                type="button"
+                                                size="sm"
+                                                className="bg-liquor-amber hover:bg-liquor-amber/90 text-white"
+                                                onClick={approveAllUnknownRoles}
+                                                disabled={isTesting}
+                                            >
+                                                Crear todos los roles nuevos
+                                            </Button>
+                                            <Button
+                                                type="button"
+                                                size="sm"
+                                                variant="outline"
+                                                onClick={omitAllRowsAffectedByUnknownRoles}
+                                                disabled={isTesting}
+                                            >
+                                                Omitir todas las filas afectadas
+                                            </Button>
+                                        </div>
+                                    </div>
+                                )}
                                 <ScrollArea className="h-[calc(100vh-280px)]">
                                     <Table>
                                         <TableHeader>
@@ -761,86 +828,47 @@ export default function UserImportPage() {
                                                                     </div>
                                                                 )}
 
-                                                                {/* Sugerencias de equivalencias para roles que "no existen" */}
                                                                 {hasTestedOnce &&
                                                                     mapping.systemField === 'role' &&
-                                                                    hasNotExistsError('role') && (
-                                                                        <div className="space-y-2 pt-2 border-t mt-2">
-                                                                            <p className="text-xs font-medium text-orange-700">
-                                                                                Asociar manualmente:
+                                                                    resolutionHints.filter(h => h.kind === 'role').length > 0 && (
+                                                                        <div className="mt-2 space-y-2 rounded-md border border-orange-100 bg-orange-50/50 p-2">
+                                                                            <p className="text-[11px] font-medium text-orange-900">
+                                                                                Roles no encontrados:
                                                                             </p>
-                                                                            {getInvalidValues('role').map((invalidValue) => {
-                                                                                const currentValue =
-                                                                                    valueOverrides.role?.[invalidValue] || ''
-
-                                                                                return (
-                                                                                    <div
-                                                                                        key={invalidValue}
-                                                                                        className="flex items-center gap-2"
-                                                                                    >
-                                                                                        <span className="text-xs text-muted-foreground whitespace-nowrap">
-                                                                                            "{invalidValue}" →
+                                                                            {resolutionHints.filter(h => h.kind === 'role').map(h => (
+                                                                                <div
+                                                                                    key={`${h.value}-${h.rowIndexes.join(',')}`}
+                                                                                    className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:justify-between"
+                                                                                >
+                                                                                    <span className="text-xs break-words">
+                                                                                        «{h.value}»{' '}
+                                                                                        <span className="text-muted-foreground">
+                                                                                            (filas {h.rowIndexes.join(', ')})
                                                                                         </span>
-                                                                                        <Popover>
-                                                                                            <PopoverTrigger asChild>
-                                                                                                <Button
-                                                                                                    variant="outline"
-                                                                                                    role="combobox"
-                                                                                                    className="h-7 text-xs flex-1 justify-between min-w-[150px]"
-                                                                                                >
-                                                                                                    <span className="truncate">
-                                                                                                        {currentValue ||
-                                                                                                            'Buscar y seleccionar...'}
-                                                                                                    </span>
-                                                                                                    <ChevronsUpDown className="ml-2 h-3 w-3 shrink-0 opacity-50" />
-                                                                                                </Button>
-                                                                                            </PopoverTrigger>
-                                                                                            <PopoverContent
-                                                                                                className="w-[250px] p-0"
-                                                                                                align="start"
-                                                                                            >
-                                                                                                <Command>
-                                                                                                    <CommandInput
-                                                                                                        placeholder="Buscar rol..."
-                                                                                                        className="h-9"
-                                                                                                    />
-                                                                                                    <CommandList>
-                                                                                                        <CommandEmpty>
-                                                                                                            Sin resultados.
-                                                                                                        </CommandEmpty>
-                                                                                                        <CommandGroup>
-                                                                                                            {roles.map((role) => (
-                                                                                                                <CommandItem
-                                                                                                                    key={role.id}
-                                                                                                                    value={role.name}
-                                                                                                                    onSelect={() =>
-                                                                                                                        setValueOverride(
-                                                                                                                            'role',
-                                                                                                                            invalidValue,
-                                                                                                                            role.name,
-                                                                                                                        )
-                                                                                                                    }
-                                                                                                                >
-                                                                                                                    <Check
-                                                                                                                        className={cn(
-                                                                                                                            'mr-2 h-4 w-4',
-                                                                                                                            currentValue ===
-                                                                                                                                role.name
-                                                                                                                                ? 'opacity-100'
-                                                                                                                                : 'opacity-0',
-                                                                                                                        )}
-                                                                                                                    />
-                                                                                                                    {role.name}
-                                                                                                                </CommandItem>
-                                                                                                            ))}
-                                                                                                        </CommandGroup>
-                                                                                                    </CommandList>
-                                                                                                </Command>
-                                                                                            </PopoverContent>
-                                                                                        </Popover>
+                                                                                    </span>
+                                                                                    <div className="flex shrink-0 gap-1.5">
+                                                                                        <Button
+                                                                                            type="button"
+                                                                                            size="sm"
+                                                                                            className="h-7 text-xs px-2 bg-liquor-amber hover:bg-liquor-amber/90 text-white"
+                                                                                            onClick={() => approveCreateRole(h)}
+                                                                                            disabled={isTesting}
+                                                                                        >
+                                                                                            Crear
+                                                                                        </Button>
+                                                                                        <Button
+                                                                                            type="button"
+                                                                                            size="sm"
+                                                                                            variant="outline"
+                                                                                            className="h-7 text-xs px-2"
+                                                                                            onClick={() => omitRowsForHint(h)}
+                                                                                            disabled={isTesting}
+                                                                                        >
+                                                                                            Omitir filas
+                                                                                        </Button>
                                                                                     </div>
-                                                                                )
-                                                                            })}
+                                                                                </div>
+                                                                            ))}
                                                                         </div>
                                                                     )}
 
@@ -867,16 +895,21 @@ export default function UserImportPage() {
 
                                 {/* Validation Summary */}
                                 {hasTestedOnce && (
-                                    <div className={cn("mt-4 p-3 rounded-md", validationErrors.length > 0 ? 'bg-destructive/10' : 'bg-green-50')}>
+                                    <div
+                                        className={
+                                            'mt-4 p-3 rounded-md ' +
+                                            (validationErrors.length > 0 ? 'bg-destructive/10' : 'bg-green-50')
+                                        }
+                                    >
                                         {validationErrors.length > 0 ? (
                                             <p className="text-sm text-destructive flex items-center gap-2">
                                                 <AlertCircle className="h-4 w-4" />
-                                                {validationErrors.length} usuarios con errores. Corríjalos antes de importar.
+                                                {validationErrors.length} filas con errores. Resuelva el rol en «Comentarios» o con los botones globales.
                                             </p>
                                         ) : (
                                             <p className="text-sm text-green-700 flex items-center gap-2">
                                                 <CheckCircle2 className="h-4 w-4" />
-                                                ¡Validación exitosa! {validRowCount} usuarios listos para importar.
+                                                ¡Validación exitosa! {validRowCount} fila(s) lista(s) para importar.
                                             </p>
                                         )}
                                     </div>

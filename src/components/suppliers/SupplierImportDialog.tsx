@@ -79,7 +79,7 @@ export function SupplierImportDialog({ open, onOpenChange }: SupplierImportDialo
             const url = window.URL.createObjectURL(blob)
             const a = document.createElement('a')
             a.href = url
-            a.download = 'plantilla_proveedores.xlsx'
+            a.download = 'plantilla_contactos.xlsx'
             document.body.appendChild(a)
             a.click()
             a.remove()
@@ -263,7 +263,7 @@ export function SupplierImportDialog({ open, onOpenChange }: SupplierImportDialo
                         Importar Proveedores
                     </DialogTitle>
                     <DialogDescription>
-                        Importa proveedores masivamente desde un archivo Excel
+                        Importa contactos (proveedores y clientes) desde un archivo Excel
                     </DialogDescription>
                 </DialogHeader>
                 {renderContent()}
