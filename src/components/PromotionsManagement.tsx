@@ -383,6 +383,8 @@ const PromotionsManagement = () => {
                 dialog={codesDialog}
                 setDialog={setCodesDialog}
                 onCopyCode={copyCode}
+                locale={locale}
+                currencyCode={currencyCode}
             />
         </div>
     )
@@ -395,9 +397,11 @@ interface CodesDialogProps {
     dialog: CodesDialogState
     setDialog: (state: CodesDialogState) => void
     onCopyCode: (code: string) => void
+    locale?: string
+    currencyCode?: string
 }
 
-const CodesDialog = ({ dialog, setDialog, onCopyCode }: CodesDialogProps) => {
+const CodesDialog = ({ dialog, setDialog, onCopyCode, locale, currencyCode }: CodesDialogProps) => {
     const [selectedCodes, setSelectedCodes] = useState<string[]>([])
     const [termsText, setTermsText] = useState('Válido solo en tiendas participantes. No acumulable con otras promociones.')
 

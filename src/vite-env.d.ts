@@ -9,3 +9,12 @@
  */
 
 /// <reference types="vite/client" />
+
+interface ImportMetaEnv {
+    /** Opcional: mismo límite que `MAX_PROMOTION_CODES_PER_SALE` en el backend (solo UX en POS). */
+    readonly VITE_MAX_PROMOTION_CODES_PER_SALE?: string
+}
+
+interface ImportMeta {
+    readonly env: ImportMetaEnv
+}

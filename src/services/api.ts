@@ -65,7 +65,25 @@ export const apiFetch = async <T>(path: string, options: RequestInit = {}): Prom
   });
 
   const text = await res.text();
-  const data = text ? JSON.parse(text) : undefined;
+  let data: unknown = undefined;
+  if (text) {
+    try {
+      data = JSON.parse(text) as unknown;
+    } catch {
+      if (!res.ok) {
+        const preview = text.length > 180 ? `${text.slice(0, 180)}…` : text;
+        throw new ApiError(
+          preview.trim() || `${res.status} ${res.statusText || "Error"}`,
+          res.status
+        );
+      }
+      throw new ApiError(
+        "La respuesta del servidor no es JSON válido",
+        res.status,
+        { rawSnippet: text.slice(0, 240) }
+      );
+    }
+  }
 
   if (!res.ok) {
     if (res.status === 401) {
@@ -79,7 +97,13 @@ export const apiFetch = async <T>(path: string, options: RequestInit = {}): Prom
         // no-op
       }
     }
-    const message = (data && (data.message || data.error)) || res.statusText || "Error";
+    const msg =
+      data && typeof data === "object" && data !== null && ("message" in data || "error" in data)
+        ? String((data as { message?: string; error?: string }).message ||
+            (data as { message?: string; error?: string }).error ||
+            "")
+        : "";
+    const message = msg || res.statusText || "Error";
     throw new ApiError(String(message), res.status, data);
   }
 

@@ -18,8 +18,8 @@
  * - Real-time validation feedback
  */
 import { useState, useEffect, useMemo } from 'react'
-import { apiFetch } from '@/services/api'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { apiFetch, getApiBaseUrl, getAuthToken } from '@/services/api'
+import { useNavigate } from 'react-router-dom'
 import * as XLSX from 'xlsx'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -46,32 +46,13 @@ import {
 import {
     FileSpreadsheet,
     Upload,
-    X,
     ArrowLeft,
     CheckCircle2,
     AlertCircle,
     Loader2,
-    HelpCircle,
-    FileUp,
     RefreshCw,
-    ChevronsUpDown,
-    Check
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
-import {
-    Popover,
-    PopoverContent,
-    PopoverTrigger,
-} from '@/components/ui/popover'
-import {
-    Command,
-    CommandEmpty,
-    CommandGroup,
-    CommandInput,
-    CommandItem,
-    CommandList,
-} from '@/components/ui/command'
-import { cn } from '@/lib/utils'
 
 // System fields available for mapping
 const SYSTEM_FIELDS = [
@@ -103,9 +84,14 @@ interface ValidationError {
     fieldErrors: Record<string, string[]>  // field name -> errors
 }
 
+interface ResolutionHint {
+    kind: 'category' | 'supplier'
+    value: string
+    rowIndexes: number[]
+}
+
 export default function ImportPage() {
     const navigate = useNavigate()
-    const [searchParams] = useSearchParams()
     const { toast } = useToast()
 
     // State
@@ -124,17 +110,13 @@ export default function ImportPage() {
     const [isTesting, setIsTesting] = useState(false)
     const [hasTestedOnce, setHasTestedOnce] = useState(false)
     const [validationErrors, setValidationErrors] = useState<ValidationError[]>([])
-    const [generalErrors, setGeneralErrors] = useState<string[]>([])
     const [validRowCount, setValidRowCount] = useState(0)
     const [totalRowCount, setTotalRowCount] = useState(0)
 
-    // Catalog data for manual association
-    const [categories, setCategories] = useState<{ id: number; name: string }[]>([])
-    const [suppliers, setSuppliers] = useState<{ id: number; name: string }[]>([])
-
-    // Value overrides - map invalid values to valid ones
-    // Format: { fieldName: { originalValue: replacementValue } }
-    const [valueOverrides, setValueOverrides] = useState<Record<string, Record<string, string>>>({})
+    const [createCategories, setCreateCategories] = useState<string[]>([])
+    const [createSuppliers, setCreateSuppliers] = useState<string[]>([])
+    const [skipRowIndexes, setSkipRowIndexes] = useState<number[]>([])
+    const [resolutionHints, setResolutionHints] = useState<ResolutionHint[]>([])
 
     // Check for file in sessionStorage on mount
     useEffect(() => {
@@ -170,41 +152,6 @@ export default function ImportPage() {
             navigate('/inventario')
         }
     }, [navigate])
-
-    // Fetch categories and suppliers for manual association
-    useEffect(() => {
-        const fetchCatalogs = async () => {
-            try {
-                const [catData, supData] = await Promise.all([
-                    apiFetch<unknown>('/api/catalogs/product-categories?page=1&pageSize=1000'),
-                    apiFetch<unknown>('/api/suppliers?page=1&pageSize=1000&party_type=SUPPLIER')
-                ])
-
-                if (catData) {
-                    console.log('Categories loaded:', catData)
-                    const catItems = Array.isArray(catData)
-                        ? catData
-                        : (catData as { items?: Array<{ id: number; name: string }> }).items ?? []
-                    if (Array.isArray(catItems)) {
-                        setCategories(catItems.map((c: { id: number; name: string }) => ({ id: c.id, name: c.name })))
-                    }
-                }
-
-                if (supData) {
-                    console.log('Suppliers loaded:', supData)
-                    const supItems = Array.isArray(supData)
-                        ? supData
-                        : (supData as { items?: Array<{ id: number; name: string }> }).items ?? []
-                    if (Array.isArray(supItems)) {
-                        setSuppliers(supItems.map((s: { id: number; name: string }) => ({ id: s.id, name: s.name })))
-                    }
-                }
-            } catch (err) {
-                console.error('Error fetching catalogs:', err)
-            }
-        }
-        fetchCatalogs()
-    }, [])
 
     // Parse selected sheet and extract columns
     useEffect(() => {
@@ -285,6 +232,12 @@ export default function ImportPage() {
             setWorkbook(wb)
             setSheetNames(wb.SheetNames)
             setSelectedSheet(wb.SheetNames[0])
+            setHasTestedOnce(false)
+            setValidationErrors([])
+            setCreateCategories([])
+            setCreateSuppliers([])
+            setSkipRowIndexes([])
+            setResolutionHints([])
         } catch (err) {
             toast({
                 variant: 'destructive',
@@ -294,124 +247,99 @@ export default function ImportPage() {
         }
     }
 
-    // Execute import with current mappings
-    const handleImport = async () => {
-        if (!workbook || !selectedSheet) return
-
-        setStep('validating')
-        setImportProgress(10)
-
-        try {
-            // Get sheet data
-            const sheet = workbook.Sheets[selectedSheet]
-            const data = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, {
-                header: useFirstRowAsHeader ? undefined : 1,
-                defval: ''
-            })
-
-            const total = data.length || 1
-
-            // Transform data using mappings and apply value overrides, actual progress based on rows
-            const mappedData: Record<string, unknown>[] = []
-            data.forEach((row, index) => {
-                const mapped: Record<string, unknown> = {}
-                columnMappings.forEach(mapping => {
-                    if (mapping.systemField) {
-                        let value = row[mapping.excelColumn]
-
-                        // Apply value override if set (for manual entity association)
-                        const overrides = valueOverrides[mapping.systemField]
-                        if (overrides && typeof value === 'string' && overrides[value]) {
-                            value = overrides[value]
-                        }
-
-                        mapped[mapping.systemField] = value
-                    }
-                })
-                mappedData.push(mapped)
-
-                // 10% -> 60% while mapeamos filas
-                if (index % 10 === 0) {
-                    const progress = 10 + Math.round(((index + 1) / total) * 50)
-                    setImportProgress(progress)
+    const buildMappedRows = (): Record<string, unknown>[] => {
+        if (!workbook || !selectedSheet) return []
+        const sheet = workbook.Sheets[selectedSheet]
+        const data = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, {
+            header: useFirstRowAsHeader ? undefined : 1,
+            defval: '',
+        })
+        return data.map(row => {
+            const mapped: Record<string, unknown> = {}
+            columnMappings.forEach(mapping => {
+                if (mapping.systemField) {
+                    mapped[mapping.systemField] = row[mapping.excelColumn]
                 }
             })
-
-            setStep('importing')
-            setImportProgress(65)
-
-            // Send to server for validation and import
-            const result = await apiFetch<{ created: number; skipped?: number }>('/products/bulk-import-mapped', {
-                method: 'POST',
-                body: JSON.stringify({ products: mappedData })
-            })
-
-            setImportProgress(100)
-            setImportResult(result)
-            setStep('success')
-
-            toast({
-                title: '¡Importación exitosa!',
-                description: `Se importaron ${result.created} productos`
-            })
-
-        } catch (err) {
-            setErrorMessage(err instanceof Error ? err.message : 'Error en importación')
-            setStep('error')
-        }
+            return mapped
+        })
     }
 
-    // Test/Validate data without importing
-    const handleTest = async () => {
+    const executeValidate = async (overrides?: {
+        createCategories?: string[]
+        createSuppliers?: string[]
+        skipRowIndexes?: number[]
+    }) => {
         if (!workbook || !selectedSheet) return
 
+        const cats = overrides?.createCategories ?? createCategories
+        const sups = overrides?.createSuppliers ?? createSuppliers
+        const skips = overrides?.skipRowIndexes ?? skipRowIndexes
+
         setIsTesting(true)
-        setValidationErrors([])
-        setGeneralErrors([])
+        setStep('testing')
 
         try {
             const sheet = workbook.Sheets[selectedSheet]
             const data = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, {
                 header: useFirstRowAsHeader ? undefined : 1,
-                defval: ''
+                defval: '',
             })
-
             setTotalRowCount(data.length)
 
-            // Transform data using mappings and apply value overrides
             const mappedData = data.map(row => {
                 const mapped: Record<string, unknown> = {}
                 columnMappings.forEach(mapping => {
                     if (mapping.systemField) {
-                        let value = row[mapping.excelColumn]
-
-                        // Apply value override if set
-                        const overrides = valueOverrides[mapping.systemField]
-                        if (overrides && typeof value === 'string' && overrides[value]) {
-                            value = overrides[value]
-                        }
-
-                        mapped[mapping.systemField] = value
+                        mapped[mapping.systemField] = row[mapping.excelColumn]
                     }
                 })
                 return mapped
             })
 
-            // Send to server for validation only
-            const result = await apiFetch<{
-                invalidRows?: Array<{ rowIndex: number; errors: string[] }>
-                totals?: { valid: number }
-            }>('/products/validate-import-mapped', {
+            const token = getAuthToken()
+            const response = await fetch(`${getApiBaseUrl()}/products/validate-import-mapped`, {
                 method: 'POST',
-                body: JSON.stringify({ products: mappedData })
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    products: mappedData,
+                    importOptions: {
+                        createCategories: cats,
+                        createSuppliers: sups,
+                        skipRowIndexes: skips,
+                    },
+                }),
             })
 
-            if (result.invalidRows && result.invalidRows.length > 0) {
-                // Process errors and extract field-specific errors
-                const processed: ValidationError[] = result.invalidRows.map((row: { rowIndex: number; errors: string[] }) => {
-                    const fieldErrors: Record<string, string[]> = {}
+            if (!response.ok) {
+                const errorText = await response.text()
+                let msg = 'Error al validar productos'
+                try {
+                    const j = JSON.parse(errorText) as { message?: string }
+                    msg = j.message || msg
+                } catch {
+                    msg = errorText || `Error ${response.status}`
+                }
+                throw new Error(msg)
+            }
 
-                    // Parse errors to extract field names
+            const result = (await response.json()) as {
+                invalidRows?: Array<{ rowIndex: number; errors: string[] }>
+                totals?: { valid: number; invalid?: number; skipped?: number; total?: number }
+                resolutionHints?: ResolutionHint[]
+            }
+
+            const hints: ResolutionHint[] = Array.isArray(result.resolutionHints)
+                ? result.resolutionHints
+                : []
+            setResolutionHints(hints)
+
+            if (result.invalidRows && result.invalidRows.length > 0) {
+                const processed: ValidationError[] = result.invalidRows.map(row => {
+                    const fieldErrors: Record<string, string[]> = {}
                     row.errors.forEach(error => {
                         if (error.includes('nombre')) fieldErrors.name = [...(fieldErrors.name || []), error]
                         else if (error.includes('categoria') || error.includes('Categoría')) fieldErrors.category = [...(fieldErrors.category || []), error]
@@ -421,45 +349,145 @@ export default function ImportPage() {
                         else if (error.includes('stock') && !error.includes('mínimo')) fieldErrors.stock = [...(fieldErrors.stock || []), error]
                         else if (error.includes('stock mínimo') || error.includes('minimo')) fieldErrors.min_stock = [...(fieldErrors.min_stock || []), error]
                         else if (error.includes('código') || error.includes('barras')) fieldErrors.barcode = [...(fieldErrors.barcode || []), error]
-                        else {
-                            // General error for this row
-                            fieldErrors._general = [...(fieldErrors._general || []), error]
-                        }
+                        else fieldErrors._general = [...(fieldErrors._general || []), error]
                     })
-
-                    return {
-                        rowIndex: row.rowIndex,
-                        errors: row.errors,
-                        fieldErrors
-                    }
+                    return { rowIndex: row.rowIndex, errors: row.errors, fieldErrors }
                 })
-
                 setValidationErrors(processed)
-                setValidRowCount(result.totals?.valid || 0)
-
+                setValidRowCount(result.totals?.valid ?? 0)
+                const hintCount = hints.length
                 toast({
                     variant: 'destructive',
-                    title: 'Errores encontrados',
-                    description: `${result.invalidRows.length} filas tienen errores. Revisa la columna de comentarios.`
+                    title: 'Hay errores en el archivo',
+                    description: hintCount > 0
+                        ? `${result.totals?.invalid ?? result.invalidRows.length} fila(s) con error. Use «Comentarios» o los botones globales.`
+                        : `${result.invalidRows.length} fila(s) con errores.`,
                 })
             } else {
-                setValidRowCount(result.totals?.valid || data.length)
+                setValidationErrors([])
+                setValidRowCount(result.totals?.valid ?? data.length)
+                const skipped = Number(result.totals?.skipped ?? 0)
                 toast({
                     title: '¡Validación exitosa!',
-                    description: `Todos los ${data.length} productos son válidos y listos para importar.`
+                    description: skipped > 0
+                        ? `${result.totals?.valid ?? 0} fila(s) lista(s); ${skipped} omitida(s) del archivo.`
+                        : `${result.totals?.valid ?? data.length} fila(s) válida(s).`,
                 })
             }
 
             setHasTestedOnce(true)
+            setStep('mapping')
         } catch (err) {
-            setGeneralErrors([err instanceof Error ? err.message : 'Error en validación'])
-            toast({
-                variant: 'destructive',
-                title: 'Error',
-                description: 'No se pudo validar los datos'
-            })
+            const msg = err instanceof Error ? err.message : 'Error al validar productos'
+            toast({ title: 'Error de validación', description: msg, variant: 'destructive' })
+            setValidationErrors([{ rowIndex: -1, errors: [msg], fieldErrors: { _general: [msg] } }])
+            setValidRowCount(0)
+            setResolutionHints([])
+            setStep('mapping')
         } finally {
             setIsTesting(false)
+        }
+    }
+
+    const handleTest = () => {
+        void executeValidate()
+    }
+
+    const approveCreateCatalogValue = (h: ResolutionHint) => {
+        const nextCats =
+            h.kind === 'category'
+                ? Array.from(new Set([...createCategories, h.value]))
+                : createCategories
+        const nextSups =
+            h.kind === 'supplier'
+                ? Array.from(new Set([...createSuppliers, h.value]))
+                : createSuppliers
+        setCreateCategories(nextCats)
+        setCreateSuppliers(nextSups)
+        void executeValidate({
+            createCategories: nextCats,
+            createSuppliers: nextSups,
+            skipRowIndexes,
+        })
+    }
+
+    const omitRowsForHint = (h: ResolutionHint) => {
+        const nextSkip = Array.from(new Set([...skipRowIndexes, ...h.rowIndexes]))
+        setSkipRowIndexes(nextSkip)
+        void executeValidate({
+            createCategories,
+            createSuppliers,
+            skipRowIndexes: nextSkip,
+        })
+    }
+
+    const approveAllUnknownCatalogValues = () => {
+        const catVals = resolutionHints.filter(h => h.kind === 'category').map(h => h.value)
+        const supVals = resolutionHints.filter(h => h.kind === 'supplier').map(h => h.value)
+        const nextCats = Array.from(new Set([...createCategories, ...catVals]))
+        const nextSups = Array.from(new Set([...createSuppliers, ...supVals]))
+        setCreateCategories(nextCats)
+        setCreateSuppliers(nextSups)
+        void executeValidate({
+            createCategories: nextCats,
+            createSuppliers: nextSups,
+            skipRowIndexes,
+        })
+    }
+
+    const omitAllRowsAffectedByUnknownCatalog = () => {
+        const allRows = Array.from(new Set(resolutionHints.flatMap(h => h.rowIndexes)))
+        const nextSkip = Array.from(new Set([...skipRowIndexes, ...allRows]))
+        setSkipRowIndexes(nextSkip)
+        void executeValidate({
+            createCategories,
+            createSuppliers,
+            skipRowIndexes: nextSkip,
+        })
+    }
+
+    const handleImport = async () => {
+        if (!workbook || !selectedSheet) return
+
+        setStep('validating')
+        setImportProgress(10)
+
+        try {
+            const mappedData = buildMappedRows()
+            const total = mappedData.length || 1
+
+            mappedData.forEach((_, index) => {
+                if (index % 10 === 0) {
+                    setImportProgress(10 + Math.round(((index + 1) / total) * 50))
+                }
+            })
+
+            setStep('importing')
+            setImportProgress(65)
+
+            const result = await apiFetch<{ created: number; skipped?: number }>('/products/bulk-import-mapped', {
+                method: 'POST',
+                body: JSON.stringify({
+                    products: mappedData,
+                    importOptions: {
+                        createCategories,
+                        createSuppliers,
+                        skipRowIndexes,
+                    },
+                }),
+            })
+
+            setImportProgress(100)
+            setImportResult(result)
+            setStep('success')
+
+            toast({
+                title: '¡Importación exitosa!',
+                description: `Se importaron ${result.created} productos`,
+            })
+        } catch (err) {
+            setErrorMessage(err instanceof Error ? err.message : 'Error en importación')
+            setStep('error')
         }
     }
 
@@ -503,13 +531,13 @@ export default function ImportPage() {
                 ]
             case 'category':
                 return [
-                    'Debe coincidir exactamente con una categoría existente.',
-                    'Usa los valores de la hoja "Catálogos" de la plantilla (acentos y mayúsculas importan).',
+                    'Si el nombre no está en el catálogo, «Probar» fallará hasta «Crear categoría» u «Omitir filas».',
+                    'Puede crear el valor en catálogo desde esta pantalla sin salir del import.',
                 ]
             case 'supplier':
                 return [
-                    'Debe coincidir exactamente con un proveedor existente.',
-                    'Si el proveedor no existe, créalo primero o asígnalo manualmente aquí.',
+                    'Solo se consideran contactos con tipo proveedor.',
+                    'Si no existe, use «Crear» para darlo de alta con datos mínimos u «Omitir filas».',
                 ]
             case 'price':
                 return [
@@ -549,38 +577,6 @@ export default function ImportPage() {
         }
     }
 
-    // Check if field has "not exists" error (category/supplier not found)
-    const hasNotExistsError = (systemField: string | null): boolean => {
-        if (!systemField) return false
-        const errors = getFieldErrors(systemField)
-        return errors.some(e => e.includes('no existe') || e.includes('not exist'))
-    }
-
-    // Extract invalid values from errors (e.g., "Categoría 'prueba' no existe" -> ["prueba"])
-    const getInvalidValues = (systemField: string | null): string[] => {
-        if (!systemField) return []
-        const errors = getFieldErrors(systemField)
-        const values: string[] = []
-        errors.forEach(err => {
-            const match = err.match(/"([^"]+)"/)
-            if (match && match[1] && !values.includes(match[1])) {
-                values.push(match[1])
-            }
-        })
-        return values
-    }
-
-    // Set value override for a field
-    const setValueOverride = (fieldName: string, originalValue: string, replacement: string) => {
-        setValueOverrides(prev => ({
-            ...prev,
-            [fieldName]: {
-                ...(prev[fieldName] || {}),
-                [originalValue]: replacement
-            }
-        }))
-    }
-
     // Get available fields (not yet mapped)
     const getAvailableFields = (currentColumn: string) => {
         const usedFields = columnMappings
@@ -590,8 +586,8 @@ export default function ImportPage() {
         return SYSTEM_FIELDS.filter(f => !usedFields.includes(f.id))
     }
 
-    // Render mapping UI
-    if (step === 'mapping') {
+    // Render mapping UI (incluye 'testing' mientras revalidamos tras Crear/Omitir)
+    if (step === 'mapping' || step === 'testing') {
         return (
             <div className="min-h-screen bg-background">
                 {/* Header */}
@@ -614,6 +610,7 @@ export default function ImportPage() {
                                             validationErrors.length > 0
                                         }
                                     >
+                                        <Upload className="h-4 w-4 mr-2" />
                                         Importar
                                     </Button>
                                     <Button
@@ -696,6 +693,15 @@ export default function ImportPage() {
 
                                     <HR />
 
+                                    <div className="space-y-2">
+                                        <p className="text-xs font-medium text-muted-foreground">Catálogo</p>
+                                        <p className="text-[11px] text-muted-foreground leading-snug">
+                                            Si «Probar» detecta categoría o proveedor inexistente, elija crear el valor o omitir las filas del Excel (mismo criterio que en importación de contactos).
+                                        </p>
+                                    </div>
+
+                                    <HR />
+
                                     {/* Help section */}
                                     <div className="space-y-2">
                                         <p className="text-xs font-medium text-muted-foreground">Ayuda</p>
@@ -744,6 +750,36 @@ export default function ImportPage() {
                                     </div>
                                 </CardHeader>
                                 <CardContent>
+                                    {hasTestedOnce && resolutionHints.length > 0 && (
+                                        <div className="mb-4 space-y-2 rounded-md border border-orange-200 bg-orange-50/90 p-3">
+                                            <p className="text-sm font-medium text-orange-950">
+                                                ¿Qué hacer con categorías o proveedores que no existen?
+                                            </p>
+                                            <p className="text-xs text-muted-foreground">
+                                                Aplique a todos los valores detectados, o use los botones por columna en «Comentarios».
+                                            </p>
+                                            <div className="flex flex-wrap gap-2 pt-1">
+                                                <Button
+                                                    type="button"
+                                                    size="sm"
+                                                    className="bg-liquor-amber hover:bg-liquor-amber/90 text-white"
+                                                    onClick={approveAllUnknownCatalogValues}
+                                                    disabled={isTesting}
+                                                >
+                                                    Crear todos los valores nuevos
+                                                </Button>
+                                                <Button
+                                                    type="button"
+                                                    size="sm"
+                                                    variant="outline"
+                                                    onClick={omitAllRowsAffectedByUnknownCatalog}
+                                                    disabled={isTesting}
+                                                >
+                                                    Omitir todas las filas afectadas
+                                                </Button>
+                                            </div>
+                                        </div>
+                                    )}
                                     <ScrollArea className="h-[calc(100vh-280px)]">
                                         <Table>
                                             <TableHeader>
@@ -807,67 +843,76 @@ export default function ImportPage() {
                                                                         </div>
                                                                     )}
 
-                                                                    {/* Manual association combobox for "not exists" errors */}
-                                                                    {hasTestedOnce && mapping.systemField && hasNotExistsError(mapping.systemField) && (
-                                                                        <div className="space-y-2 pt-2 border-t mt-2">
-                                                                            <p className="text-xs font-medium text-orange-700">Asociar manualmente:</p>
-                                                                            {getInvalidValues(mapping.systemField).map(invalidValue => {
-                                                                                const options = mapping.systemField === 'category' ? categories :
-                                                                                    mapping.systemField === 'supplier' ? suppliers : []
-                                                                                const currentValue = valueOverrides[mapping.systemField!]?.[invalidValue] || ''
-
-                                                                                return (
-                                                                                    <div key={invalidValue} className="flex items-center gap-2">
-                                                                                        <span className="text-xs text-muted-foreground whitespace-nowrap">
-                                                                                            "{invalidValue}" →
-                                                                                        </span>
-                                                                                        <Popover>
-                                                                                            <PopoverTrigger asChild>
-                                                                                                <Button
-                                                                                                    variant="outline"
-                                                                                                    role="combobox"
-                                                                                                    className="h-7 text-xs flex-1 justify-between min-w-[150px]"
-                                                                                                >
-                                                                                                    <span className="truncate">
-                                                                                                        {currentValue || "Buscar y seleccionar..."}
-                                                                                                    </span>
-                                                                                                    <ChevronsUpDown className="ml-2 h-3 w-3 shrink-0 opacity-50" />
-                                                                                                </Button>
-                                                                                            </PopoverTrigger>
-                                                                                            <PopoverContent className="w-[250px] p-0" align="start">
-                                                                                                <Command>
-                                                                                                    <CommandInput
-                                                                                                        placeholder={`Buscar ${mapping.systemField === 'category' ? 'categoría' : 'proveedor'}...`}
-                                                                                                        className="h-9"
-                                                                                                    />
-                                                                                                    <CommandList>
-                                                                                                        <CommandEmpty>Sin resultados.</CommandEmpty>
-                                                                                                        <CommandGroup>
-                                                                                                            {options.map((opt) => (
-                                                                                                                <CommandItem
-                                                                                                                    key={opt.id}
-                                                                                                                    value={opt.name}
-                                                                                                                    onSelect={() => {
-                                                                                                                        setValueOverride(mapping.systemField!, invalidValue, opt.name)
-                                                                                                                    }}
-                                                                                                                >
-                                                                                                                    <Check
-                                                                                                                        className={cn(
-                                                                                                                            "mr-2 h-4 w-4",
-                                                                                                                            currentValue === opt.name ? "opacity-100" : "opacity-0"
-                                                                                                                        )}
-                                                                                                                    />
-                                                                                                                    {opt.name}
-                                                                                                                </CommandItem>
-                                                                                                            ))}
-                                                                                                        </CommandGroup>
-                                                                                                    </CommandList>
-                                                                                                </Command>
-                                                                                            </PopoverContent>
-                                                                                        </Popover>
+                                                                    {hasTestedOnce && mapping.systemField === 'category' &&
+                                                                        resolutionHints.filter(h => h.kind === 'category').length > 0 && (
+                                                                        <div className="mt-2 space-y-2 rounded-md border border-orange-100 bg-orange-50/50 p-2">
+                                                                            <p className="text-[11px] font-medium text-orange-900">
+                                                                                Categorías no encontradas:
+                                                                            </p>
+                                                                            {resolutionHints.filter(h => h.kind === 'category').map(h => (
+                                                                                <div key={`${h.value}-${h.rowIndexes.join(',')}`} className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:justify-between">
+                                                                                    <span className="text-xs break-words">
+                                                                                        «{h.value}» <span className="text-muted-foreground">(filas {h.rowIndexes.join(', ')})</span>
+                                                                                    </span>
+                                                                                    <div className="flex shrink-0 gap-1.5">
+                                                                                        <Button
+                                                                                            type="button"
+                                                                                            size="sm"
+                                                                                            className="h-7 text-xs px-2 bg-liquor-amber hover:bg-liquor-amber/90 text-white"
+                                                                                            onClick={() => approveCreateCatalogValue(h)}
+                                                                                            disabled={isTesting}
+                                                                                        >
+                                                                                            Crear
+                                                                                        </Button>
+                                                                                        <Button
+                                                                                            type="button"
+                                                                                            size="sm"
+                                                                                            variant="outline"
+                                                                                            className="h-7 text-xs px-2"
+                                                                                            onClick={() => omitRowsForHint(h)}
+                                                                                            disabled={isTesting}
+                                                                                        >
+                                                                                            Omitir filas
+                                                                                        </Button>
                                                                                     </div>
-                                                                                )
-                                                                            })}
+                                                                                </div>
+                                                                            ))}
+                                                                        </div>
+                                                                    )}
+                                                                    {hasTestedOnce && mapping.systemField === 'supplier' &&
+                                                                        resolutionHints.filter(h => h.kind === 'supplier').length > 0 && (
+                                                                        <div className="mt-2 space-y-2 rounded-md border border-orange-100 bg-orange-50/50 p-2">
+                                                                            <p className="text-[11px] font-medium text-orange-900">
+                                                                                Proveedores no encontrados:
+                                                                            </p>
+                                                                            {resolutionHints.filter(h => h.kind === 'supplier').map(h => (
+                                                                                <div key={`${h.value}-${h.rowIndexes.join(',')}`} className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:justify-between">
+                                                                                    <span className="text-xs break-words">
+                                                                                        «{h.value}» <span className="text-muted-foreground">(filas {h.rowIndexes.join(', ')})</span>
+                                                                                    </span>
+                                                                                    <div className="flex shrink-0 gap-1.5">
+                                                                                        <Button
+                                                                                            type="button"
+                                                                                            size="sm"
+                                                                                            className="h-7 text-xs px-2 bg-liquor-amber hover:bg-liquor-amber/90 text-white"
+                                                                                            onClick={() => approveCreateCatalogValue(h)}
+                                                                                            disabled={isTesting}
+                                                                                        >
+                                                                                            Crear
+                                                                                        </Button>
+                                                                                        <Button
+                                                                                            type="button"
+                                                                                            size="sm"
+                                                                                            variant="outline"
+                                                                                            className="h-7 text-xs px-2"
+                                                                                            onClick={() => omitRowsForHint(h)}
+                                                                                            disabled={isTesting}
+                                                                                        >
+                                                                                            Omitir filas
+                                                                                        </Button>
+                                                                                    </div>
+                                                                                </div>
+                                                                            ))}
                                                                         </div>
                                                                     )}
 
@@ -906,6 +951,22 @@ export default function ImportPage() {
                                             </TableBody>
                                         </Table>
                                     </ScrollArea>
+
+                                    {hasTestedOnce && (
+                                        <div className={`mt-4 p-3 rounded-md ${validationErrors.length > 0 ? 'bg-destructive/10' : 'bg-green-50'}`}>
+                                            {validationErrors.length > 0 ? (
+                                                <p className="text-sm text-destructive flex items-center gap-2">
+                                                    <AlertCircle className="h-4 w-4" />
+                                                    {validationErrors.length} filas con errores. Resuelva categoría/proveedor en «Comentarios» o con los botones globales.
+                                                </p>
+                                            ) : (
+                                                <p className="text-sm text-green-700 flex items-center gap-2">
+                                                    <CheckCircle2 className="h-4 w-4" />
+                                                    ¡Validación exitosa! {validRowCount} fila(s) lista(s) para importar.
+                                                </p>
+                                            )}
+                                        </div>
+                                    )}
                                 </CardContent>
                             </Card>
                         </div>
@@ -964,7 +1025,18 @@ export default function ImportPage() {
                                 <Button variant="outline" onClick={() => navigate('/inventario')}>
                                     Ir al Inventario
                                 </Button>
-                                <Button onClick={() => { setStep('mapping'); setImportResult(null); setHasTestedOnce(false); setValidationErrors([]); }}>
+                                <Button
+                                    onClick={() => {
+                                        setStep('mapping')
+                                        setImportResult(null)
+                                        setHasTestedOnce(false)
+                                        setValidationErrors([])
+                                        setCreateCategories([])
+                                        setCreateSuppliers([])
+                                        setSkipRowIndexes([])
+                                        setResolutionHints([])
+                                    }}
+                                >
                                     Importar Más
                                 </Button>
                             </div>
