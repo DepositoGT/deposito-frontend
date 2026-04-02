@@ -626,6 +626,11 @@ export default function PromotionEditPage() {
                   placeholder="0.00"
                   className="mt-1"
                 />
+                <p className="text-xs text-muted-foreground mt-1.5 max-w-3xl">
+                  Si la promoción no aplica a todo el carrito (solo productos o categorías), el mínimo
+                  se calcula sobre ese subtotal. Si aplica a todo el carrito o es otro tipo de promoción,
+                  el mínimo es el total de la venta.
+                </p>
               </div>
             </div>
             {selectedType &&

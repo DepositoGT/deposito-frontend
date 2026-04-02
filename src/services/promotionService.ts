@@ -71,7 +71,8 @@ export interface AppliedPromotion extends Promotion {
     discountApplied: number
     freeGift?: {
         product_id: string
-        qty: number
+        qty?: number
+        mustAddToCart?: boolean
     }
 }
 
