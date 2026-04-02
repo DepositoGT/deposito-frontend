@@ -17,8 +17,13 @@ import { useSystemSettings } from '@/hooks/useSystemSettings'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { apiFetch } from '@/services/api'
 import { getFriendlyTypeName } from './getFriendlyTypeName'
-import { getTypeConfig, validatePayloadForType } from './promotionTypeConfig'
+import { getTypeConfig, validatePayloadForType, supportsProductCategoryScope } from './promotionTypeConfig'
 import { ProductCombobox } from './ProductCombobox'
+import {
+  PromotionApplicableScopeFields,
+  type ApplicableProductRef,
+  type ApplicableCategoryRef
+} from './PromotionApplicableScopeFields'
 import {
   ArrowLeft,
   Tag,
@@ -66,6 +71,14 @@ interface Promotion {
   max_uses?: number | null
   max_uses_per_customer?: number | null
   min_purchase_amount?: string | number | null
+  applicable_products?: Array<{
+    product_id?: string
+    product?: { id: string; name: string }
+  }>
+  applicable_categories?: Array<{
+    category_id?: number
+    category?: { id: number; name: string }
+  }>
 }
 
 const emptyFormData = {
@@ -117,6 +130,8 @@ export default function PromotionEditPage() {
   const currencyLabel = currencyCode || 'Q'
 
   const [formData, setFormData] = useState(emptyFormData)
+  const [applicableProducts, setApplicableProducts] = useState<ApplicableProductRef[]>([])
+  const [applicableCategories, setApplicableCategories] = useState<ApplicableCategoryRef[]>([])
 
   const { data: promotion, isLoading: loadingPromotion, error: errorPromotion } = useQuery({
     queryKey: ['promotion', id],
@@ -130,9 +145,26 @@ export default function PromotionEditPage() {
   })
 
   useEffect(() => {
-    if (promotion) {
-      setFormData(promotionToFormData(promotion))
-    }
+    if (!promotion) return
+    setFormData(promotionToFormData(promotion))
+    const prods = (promotion.applicable_products ?? [])
+      .map((pp) => {
+        const id = pp.product?.id ?? pp.product_id ?? ''
+        const name = pp.product?.name ?? ''
+        return id ? { id, name } : null
+      })
+      .filter((x): x is ApplicableProductRef => x !== null)
+    const cats = (promotion.applicable_categories ?? [])
+      .map((pc) => {
+        const id = pc.category?.id ?? pc.category_id
+        const name = pc.category?.name ?? ''
+        return id != null && Number.isFinite(Number(id))
+          ? { id: Number(id), name }
+          : null
+      })
+      .filter((x): x is ApplicableCategoryRef => x !== null)
+    setApplicableProducts(prods)
+    setApplicableCategories(cats)
   }, [promotion])
 
   const updateMutation = useMutation({
@@ -215,6 +247,23 @@ export default function PromotionEditPage() {
       return
     }
 
+    if (supportsProductCategoryScope(selectedType.name) && !formData.applies_to_all) {
+      if (applicableProducts.length === 0 && applicableCategories.length === 0) {
+        toast({
+          title: 'Alcance de la promoción',
+          description:
+            'Si no aplica a todo el carrito, elija al menos un producto o una categoría.',
+          variant: 'destructive'
+        })
+        return
+      }
+    }
+
+    if (supportsProductCategoryScope(selectedType.name) && !formData.applies_to_all) {
+      payload.product_ids = applicableProducts.map((p) => p.id)
+      payload.category_ids = applicableCategories.map((c) => c.id)
+    }
+
     updateMutation.mutate(payload as Record<string, unknown> & { id: string })
   }
 
@@ -242,7 +291,7 @@ export default function PromotionEditPage() {
   }
 
   return (
-    <div className="p-3 sm:p-6 space-y-6 animate-fade-in max-w-4xl mx-auto">
+    <div className="p-3 sm:p-6 space-y-4 sm:space-y-6 animate-fade-in w-full min-w-0">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <Button variant="ghost" size="icon" onClick={() => navigate('/promociones')}>
@@ -577,16 +626,42 @@ export default function PromotionEditPage() {
                   placeholder="0.00"
                   className="mt-1"
                 />
+                <p className="text-xs text-muted-foreground mt-1.5 max-w-3xl">
+                  Si la promoción no aplica a todo el carrito (solo productos o categorías), el mínimo
+                  se calcula sobre ese subtotal. Si aplica a todo el carrito o es otro tipo de promoción,
+                  el mínimo es el total de la venta.
+                </p>
               </div>
             </div>
-            <div className="flex items-center space-x-2">
-              <Switch
-                id="applies_to_all"
-                checked={formData.applies_to_all}
-                onCheckedChange={(v) => setFormData({ ...formData, applies_to_all: v })}
-              />
-              <Label htmlFor="applies_to_all">Aplica a todos los productos del carrito</Label>
-            </div>
+            {selectedType &&
+              (selectedType.name === 'PERCENTAGE' ||
+                selectedType.name === 'BUY_X_GET_Y' ||
+                selectedType.name === 'MIN_QTY_DISCOUNT') && (
+                <div className="flex items-center space-x-2">
+                  <Switch
+                    id="applies_to_all"
+                    checked={formData.applies_to_all}
+                    onCheckedChange={(v) => {
+                      setFormData({ ...formData, applies_to_all: v })
+                      if (v) {
+                        setApplicableProducts([])
+                        setApplicableCategories([])
+                      }
+                    }}
+                  />
+                  <Label htmlFor="applies_to_all">Aplica a todos los productos del carrito</Label>
+                </div>
+              )}
+            {selectedType &&
+              supportsProductCategoryScope(selectedType.name) &&
+              !formData.applies_to_all && (
+                <PromotionApplicableScopeFields
+                  products={applicableProducts}
+                  categories={applicableCategories}
+                  onProductsChange={setApplicableProducts}
+                  onCategoriesChange={setApplicableCategories}
+                />
+              )}
           </CardContent>
         </Card>
 

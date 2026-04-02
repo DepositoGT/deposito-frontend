@@ -78,6 +78,11 @@ export function getTypeConfig(typeName: string): TypeConfig | null {
   return null
 }
 
+/** Tipos donde tiene sentido restringir por productos/categorías (al desmarcar «Aplica a todos»). */
+export function supportsProductCategoryScope(typeName: string): boolean {
+  return getTypeConfig(typeName)?.supportsProductCategoryRestriction ?? false
+}
+
 export function validatePayloadForType(
   typeName: string,
   payload: Record<string, unknown>

@@ -15,6 +15,7 @@
 
 import { useState, useCallback, useMemo } from 'react'
 import { useToast } from '@/hooks/use-toast'
+import { formatMoney } from '@/utils'
 import {
     validatePromotionCode,
     AppliedPromotion,
@@ -22,9 +23,19 @@ import {
     Promotion
 } from '@/services/promotionService'
 
+/** Alineado con backend: MAX_PROMOTION_CODES_PER_SALE. Sin variable = sin límite en UI. */
+function maxPromoCodesPerSale(): number {
+    const v = import.meta.env.VITE_MAX_PROMOTION_CODES_PER_SALE
+    if (v === undefined || v === '' || v === null) return Number.POSITIVE_INFINITY
+    const n = parseInt(String(v), 10)
+    return Number.isFinite(n) && n >= 1 ? n : Number.POSITIVE_INFINITY
+}
+
 interface UsePromotionsProps {
     cartItems: CartItemForPromotion[]
     cartTotal: number
+    locale?: string
+    currencyCode?: string
 }
 
 interface UsePromotionsReturn {
@@ -41,7 +52,12 @@ interface UsePromotionsReturn {
     clearPromotions: () => void
 }
 
-export function usePromotions({ cartItems, cartTotal }: UsePromotionsProps): UsePromotionsReturn {
+export function usePromotions({
+    cartItems,
+    cartTotal,
+    locale = 'es-GT',
+    currencyCode = 'GTQ'
+}: UsePromotionsProps): UsePromotionsReturn {
     const { toast } = useToast()
     const [appliedPromotions, setAppliedPromotions] = useState<AppliedPromotion[]>([])
     const [isValidating, setIsValidating] = useState(false)
@@ -81,6 +97,19 @@ export function usePromotions({ cartItems, cartTotal }: UsePromotionsProps): Use
             return false
         }
 
+        const maxCodes = maxPromoCodesPerSale()
+        if (appliedPromotions.length >= maxCodes) {
+            toast({
+                title: 'Límite de códigos',
+                description:
+                    maxCodes === 1
+                        ? 'Solo puede aplicar un código de promoción por venta.'
+                        : `Puede aplicar como máximo ${maxCodes} códigos de promoción por venta.`,
+                variant: 'destructive'
+            })
+            return false
+        }
+
         setIsValidating(true)
 
         try {
@@ -102,7 +131,7 @@ export function usePromotions({ cartItems, cartTotal }: UsePromotionsProps): Use
                 return false
             }
 
-            if (result.discount === 0) {
+            if (result.discount === 0 && !result.freeGift?.mustAddToCart) {
                 toast({
                     title: 'Sin descuento aplicable',
                     description: 'El código es válido pero no aplica descuento a los productos en el carrito',
@@ -115,17 +144,28 @@ export function usePromotions({ cartItems, cartTotal }: UsePromotionsProps): Use
             const appliedPromo: AppliedPromotion = {
                 ...result.promotion as Promotion,
                 discountApplied: result.discount,
-                freeGift: result.freeGift ? {
-                    product_id: result.freeGift.product_id,
-                    qty: result.freeGift.qty || 1
-                } : undefined
+                freeGift: result.freeGift
+                    ? {
+                        product_id: result.freeGift.product_id,
+                        qty: result.freeGift.qty ?? 1,
+                        mustAddToCart: result.freeGift.mustAddToCart
+                    }
+                    : undefined
             }
 
             setAppliedPromotions(prev => [...prev, appliedPromo])
 
+            const discountFmt =
+                result.discount > 0
+                    ? `-${formatMoney(result.discount, locale, currencyCode)}`
+                    : null
             toast({
                 title: '¡Promoción aplicada!',
-                description: `${result.promotion?.name}: -Q${result.discount.toFixed(2)}`
+                description: discountFmt
+                    ? `${result.promotion?.name}: ${discountFmt}`
+                    : result.freeGift?.mustAddToCart
+                      ? `${result.promotion?.name}: agregue el producto regalo al carrito para aplicar el beneficio al registrar la venta.`
+                      : (result.promotion?.name ?? 'Promoción aplicada')
             })
 
             return true
@@ -140,7 +180,7 @@ export function usePromotions({ cartItems, cartTotal }: UsePromotionsProps): Use
         } finally {
             setIsValidating(false)
         }
-    }, [cartItems, appliedPromotions, toast])
+    }, [cartItems, appliedPromotions, toast, locale, currencyCode])
 
     // Remove a promotion
     const removePromotion = useCallback((promotionId: string) => {

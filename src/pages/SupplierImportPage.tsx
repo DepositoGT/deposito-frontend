@@ -9,14 +9,10 @@
  */
 
 /**
- * SupplierImportPage - Advanced import page for suppliers with column mapping
- * 
- * Features:
- * - Sheet selector for multi-sheet Excel files
- * - Column mapping with system field dropdowns
- * - Preview of first row data per column
- * - Real-time validation feedback
- * - Manual category association for non-existent categories
+ * SupplierImportPage - Importación de contactos (proveedores y clientes)
+ *
+ * - Categoría / términos desconocidos: validación falla hasta Crear en catálogo u Omitir filas
+ * - importOptions: createCategories, createPaymentTerms, skipRowIndexes
  */
 import { useState, useEffect, useMemo } from 'react'
 import { getApiBaseUrl } from '@/services/api'
@@ -52,40 +48,28 @@ import {
     AlertCircle,
     Loader2,
     RefreshCw,
-    ChevronsUpDown,
-    Check
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
-import {
-    Popover,
-    PopoverContent,
-    PopoverTrigger,
-} from '@/components/ui/popover'
-import {
-    Command,
-    CommandEmpty,
-    CommandGroup,
-    CommandInput,
-    CommandItem,
-    CommandList,
-} from '@/components/ui/command'
-import { cn } from '@/lib/utils'
-
-// System fields available for mapping (Supplier fields)
 const SYSTEM_FIELDS = [
+    {
+        id: 'party_type',
+        label: 'Tipo de relación (proveedor / cliente)',
+        required: false,
+        type: 'string',
+    },
     {
         id: 'entity_kind',
         label: 'Naturaleza (empresa / persona)',
         required: false,
         type: 'string',
     },
-    { id: 'name', label: 'Nombre', required: true, type: 'string' },
-    { id: 'contact', label: 'Contacto', required: false, type: 'string' },
+    { id: 'name', label: 'Nombre / razón social', required: true, type: 'string' },
+    { id: 'contact', label: 'Persona de contacto', required: false, type: 'string' },
     { id: 'phone', label: 'Teléfono', required: true, type: 'string' },
-    { id: 'email', label: 'Email', required: true, type: 'string' },
+    { id: 'email', label: 'Email', required: false, type: 'string' },
     { id: 'address', label: 'Dirección', required: true, type: 'string' },
-    { id: 'category', label: 'Categoría', required: true, type: 'relation' },
-    { id: 'payment_terms', label: 'Términos de Pago', required: true, type: 'relation' },
+    { id: 'category', label: 'Categoría (solo proveedores)', required: false, type: 'string' },
+    { id: 'payment_terms', label: 'Términos de pago', required: false, type: 'string' },
     { id: 'tax_id', label: 'ID fiscal', required: false, type: 'string' },
 ]
 
@@ -101,6 +85,12 @@ interface ValidationError {
     rowIndex: number
     errors: string[]
     fieldErrors: Record<string, string[]>
+}
+
+interface ResolutionHint {
+    kind: 'category' | 'payment_term'
+    value: string
+    rowIndexes: number[]
 }
 
 const HR = () => <div className="border-t my-4" />
@@ -128,12 +118,13 @@ export default function SupplierImportPage() {
     const [validRowCount, setValidRowCount] = useState(0)
     const [totalRowCount, setTotalRowCount] = useState(0)
 
-    // Catalog data for manual association
-    const [categories, setCategories] = useState<{ id: number; name: string }[]>([])
-    const [paymentTerms, setPaymentTerms] = useState<{ id: number; name: string }[]>([])
+    /** Celda vacía de términos de pago: usar el primero del sistema vs exigir texto */
+    const [paymentTermsWhenEmpty, setPaymentTermsWhenEmpty] = useState<'default' | 'require'>('default')
 
-    // Value overrides
-    const [valueOverrides, setValueOverrides] = useState<Record<string, Record<string, string>>>({})
+    const [createCategories, setCreateCategories] = useState<string[]>([])
+    const [createPaymentTerms, setCreatePaymentTerms] = useState<string[]>([])
+    const [skipRowIndexes, setSkipRowIndexes] = useState<number[]>([])
+    const [resolutionHints, setResolutionHints] = useState<ResolutionHint[]>([])
 
     // Check for file in sessionStorage on mount
     useEffect(() => {
@@ -165,39 +156,6 @@ export default function SupplierImportPage() {
         }
     }, [navigate])
 
-    // Fetch catalogs
-    useEffect(() => {
-        const fetchCatalogs = async () => {
-            try {
-                const token = localStorage.getItem('auth:token')
-                const headers = { 'Authorization': `Bearer ${token}` }
-
-                const [catRes, ptRes] = await Promise.all([
-                    fetch('/api/catalogs/product-categories?page=1&pageSize=1000', { headers }),
-                    fetch('/api/catalogs/payment-terms?page=1&pageSize=1000', { headers })
-                ])
-
-                if (catRes.ok) {
-                    const catData = await catRes.json()
-                    const catItems = Array.isArray(catData) ? catData : (catData.items ?? [])
-                    if (Array.isArray(catItems)) {
-                        setCategories(catItems.map((c: { id: number; name: string }) => ({ id: c.id, name: c.name })))
-                    }
-                }
-                if (ptRes.ok) {
-                    const ptData = await ptRes.json()
-                    const ptItems = Array.isArray(ptData) ? ptData : (ptData.items ?? [])
-                    if (Array.isArray(ptItems)) {
-                        setPaymentTerms(ptItems.map((p: { id: number; name: string }) => ({ id: p.id, name: p.name })))
-                    }
-                }
-            } catch (err) {
-                console.error('Error fetching catalogs:', err)
-            }
-        }
-        fetchCatalogs()
-    }, [])
-
     // Parse selected sheet
     useEffect(() => {
         if (!workbook || !selectedSheet) return
@@ -220,6 +178,13 @@ export default function SupplierImportPage() {
             let autoField: string | null = null
 
             if (
+                lowerCol.includes('tipo_relacion') ||
+                lowerCol.includes('party_type') ||
+                lowerCol === 'relacion' ||
+                (lowerCol.includes('rol') && lowerCol.includes('contacto'))
+            )
+                autoField = 'party_type'
+            else if (
                 lowerCol.includes('naturaleza') ||
                 lowerCol.includes('tipo_entidad') ||
                 lowerCol === 'entity_kind'
@@ -280,6 +245,10 @@ export default function SupplierImportPage() {
                 setFile(selectedFile)
                 setHasTestedOnce(false)
                 setValidationErrors([])
+                setCreateCategories([])
+                setCreatePaymentTerms([])
+                setSkipRowIndexes([])
+                setResolutionHints([])
             } catch (err) {
                 toast({ variant: 'destructive', title: 'Error', description: 'No se pudo leer el archivo' })
             }
@@ -287,8 +256,16 @@ export default function SupplierImportPage() {
         reader.readAsArrayBuffer(selectedFile)
     }
 
-    const handleTest = async () => {
+    const executeValidate = async (overrides?: {
+        createCategories?: string[]
+        createPaymentTerms?: string[]
+        skipRowIndexes?: number[]
+    }) => {
         if (!workbook || !selectedSheet) return
+
+        const cats = overrides?.createCategories ?? createCategories
+        const pts = overrides?.createPaymentTerms ?? createPaymentTerms
+        const skips = overrides?.skipRowIndexes ?? skipRowIndexes
 
         setIsTesting(true)
         setStep('testing')
@@ -306,12 +283,7 @@ export default function SupplierImportPage() {
                 const mapped: Record<string, unknown> = {}
                 columnMappings.forEach(mapping => {
                     if (mapping.systemField) {
-                        let value = row[mapping.excelColumn]
-                        const overrides = valueOverrides[mapping.systemField]
-                        if (overrides && typeof value === 'string' && overrides[value]) {
-                            value = overrides[value]
-                        }
-                        mapped[mapping.systemField] = value
+                        mapped[mapping.systemField] = row[mapping.excelColumn]
                     }
                 })
                 return mapped
@@ -321,12 +293,20 @@ export default function SupplierImportPage() {
             const response = await fetch(`${getApiBaseUrl()}/suppliers/validate-import-mapped`, {
                 method: 'POST',
                 headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-                body: JSON.stringify({ suppliers: mappedData })
+                body: JSON.stringify({
+                    suppliers: mappedData,
+                    importOptions: {
+                        paymentTermsWhenEmpty,
+                        createCategories: cats,
+                        createPaymentTerms: pts,
+                        skipRowIndexes: skips,
+                    },
+                })
             })
 
             if (!response.ok) {
                 const errorText = await response.text()
-                let errorMessage = 'Error al validar proveedores'
+                let errorMessage = 'Error al validar contactos'
                 try {
                     const errorJson = JSON.parse(errorText)
                     errorMessage = errorJson.message || errorMessage
@@ -338,6 +318,11 @@ export default function SupplierImportPage() {
 
             const result = await response.json()
 
+            const hints: ResolutionHint[] = Array.isArray(result.resolutionHints)
+                ? result.resolutionHints
+                : []
+            setResolutionHints(hints)
+
             if (result.invalidRows && result.invalidRows.length > 0) {
                 const processed: ValidationError[] = result.invalidRows.map((row: { rowIndex: number; errors: string[] }) => {
                     const fieldErrors: Record<string, string[]> = {}
@@ -347,8 +332,13 @@ export default function SupplierImportPage() {
                         else if (error.includes('telefono')) fieldErrors.phone = [...(fieldErrors.phone || []), error]
                         else if (error.includes('email') || error.includes('Email')) fieldErrors.email = [...(fieldErrors.email || []), error]
                         else if (error.includes('direccion')) fieldErrors.address = [...(fieldErrors.address || []), error]
-                        else if (error.includes('categoria') || error.includes('Categoría')) fieldErrors.category = [...(fieldErrors.category || []), error]
-                        else if (error.includes('terminos') || error.includes('Términos')) fieldErrors.payment_terms = [...(fieldErrors.payment_terms || []), error]
+                        else if (error.includes('categoria') || error.includes('categoría') || error.includes('Categoría')) fieldErrors.category = [...(fieldErrors.category || []), error]
+                        else if (error.includes('terminos') || error.includes('términos') || error.includes('Términos')) fieldErrors.payment_terms = [...(fieldErrors.payment_terms || []), error]
+                        else if (
+                            error.includes('tipo_relacion') ||
+                            error.includes('Use proveedor o cliente')
+                        )
+                            fieldErrors.party_type = [...(fieldErrors.party_type || []), error]
                         else if (
                             error.includes('entidad') ||
                             error.includes('Tipo de entidad') ||
@@ -362,33 +352,102 @@ export default function SupplierImportPage() {
                 })
                 setValidationErrors(processed)
                 setValidRowCount(result.totals.valid)
-                toast({ title: 'Validación completada', description: `${result.totals.invalid} proveedores con errores`, variant: 'destructive' })
+                const hintCount = hints.length
+                toast({
+                    title: 'Hay errores en el archivo',
+                    description: hintCount > 0
+                        ? `${result.totals.invalid} fila(s) con error. Use las acciones en «Comentarios» o los botones globales.`
+                        : `${result.totals.invalid} fila(s) con errores.`,
+                    variant: 'destructive',
+                })
             } else {
                 setValidationErrors([])
                 setValidRowCount(result.totals.valid)
-                toast({ title: '¡Validación exitosa!', description: `Todos los ${result.totals.total} proveedores son válidos.` })
+                const skipped = Number(result.totals?.skipped ?? 0)
+                toast({
+                    title: '¡Validación exitosa!',
+                    description: skipped > 0
+                        ? `${result.totals.valid} fila(s) lista(s); ${skipped} omitida(s) del archivo.`
+                        : `${result.totals.valid} fila(s) válida(s).`,
+                })
             }
 
             setHasTestedOnce(true)
             setStep('mapping')
         } catch (err) {
-            const errorMessage = err instanceof Error ? err.message : 'Error al validar proveedores'
-            toast({ 
-                title: 'Error de validación', 
-                description: errorMessage, 
-                variant: 'destructive' 
+            const errorMessage = err instanceof Error ? err.message : 'Error al validar contactos'
+            toast({
+                title: 'Error de validación',
+                description: errorMessage,
+                variant: 'destructive'
             })
-            // Set a general error to display in the UI
             setValidationErrors([{
                 rowIndex: -1,
                 errors: [errorMessage],
                 fieldErrors: { _general: [errorMessage] }
             }])
             setValidRowCount(0)
+            setResolutionHints([])
             setStep('mapping')
         } finally {
             setIsTesting(false)
         }
+    }
+
+    const handleTest = () => {
+        void executeValidate()
+    }
+
+    const approveCreateCatalogValue = (h: ResolutionHint) => {
+        const nextCats = h.kind === 'category'
+            ? Array.from(new Set([...createCategories, h.value]))
+            : createCategories
+        const nextPts = h.kind === 'payment_term'
+            ? Array.from(new Set([...createPaymentTerms, h.value]))
+            : createPaymentTerms
+        setCreateCategories(nextCats)
+        setCreatePaymentTerms(nextPts)
+        void executeValidate({
+            createCategories: nextCats,
+            createPaymentTerms: nextPts,
+            skipRowIndexes,
+        })
+    }
+
+    const omitRowsForHint = (h: ResolutionHint) => {
+        const nextSkip = Array.from(new Set([...skipRowIndexes, ...h.rowIndexes]))
+        setSkipRowIndexes(nextSkip)
+        void executeValidate({
+            createCategories,
+            createPaymentTerms,
+            skipRowIndexes: nextSkip,
+        })
+    }
+
+
+    const approveAllUnknownCatalogValues = () => {
+        const catVals = resolutionHints.filter(h => h.kind === 'category').map(h => h.value)
+        const ptVals = resolutionHints.filter(h => h.kind === 'payment_term').map(h => h.value)
+        const nextCats = Array.from(new Set([...createCategories, ...catVals]))
+        const nextPts = Array.from(new Set([...createPaymentTerms, ...ptVals]))
+        setCreateCategories(nextCats)
+        setCreatePaymentTerms(nextPts)
+        void executeValidate({
+            createCategories: nextCats,
+            createPaymentTerms: nextPts,
+            skipRowIndexes,
+        })
+    }
+
+    const omitAllRowsAffectedByUnknownCatalog = () => {
+        const allRows = Array.from(new Set(resolutionHints.flatMap(h => h.rowIndexes)))
+        const nextSkip = Array.from(new Set([...skipRowIndexes, ...allRows]))
+        setSkipRowIndexes(nextSkip)
+        void executeValidate({
+            createCategories,
+            createPaymentTerms,
+            skipRowIndexes: nextSkip,
+        })
     }
 
     const handleImport = async () => {
@@ -411,12 +470,7 @@ export default function SupplierImportPage() {
                 const mapped: Record<string, unknown> = {}
                 columnMappings.forEach(mapping => {
                     if (mapping.systemField) {
-                        let value = row[mapping.excelColumn]
-                        const overrides = valueOverrides[mapping.systemField]
-                        if (overrides && typeof value === 'string' && overrides[value]) {
-                            value = overrides[value]
-                        }
-                        mapped[mapping.systemField] = value
+                        mapped[mapping.systemField] = row[mapping.excelColumn]
                     }
                 })
                 mappedData.push(mapped)
@@ -432,7 +486,15 @@ export default function SupplierImportPage() {
             const response = await fetch(`${getApiBaseUrl()}/suppliers/bulk-import-mapped`, {
                 method: 'POST',
                 headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-                body: JSON.stringify({ suppliers: mappedData })
+                body: JSON.stringify({
+                    suppliers: mappedData,
+                    importOptions: {
+                        paymentTermsWhenEmpty,
+                        createCategories,
+                        createPaymentTerms,
+                        skipRowIndexes,
+                    },
+                })
             })
 
             setImportProgress(80)
@@ -454,7 +516,7 @@ export default function SupplierImportPage() {
             setImportProgress(100)
             setImportResult(result)
             setStep('success')
-            toast({ title: '¡Importación exitosa!', description: `Se importaron ${result.created} proveedores` })
+            toast({ title: '¡Importación exitosa!', description: `Se importaron ${result.created} contactos` })
         } catch (err) {
             setErrorMessage(err instanceof Error ? err.message : 'Error en importación')
             setStep('error')
@@ -478,38 +540,23 @@ export default function SupplierImportPage() {
         return count
     }
 
-    const hasNotExistsError = (systemField: string | null): boolean => {
-        if (!systemField) return false
-        return getFieldErrors(systemField).some(e => e.includes('no existe') || e.includes('not exist'))
-    }
-
-    const getInvalidValues = (systemField: string | null): string[] => {
-        if (!systemField) return []
-        const values: string[] = []
-        getFieldErrors(systemField).forEach(err => {
-            const match = err.match(/"([^"]+)"/)
-            if (match && match[1] && !values.includes(match[1])) values.push(match[1])
-        })
-        return values
-    }
-
-    const setValueOverride = (fieldName: string, originalValue: string, replacement: string) => {
-        setValueOverrides(prev => ({
-            ...prev,
-            [fieldName]: { ...(prev[fieldName] || {}), [originalValue]: replacement }
-        }))
-    }
-
     // Hints / posibles errores por campo (para sección Comentarios)
     const getFieldHints = (systemField: string | null): string[] => {
         if (!systemField) return []
 
         switch (systemField) {
+            case 'party_type':
+                return [
+                    'Opcional. Si no mapea esta columna, todas las filas se importan como proveedor.',
+                    'Columna sugerida: tipo_relacion. Valores: proveedor o cliente.',
+                    'Los clientes no requieren categoría; los proveedores sí.',
+                ]
             case 'entity_kind':
                 return [
                     'Opcional. Columna sugerida en plantilla: naturaleza_contacto.',
                     'Valores: empresa o persona (vacío = empresa). También acepta tipo_entidad.',
-                    'Si es persona, la columna contacto puede ir vacía.',
+                    'Empresa: nombre = razón social y persona de contacto obligatoria.',
+                    'Persona: nombre = nombre completo; contacto puede ir vacío.',
                 ]
             case 'name':
                 return [
@@ -528,8 +575,8 @@ export default function SupplierImportPage() {
                 ]
             case 'email':
                 return [
-                    'Requerido y debe tener formato de email válido.',
-                    'No puede repetirse en varios proveedores.',
+                    'Obligatorio para proveedores; opcional para clientes.',
+                    'Si hay email, debe ser válido y único en el archivo y en el sistema.',
                 ]
             case 'address':
                 return [
@@ -538,13 +585,14 @@ export default function SupplierImportPage() {
                 ]
             case 'category':
                 return [
-                    'Debe coincidir exactamente con una categoría de proveedores existente.',
-                    'Puedes revisar las categorías válidas en el catálogo antes de importar.',
+                    'Solo proveedores: una o varias separadas por ; , o /.',
+                    'Si el nombre no está en el catálogo, «Probar» fallará hasta que elija «Crear» u «Omitir filas».',
+                    'Clientes: puede omitir el mapeo.',
                 ]
             case 'payment_terms':
                 return [
-                    'Obligatorio. Debe coincidir exactamente con un término de pago existente.',
-                    'Revisa la hoja Catálogos de la plantilla o los catálogos del sistema.',
+                    'Texto que coincida con un término existente o que apruebe con «Crear» tras Probar.',
+                    'Celda vacía: según la opción lateral, término por defecto o error.',
                 ]
             case 'tax_id':
                 return [
@@ -564,7 +612,7 @@ export default function SupplierImportPage() {
                         <CheckCircle2 className="h-16 w-16 text-green-500 mx-auto mb-4" />
                         <h3 className="text-xl font-semibold mb-2">¡Importación Exitosa!</h3>
                         <p className="text-muted-foreground mb-4">
-                            Se importaron {importResult.created} proveedores.
+                            Se importaron {importResult.created} contactos.
                             {importResult.skipped && importResult.skipped > 0 && ` ${importResult.skipped} fueron omitidos.`}
                         </p>
                         <div className="flex gap-3 justify-center">
@@ -603,7 +651,7 @@ export default function SupplierImportPage() {
                 <Card className="max-w-md">
                     <CardContent className="p-8 text-center">
                         <Loader2 className="h-16 w-16 animate-spin text-primary mx-auto mb-4" />
-                        <h3 className="text-xl font-semibold mb-2">Importando proveedores...</h3>
+                        <h3 className="text-xl font-semibold mb-2">Importando contactos...</h3>
                         <Progress value={importProgress} className="mt-4" />
                         <p className="text-sm text-muted-foreground mt-2">{importProgress}%</p>
                     </CardContent>
@@ -663,7 +711,7 @@ export default function SupplierImportPage() {
                             </div>
                         </div>
                         <div className="text-sm text-muted-foreground">
-                            Contactos / Importar proveedores
+                            Contactos / Importar
                         </div>
                     </div>
                 </div>
@@ -711,9 +759,45 @@ export default function SupplierImportPage() {
                                 <HR />
 
                                 <div className="space-y-2">
+                                    <p className="text-xs font-medium text-muted-foreground">Términos de pago vacíos</p>
+                                    <Select
+                                        value={paymentTermsWhenEmpty}
+                                        onValueChange={(v) => {
+                                            setPaymentTermsWhenEmpty(v as 'default' | 'require')
+                                            setHasTestedOnce(false)
+                                            setValidationErrors([])
+                                            setCreateCategories([])
+                                            setCreatePaymentTerms([])
+                                            setSkipRowIndexes([])
+                                            setResolutionHints([])
+                                        }}
+                                    >
+                                        <SelectTrigger className="text-xs h-8">
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="default">
+                                                Usar término por defecto del sistema (omitir celda vacía)
+                                            </SelectItem>
+                                            <SelectItem value="require">
+                                                Exigir valor en cada fila
+                                            </SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                    <p className="text-[11px] text-muted-foreground leading-snug">
+                                        Si «Probar» marca categoría o término inexistente, elija crear el valor en catálogo u omitir las filas del Excel .
+                                    </p>
+                                </div>
+
+                                <HR />
+
+                                <div className="space-y-2">
                                     <p className="text-xs font-medium text-muted-foreground">Ayuda</p>
-                                    <a href="/api/suppliers/template" className="text-xs text-primary hover:underline block">
-                                        📄 Plantilla de importación para proveedores
+                                    <a
+                                        href={`${getApiBaseUrl()}/suppliers/template`}
+                                        className="text-xs text-primary hover:underline block"
+                                    >
+                                        Descargar plantilla de contactos (.xlsx)
                                     </a>
                                 </div>
 
@@ -753,6 +837,36 @@ export default function SupplierImportPage() {
                                 </div>
                             </CardHeader>
                             <CardContent>
+                                {hasTestedOnce && resolutionHints.length > 0 && (
+                                    <div className="mb-4 space-y-2 rounded-md border border-orange-200 bg-orange-50/90 p-3">
+                                        <p className="text-sm font-medium text-orange-950">
+                                            ¿Qué hacer con datos que no existen en el catálogo?
+                                        </p>
+                                        <p className="text-xs text-muted-foreground">
+                                            Aplique a todos los valores detectados, o use los botones por columna en «Comentarios».
+                                        </p>
+                                        <div className="flex flex-wrap gap-2 pt-1">
+                                            <Button
+                                                type="button"
+                                                size="sm"
+                                                className="bg-liquor-amber hover:bg-liquor-amber/90 text-white"
+                                                onClick={approveAllUnknownCatalogValues}
+                                                disabled={isTesting}
+                                            >
+                                                Crear todos los valores nuevos
+                                            </Button>
+                                            <Button
+                                                type="button"
+                                                size="sm"
+                                                variant="outline"
+                                                onClick={omitAllRowsAffectedByUnknownCatalog}
+                                                disabled={isTesting}
+                                            >
+                                                Omitir todas las filas afectadas
+                                            </Button>
+                                        </div>
+                                    </div>
+                                )}
                                 <ScrollArea className="h-[calc(100vh-280px)]">
                                     <Table>
                                         <TableHeader>
@@ -766,8 +880,6 @@ export default function SupplierImportPage() {
                                             {columnMappings.map((mapping) => {
                                                 const field = SYSTEM_FIELDS.find(f => f.id === mapping.systemField)
                                                 const errorCount = getFieldErrorCount(mapping.systemField)
-                                                const hasNotExists = hasNotExistsError(mapping.systemField)
-                                                const invalidValues = getInvalidValues(mapping.systemField)
 
                                                 return (
                                                     <TableRow key={mapping.excelColumn}>
@@ -804,51 +916,83 @@ export default function SupplierImportPage() {
                                                                 )}
                                                                 {hasTestedOnce && mapping.systemField && errorCount > 0 && (
                                                                     <div className="space-y-1">
-                                                                        {getFieldErrors(mapping.systemField).slice(0, 2).map((err, i) => (
+                                                                        {getFieldErrors(mapping.systemField).slice(0, 4).map((err, i) => (
                                                                             <p key={i} className="text-xs text-destructive">{err}</p>
                                                                         ))}
                                                                     </div>
                                                                 )}
-                                                                {hasNotExists && invalidValues.length > 0 && (
-                                                                    <div className="space-y-2 pt-2 border-t">
-                                                                        <p className="text-xs font-medium text-orange-600">Asociar manualmente:</p>
-                                                                        {invalidValues.map(val => {
-                                                                            const options = mapping.systemField === 'category' ? categories : paymentTerms
-                                                                            const current = valueOverrides[mapping.systemField!]?.[val] || ''
-                                                                            return (
-                                                                                <div key={val} className="flex items-center gap-2">
-                                                                                    <span className="text-xs text-muted-foreground">"{val}" →</span>
-                                                                                    <Popover>
-                                                                                        <PopoverTrigger asChild>
-                                                                                            <Button variant="outline" size="sm" className="h-7 text-xs flex-1 justify-between">
-                                                                                                <span className="truncate">{current || 'Seleccionar...'}</span>
-                                                                                                <ChevronsUpDown className="ml-2 h-3 w-3 opacity-50" />
-                                                                                            </Button>
-                                                                                        </PopoverTrigger>
-                                                                                        <PopoverContent className="w-[200px] p-0" align="start">
-                                                                                            <Command>
-                                                                                                <CommandInput placeholder="Buscar..." className="h-9" />
-                                                                                                <CommandList>
-                                                                                                    <CommandEmpty>Sin resultados.</CommandEmpty>
-                                                                                                    <CommandGroup>
-                                                                                                        {options.map(opt => (
-                                                                                                            <CommandItem
-                                                                                                                key={opt.id}
-                                                                                                                value={opt.name}
-                                                                                                                onSelect={() => setValueOverride(mapping.systemField!, val, opt.name)}
-                                                                                                            >
-                                                                                                                <Check className={cn("mr-2 h-4 w-4", current === opt.name ? "opacity-100" : "opacity-0")} />
-                                                                                                                {opt.name}
-                                                                                                            </CommandItem>
-                                                                                                        ))}
-                                                                                                    </CommandGroup>
-                                                                                                </CommandList>
-                                                                                            </Command>
-                                                                                        </PopoverContent>
-                                                                                    </Popover>
+
+                                                                {/* Acciones junto al error (categoría / términos) */}
+                                                                {hasTestedOnce && mapping.systemField === 'category' &&
+                                                                    resolutionHints.filter(h => h.kind === 'category').length > 0 && (
+                                                                    <div className="mt-2 space-y-2 rounded-md border border-orange-100 bg-orange-50/50 p-2">
+                                                                        <p className="text-[11px] font-medium text-orange-900">
+                                                                            Valores de categoría no encontrados:
+                                                                        </p>
+                                                                        {resolutionHints.filter(h => h.kind === 'category').map(h => (
+                                                                            <div key={`${h.value}-${h.rowIndexes.join(',')}`} className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:justify-between">
+                                                                                <span className="text-xs break-words">
+                                                                                    «{h.value}» <span className="text-muted-foreground">(filas {h.rowIndexes.join(', ')})</span>
+                                                                                </span>
+                                                                                <div className="flex shrink-0 gap-1.5">
+                                                                                    <Button
+                                                                                        type="button"
+                                                                                        size="sm"
+                                                                                        className="h-7 text-xs px-2 bg-liquor-amber hover:bg-liquor-amber/90 text-white"
+                                                                                        onClick={() => approveCreateCatalogValue(h)}
+                                                                                        disabled={isTesting}
+                                                                                    >
+                                                                                        Crear
+                                                                                    </Button>
+                                                                                    <Button
+                                                                                        type="button"
+                                                                                        size="sm"
+                                                                                        variant="outline"
+                                                                                        className="h-7 text-xs px-2"
+                                                                                        onClick={() => omitRowsForHint(h)}
+                                                                                        disabled={isTesting}
+                                                                                    >
+                                                                                        Omitir filas
+                                                                                    </Button>
                                                                                 </div>
-                                                                            )
-                                                                        })}
+                                                                            </div>
+                                                                        ))}
+                                                                    </div>
+                                                                )}
+                                                                {hasTestedOnce && mapping.systemField === 'payment_terms' &&
+                                                                    resolutionHints.filter(h => h.kind === 'payment_term').length > 0 && (
+                                                                    <div className="mt-2 space-y-2 rounded-md border border-orange-100 bg-orange-50/50 p-2">
+                                                                        <p className="text-[11px] font-medium text-orange-900">
+                                                                            Términos de pago no encontrados:
+                                                                        </p>
+                                                                        {resolutionHints.filter(h => h.kind === 'payment_term').map(h => (
+                                                                            <div key={`${h.value}-${h.rowIndexes.join(',')}`} className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:justify-between">
+                                                                                <span className="text-xs break-words">
+                                                                                    «{h.value}» <span className="text-muted-foreground">(filas {h.rowIndexes.join(', ')})</span>
+                                                                                </span>
+                                                                                <div className="flex shrink-0 gap-1.5">
+                                                                                    <Button
+                                                                                        type="button"
+                                                                                        size="sm"
+                                                                                        className="h-7 text-xs px-2 bg-liquor-amber hover:bg-liquor-amber/90 text-white"
+                                                                                        onClick={() => approveCreateCatalogValue(h)}
+                                                                                        disabled={isTesting}
+                                                                                    >
+                                                                                        Crear
+                                                                                    </Button>
+                                                                                    <Button
+                                                                                        type="button"
+                                                                                        size="sm"
+                                                                                        variant="outline"
+                                                                                        className="h-7 text-xs px-2"
+                                                                                        onClick={() => omitRowsForHint(h)}
+                                                                                        disabled={isTesting}
+                                                                                    >
+                                                                                        Omitir filas
+                                                                                    </Button>
+                                                                                </div>
+                                                                            </div>
+                                                                        ))}
                                                                     </div>
                                                                 )}
 
@@ -872,15 +1016,15 @@ export default function SupplierImportPage() {
                                 {/* Validation Summary */}
                                 {hasTestedOnce && (
                                     <div className={`mt-4 p-3 rounded-md ${validationErrors.length > 0 ? 'bg-destructive/10' : 'bg-green-50'}`}>
-                                        {validationErrors.length > 0 ? (
+                                                {validationErrors.length > 0 ? (
                                             <p className="text-sm text-destructive flex items-center gap-2">
                                                 <AlertCircle className="h-4 w-4" />
-                                                {validationErrors.length} proveedores con errores. Corríjalos antes de importar.
+                                                {validationErrors.length} filas con errores. Resuelva categoría/términos en «Comentarios» o con los botones globales encima del cuadro.
                                             </p>
                                         ) : (
                                             <p className="text-sm text-green-700 flex items-center gap-2">
                                                 <CheckCircle2 className="h-4 w-4" />
-                                                ¡Validación exitosa! {validRowCount} proveedores listos para importar.
+                                                ¡Validación exitosa! {validRowCount} filas listas para importar.
                                             </p>
                                         )}
                                     </div>
