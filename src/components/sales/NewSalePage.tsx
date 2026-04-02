@@ -145,6 +145,8 @@ export default function NewSalePage() {
   const promotions = usePromotions({
     cartItems: promotionCartItems,
     cartTotal: cart.cartTotal,
+    locale,
+    currencyCode,
   })
 
   const filteredProducts = useMemo(
