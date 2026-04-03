@@ -16,9 +16,7 @@ import { Badge } from '@/components/ui/badge'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import {
-  RotateCcw,
   Search,
-  Eye,
   Check,
   X,
   ChevronLeft,
@@ -29,7 +27,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { useToast } from '@/hooks/use-toast'
 import { useSystemSettings } from '@/hooks/useSystemSettings'
-import { useReturns, useCreateReturn, useUpdateReturnStatus } from '@/hooks/useReturns'
+import { useReturns, useUpdateReturnStatus } from '@/hooks/useReturns'
 import { Return } from '@/services/returnService'
 import { formatMoney, formatDateTime } from '@/utils'
 
@@ -90,6 +88,7 @@ const ReturnsManagement = () => {
   }
 
   const openStatusUpdate = (returnRecord: Return, newStatus: ReturnStatusName) => {
+    setIsViewOpen(false)
     setReturnToUpdate(returnRecord)
     setStatusToUpdate(newStatus)
 
@@ -215,6 +214,9 @@ const ReturnsManagement = () => {
       <Card>
         <CardHeader>
           <CardTitle>Devoluciones Registradas ({returnsData?.totalItems || 0})</CardTitle>
+          <p className="text-sm text-muted-foreground pt-1">
+            Haz clic en una fila para ver el detalle y gestionar el estado si aplica.
+          </p>
         </CardHeader>
         <CardContent>
           {isLoading ? (
@@ -236,12 +238,23 @@ const ReturnsManagement = () => {
                       <th className="text-left p-3 font-medium">Items</th>
                       <th className="text-left p-3 font-medium">Total Reembolso</th>
                       <th className="text-left p-3 font-medium">Estado</th>
-                      <th className="text-left p-3 font-medium">Acciones</th>
                     </tr>
                   </thead>
                   <tbody>
                     {filteredReturns.map((ret) => (
-                      <tr key={ret.id} className="border-b hover:bg-muted/50">
+                      <tr
+                        key={ret.id}
+                        role="button"
+                        tabIndex={0}
+                        className="border-b hover:bg-muted/50 cursor-pointer"
+                        onClick={() => viewReturn(ret)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault()
+                            viewReturn(ret)
+                          }
+                        }}
+                      >
                         <td className="p-3 font-mono text-sm">{ret.id.substring(0, 8)}...</td>
                         <td className="p-3 text-sm">{formatDateTime(ret.return_date, undefined, locale)}</td>
                         <td className="p-3 font-mono text-sm">{ret.sale_id.substring(0, 8)}...</td>
@@ -249,51 +262,6 @@ const ReturnsManagement = () => {
                         <td className="p-3 text-center">{ret.items_count}</td>
                         <td className="p-3 font-medium">{formatMoney(ret.total_refund, locale, currencyCode)}</td>
                         <td className="p-3">{getStatusBadge(ret.status.name)}</td>
-                        <td className="p-3">
-                          <div className="flex gap-2">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => viewReturn(ret)}
-                              title="Ver detalle"
-                            >
-                              <Eye className="w-4 h-4" />
-                            </Button>
-                            {ret.status.name === 'Pendiente' && (
-                              <>
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  className="text-green-600 hover:bg-green-50"
-                                  onClick={() => openStatusUpdate(ret, 'Aprobada')}
-                                  title="Aprobar"
-                                >
-                                  <Check className="w-4 h-4" />
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  className="text-red-600 hover:bg-red-50"
-                                  onClick={() => openStatusUpdate(ret, 'Rechazada')}
-                                  title="Rechazar"
-                                >
-                                  <X className="w-4 h-4" />
-                                </Button>
-                              </>
-                            )}
-                            {ret.status.name === 'Aprobada' && (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="text-blue-600 hover:bg-blue-50"
-                                onClick={() => openStatusUpdate(ret, 'Completada')}
-                                title="Completar"
-                              >
-                                <Package className="w-4 h-4" />
-                              </Button>
-                            )}
-                          </div>
-                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -404,6 +372,33 @@ const ReturnsManagement = () => {
               {selectedReturn.processed_at && (
                 <div className="text-sm text-muted-foreground">
                   Procesado: {formatDateTime(selectedReturn.processed_at, undefined, locale)}
+                </div>
+              )}
+
+              {(selectedReturn.status.name === 'Pendiente' || selectedReturn.status.name === 'Aprobada') && (
+                <div className="flex flex-wrap gap-2 pt-4 border-t">
+                  {selectedReturn.status.name === 'Pendiente' && (
+                    <>
+                      <Button
+                        variant="default"
+                        className="bg-green-600 hover:bg-green-700"
+                        onClick={() => openStatusUpdate(selectedReturn, 'Aprobada')}
+                      >
+                        <Check className="w-4 h-4 mr-2" />
+                        Aprobar
+                      </Button>
+                      <Button variant="destructive" onClick={() => openStatusUpdate(selectedReturn, 'Rechazada')}>
+                        <X className="w-4 h-4 mr-2" />
+                        Rechazar
+                      </Button>
+                    </>
+                  )}
+                  {selectedReturn.status.name === 'Aprobada' && (
+                    <Button variant="outline" className="text-blue-600 border-blue-600 hover:bg-blue-50" onClick={() => openStatusUpdate(selectedReturn, 'Completada')}>
+                      <Package className="w-4 h-4 mr-2" />
+                      Marcar completada
+                    </Button>
+                  )}
                 </div>
               )}
             </div>

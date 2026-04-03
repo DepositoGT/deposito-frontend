@@ -363,6 +363,9 @@ const CashClosureManagement = () => {
                         <FileText className="h-5 w-5" />
                         {form.isSeller ? 'Último Cierre de Caja' : 'Historial de Cierres'}
                     </CardTitle>
+                    <p className="text-sm text-muted-foreground pt-1">
+                        Haz clic en un cierre para ver el detalle, descargar PDF o aprobar / rechazar según tu rol.
+                    </p>
                 </CardHeader>
                 <CardContent>
                     <div className="space-y-4">
