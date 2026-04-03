@@ -34,14 +34,17 @@ import {
 import { Pagination } from '@/components/shared/Pagination'
 import { useToast } from '@/hooks/use-toast'
 import { useDeletedProducts, useRestoreProduct } from '@/hooks/useProducts'
+import { usePersistedListUiState } from '@/hooks/usePersistedListUiState'
 import type { Product } from '@/types'
 import { ArrowLeft, Loader2, RotateCcw } from 'lucide-react'
 
 export default function DeletedProductsPage() {
   const navigate = useNavigate()
   const { toast } = useToast()
-  const [currentPage, setCurrentPage] = useState(1)
-  const pageSize = 20
+  const { page: currentPage, setPage: setCurrentPage, pageSize } = usePersistedListUiState(
+    'inventario/productos-eliminados',
+    { defaultPage: 1, defaultPageSize: 20 }
+  )
 
   const { data: allDeletedProducts = [], isLoading, isError, refetch } = useDeletedProducts()
 

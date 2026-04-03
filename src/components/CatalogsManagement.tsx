@@ -8,7 +8,7 @@
  * For licensing inquiries: GitHub @dpatzan2
  */
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs'
 import { Button } from './ui/button'
@@ -62,6 +62,7 @@ import { Pencil, Trash2, Plus, RotateCcw, Loader2, FileUp } from 'lucide-react'
 import { CatalogImportDialog } from './catalogs/CatalogImportDialog'
 import { Pagination } from './shared/Pagination'
 import { useAuthPermissions } from '../hooks/useAuthPermissions'
+import { usePersistedListUiState, useResetPageOnFilterChange } from '../hooks/usePersistedListUiState'
 
 // Tipos para los diálogos
 type PaymentTermDialogState = {
@@ -179,8 +180,11 @@ function PaymentTermsTab({
   const { toast } = useToast()
   const { hasPermission } = useAuthPermissions()
   const canManageCatalogs = hasPermission('catalogs.manage')
-  const [currentPage, setCurrentPage] = useState(1)
-  const [pageSize] = useState(10)
+  const { page: currentPage, setPage: setCurrentPage, pageSize } = usePersistedListUiState(
+    'catalogs/payment-terms',
+    { defaultPage: 1, defaultPageSize: 10 }
+  )
+  useResetPageOnFilterChange(setCurrentPage, [showDeleted])
   
   const { data: paymentTermsData, isLoading } = usePaymentTerms({
     page: currentPage,
@@ -193,11 +197,6 @@ function PaymentTermsTab({
   const restoreMutation = useRestorePaymentTerm()
   const [deleteConfirmTerm, setDeleteConfirmTerm] = useState<PaymentTerm | null>(null)
   const [restoreConfirmTerm, setRestoreConfirmTerm] = useState<PaymentTerm | null>(null)
-  
-  // Reset page when showDeleted changes
-  useEffect(() => {
-    setCurrentPage(1)
-  }, [showDeleted])
 
   const confirmDeletePaymentTerm = async () => {
     if (!deleteConfirmTerm) return
@@ -456,8 +455,11 @@ function ProductCategoriesTab({
   const { toast } = useToast()
   const { hasPermission } = useAuthPermissions()
   const canManageCatalogs = hasPermission('catalogs.manage')
-  const [currentPage, setCurrentPage] = useState(1)
-  const [pageSize] = useState(10)
+  const { page: currentPage, setPage: setCurrentPage, pageSize } = usePersistedListUiState(
+    'catalogs/categories',
+    { defaultPage: 1, defaultPageSize: 10 }
+  )
+  useResetPageOnFilterChange(setCurrentPage, [showDeleted])
   
   const { data: categoriesData, isLoading } = useProductCategories({
     page: currentPage,
@@ -470,11 +472,6 @@ function ProductCategoriesTab({
   const restoreMutation = useRestoreProductCategory()
   const [deleteConfirmCategory, setDeleteConfirmCategory] = useState<ProductCategory | null>(null)
   const [restoreConfirmCategory, setRestoreConfirmCategory] = useState<ProductCategory | null>(null)
-  
-  // Reset page when showDeleted changes
-  useEffect(() => {
-    setCurrentPage(1)
-  }, [showDeleted])
 
   const confirmDeleteCategory = async () => {
     if (!deleteConfirmCategory) return

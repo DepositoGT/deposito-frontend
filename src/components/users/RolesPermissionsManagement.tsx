@@ -19,6 +19,8 @@ import { useNavigate } from "react-router-dom";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Pagination } from "@/components/shared/Pagination";
+import { usePersistedListUiState } from "@/hooks/usePersistedListUiState";
+
 const RolesPermissionsManagement = () => {
   const { hasPermission, isAdmin } = useAuthPermissions();
   const navigate = useNavigate();
@@ -26,9 +28,14 @@ const RolesPermissionsManagement = () => {
   const canViewRoles = isAdmin || hasPermission("roles.view") || hasPermission("roles.manage");
   const canManageRoles = isAdmin || hasPermission("roles.manage");
 
-  const [viewMode, setViewMode] = useState<"cards" | "table">("cards");
-  const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(18);
+  const {
+    page: currentPage,
+    setPage: setCurrentPage,
+    pageSize,
+    setPageSize,
+    viewMode,
+    setViewMode,
+  } = usePersistedListUiState("usuarios/roles-permisos", { defaultPageSize: 18, defaultView: "cards" });
 
   const {
     data: rolesData,

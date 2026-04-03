@@ -8,7 +8,7 @@
  * For licensing inquiries: GitHub @dpatzan2
  */
 
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -47,6 +47,7 @@ import { useSuppliers } from '@/hooks/useSuppliers'
 import { Pagination } from '@/components/shared/Pagination'
 import { generateMerchandiseReport } from '@/services/incomingMerchandiseService'
 import { useAuthPermissions } from '@/hooks/useAuthPermissions'
+import { usePersistedListUiState, useResetPageOnFilterChange } from '@/hooks/usePersistedListUiState'
 import { useSystemSettings } from '@/hooks/useSystemSettings'
 import type { IncomingMerchandise } from '@/services/incomingMerchandiseService'
 
@@ -58,9 +59,14 @@ const IncomingMerchandiseManagement = () => {
 
   // State
   const [searchTerm, setSearchTerm] = useState('')
-  const [currentPage, setCurrentPage] = useState(1)
-  const [pageSize, setPageSize] = useState(18)
-  const [viewMode, setViewMode] = useState<'table' | 'cards'>('cards')
+  const {
+    page: currentPage,
+    setPage: setCurrentPage,
+    pageSize,
+    setPageSize,
+    viewMode,
+    setViewMode,
+  } = usePersistedListUiState('mercancia/lista', { defaultPageSize: 18, defaultView: 'cards' })
   const [selectedSupplierId, setSelectedSupplierId] = useState<string>('all')
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
@@ -93,10 +99,7 @@ const IncomingMerchandiseManagement = () => {
   const totalItems = recordsData?.totalItems ?? 0
   const totalPages = recordsData?.totalPages ?? 1
 
-  // Reset page on filter or page size change
-  useEffect(() => {
-    setCurrentPage(1)
-  }, [searchTerm, selectedSupplierId, startDate, endDate, pageSize])
+  useResetPageOnFilterChange(setCurrentPage, [searchTerm, selectedSupplierId, startDate, endDate, pageSize])
 
   // Handlers
   const handleViewDetails = (id: string) => {

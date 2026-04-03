@@ -55,6 +55,7 @@ import { useUpdateSupplier } from "@/hooks/useUpdateSupplier";
 import { SupplierImportDialog } from "@/components/suppliers/SupplierImportDialog";
 import { Pagination } from "@/components/shared/Pagination";
 import { useAuthPermissions } from "@/hooks/useAuthPermissions";
+import { usePersistedListUiState, useResetPageOnFilterChange } from "@/hooks/usePersistedListUiState";
 import {
   Popover,
   PopoverContent,
@@ -74,9 +75,14 @@ import { cn } from "@/lib/utils";
 const SuppliersManagement = () => {
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState("");
-  const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(18);
-  const [viewMode, setViewMode] = useState<"table" | "cards">("cards");
+  const {
+    page: currentPage,
+    setPage: setCurrentPage,
+    pageSize,
+    setPageSize,
+    viewMode,
+    setViewMode,
+  } = usePersistedListUiState("contactos/lista", { defaultPageSize: 18, defaultView: "cards" });
   const [partyFilter, setPartyFilter] = useState<"all" | "SUPPLIER" | "CUSTOMER">("all");
   const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(null);
   const [isImportOpen, setIsImportOpen] = useState(false);
@@ -127,10 +133,7 @@ const SuppliersManagement = () => {
   const canEditContact = (s: Supplier) =>
     s.party_type === "CUSTOMER" ? canEditCli : canEditSup;
 
-  // Reset page when search term or page size changes
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [searchTerm, pageSize, partyFilter]);
+  useResetPageOnFilterChange(setCurrentPage, [searchTerm, pageSize, partyFilter]);
 
   // Abrir modal de edición si venimos desde el detalle con un id específico
   useEffect(() => {
