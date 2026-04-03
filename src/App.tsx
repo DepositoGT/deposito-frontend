@@ -398,14 +398,6 @@ const App = () => (
                   }
                 />
                 <Route
-                  path="/usuarios/:id"
-                  element={
-                    <PermissionRoute any={["users.view", "roles.manage"]}>
-                      <UserDetailPage />
-                    </PermissionRoute>
-                  }
-                />
-                <Route
                   path="/usuarios/importar"
                   element={
                     <PermissionRoute any={["users.view", "roles.manage"]}>
@@ -434,6 +426,14 @@ const App = () => (
                   element={
                     <PermissionRoute any={["roles.manage"]}>
                       <RolePermissionsDetail />
+                    </PermissionRoute>
+                  }
+                />
+                <Route
+                  path="/usuarios/:id"
+                  element={
+                    <PermissionRoute any={["users.view", "roles.manage"]}>
+                      <UserDetailPage />
                     </PermissionRoute>
                   }
                 />

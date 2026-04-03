@@ -11,9 +11,19 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { usePermissions, useRoleWithPermissions } from "@/hooks/usePermissions";
 import { useAuth } from "@/context/useAuth";
-import { updateRole } from "@/services/userService";
+import { updateRole, deleteRole } from "@/services/userService";
 import { groupPermissionsByModule } from "@/lib/permissionGroups";
-import { ArrowLeft, Shield, CheckSquare, Loader2 } from "lucide-react";
+import { ArrowLeft, Shield, CheckSquare, Loader2, Trash2 } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 const RolePermissionsDetail = () => {
   const { id } = useParams();
@@ -53,6 +63,13 @@ const RolePermissionsDetail = () => {
 
   const [updating, setUpdating] = useState(false);
   const [selectedPerms, setSelectedPerms] = useState<string[]>([]);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [deletingRole, setDeletingRole] = useState(false);
+
+  const isProtectedRole = (r: { name: string }) => {
+    const n = r.name.toLowerCase();
+    return n === "admin" || n === "sin rol";
+  };
 
   const permissionGroups = useMemo(
     () => groupPermissionsByModule(allPermissions),
@@ -101,6 +118,42 @@ const RolePermissionsDetail = () => {
     setSelectedPerms((current) =>
       current.includes(code) ? current.filter((c) => c !== code) : [...current, code],
     );
+  };
+
+  const handleDeleteRole = async () => {
+    if (!role || isProtectedRole(role)) {
+      toast({
+        title: "Rol protegido",
+        description: `El rol "${role?.name ?? ""}" no puede eliminarse.`,
+        variant: "destructive",
+      });
+      return;
+    }
+    setDeletingRole(true);
+    try {
+      const result = await deleteRole(role.id);
+      toast({
+        title: "Rol eliminado",
+        description:
+          result.reassignedUsers && result.reassignedUsers > 0
+            ? `Rol eliminado correctamente. ${result.reassignedUsers} usuario(s) fueron movidos a un rol neutro sin permisos.`
+            : "Rol eliminado correctamente.",
+      });
+      setIsDeleteDialogOpen(false);
+      navigate("/usuarios/roles-permisos");
+    } catch (error: unknown) {
+      let message = "No se pudo eliminar el rol";
+      if (error && typeof error === "object" && "message" in error) {
+        message = String((error as { message?: string }).message) || message;
+      }
+      toast({
+        title: "Error",
+        description: message,
+        variant: "destructive",
+      });
+    } finally {
+      setDeletingRole(false);
+    }
   };
 
   const handleSave = async () => {
@@ -215,16 +268,62 @@ const RolePermissionsDetail = () => {
           </div>
         </div>
 
-        <Button
-          variant="default"
-          size="sm"
-          onClick={handleSave}
-          disabled={updating || !isDirty || !role || role.name.toLowerCase() === "admin"}
-        >
-          {updating && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-          Guardar cambios
-        </Button>
+        <div className="flex flex-wrap gap-2 justify-end">
+          {role && !isProtectedRole(role) && (
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={() => setIsDeleteDialogOpen(true)}
+              disabled={updating || deletingRole}
+            >
+              <Trash2 className="w-4 h-4 mr-2" />
+              Eliminar rol
+            </Button>
+          )}
+          <Button
+            variant="default"
+            size="sm"
+            onClick={handleSave}
+            disabled={updating || !isDirty || !role || role.name.toLowerCase() === "admin"}
+          >
+            {updating && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+            Guardar cambios
+          </Button>
+        </div>
       </div>
+
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar rol?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta acción no se puede deshacer. Se eliminará el rol &quot;{role?.name}&quot;. Los usuarios que
+              lo tengan quedarán sin rol (asignados a un rol neutro sin permisos) y se eliminarán sus permisos
+              asociados.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deletingRole}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={deletingRole}
+              onClick={(e) => {
+                e.preventDefault();
+                void handleDeleteRole();
+              }}
+            >
+              {deletingRole ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Eliminando…
+                </>
+              ) : (
+                "Eliminar"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <Card>
         <CardHeader>
