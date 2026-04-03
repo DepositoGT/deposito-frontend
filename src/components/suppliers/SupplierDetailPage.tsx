@@ -15,7 +15,7 @@
  * - Cliente: historial de compras (ventas vinculadas por nombre o ID fiscal).
  */
 import { useMemo, useState, useEffect } from 'react'
-import { useParams, useNavigate, Link } from 'react-router-dom'
+import { useParams, useNavigate } from 'react-router-dom'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -27,7 +27,6 @@ import {
   Package,
   User,
   Calendar,
-  Eye,
   Edit,
   Receipt,
   Trash2,
@@ -40,7 +39,9 @@ import { useToast } from '@/hooks/use-toast'
 import { useAuthPermissions } from '@/hooks/useAuthPermissions'
 import { useSystemSettings } from '@/hooks/useSystemSettings'
 import { adaptApiSupplier } from '@/services/supplierService'
-import type { Supplier } from '@/types'
+import type { Supplier, Sale } from '@/types'
+import { SaleDetailDialog } from '@/components/sales/components/SaleDetailDialog'
+import { normalizeRawSale } from '@/components/sales/hooks/useSalesData'
 import { generateSupplierPDF, type SupplierPDFOptions, type SupplierPDFMerchandiseEntry } from '@/components/suppliers/generateSupplierPDF'
 import { fetchIncomingMerchandise } from '@/services/incomingMerchandiseService'
 import { Pagination } from '@/components/shared/Pagination'
@@ -123,6 +124,8 @@ export default function SupplierDetailPage() {
   const [salesPageSize, setSalesPageSize] = useState(10)
   const [detailRecordId, setDetailRecordId] = useState<string | null>(null)
   const [isDetailOpen, setIsDetailOpen] = useState(false)
+  const [selectedSale, setSelectedSale] = useState<Sale | null>(null)
+  const [isSaleDetailOpen, setIsSaleDetailOpen] = useState(false)
   const [isPdfOptionsOpen, setIsPdfOptionsOpen] = useState(false)
   const [pdfOptions, setPdfOptions] = useState<SupplierPDFOptions>({
     includeBasic: true,
@@ -152,6 +155,7 @@ export default function SupplierDetailPage() {
   const canViewMerchandise = hasPermission('merchandise.view')
   const canViewCustomerSales = hasPermission('sales.view')
   const canViewSaleInvoice = hasPermission('sales.view_invoice')
+  const canViewSaleDetail = hasPermission('sales.view_detail')
   const { data: merchData, isLoading: merchLoading } = useIncomingMerchandise({
     supplier_id: id ?? undefined,
     page: merchPage,
@@ -184,6 +188,7 @@ export default function SupplierDetailPage() {
   })
   const saleRows = customerSalesData?.items ?? []
   const salesTotalPages = customerSalesData?.totalPages ?? 1
+  const customerPurchaseSummary = customerSalesData?.customerPurchaseSummary
   const canEditSupplier =
     partyType === 'CUSTOMER'
       ? hasPermission('contacts.clients.edit')
@@ -257,6 +262,23 @@ export default function SupplierDetailPage() {
         description: (e as Error)?.message ?? 'No se pudo eliminar el contacto',
         variant: 'destructive',
       })
+    }
+  }
+
+  const openMerchandiseDetail = (recordId: string) => {
+    if (!canDetails) return
+    setDetailRecordId(recordId)
+    setIsDetailOpen(true)
+  }
+
+  const saleRowClickable = canViewSaleDetail || canViewSaleInvoice
+  const openSaleRow = (raw: Sale) => {
+    const normalized = normalizeRawSale(raw as unknown)
+    if (canViewSaleDetail) {
+      setSelectedSale(normalized)
+      setIsSaleDetailOpen(true)
+    } else if (canViewSaleInvoice) {
+      navigate(`/ventas/${normalized.reference ?? normalized.id}/factura`)
     }
   }
 
@@ -927,22 +949,42 @@ export default function SupplierDetailPage() {
 
               <Separator />
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2">
+              <div
+                className={`grid grid-cols-1 gap-4 pt-2 ${isSupplierParty ? 'sm:grid-cols-3' : 'sm:grid-cols-2'}`}
+              >
+                {isSupplierParty && (
+                  <div className="text-center">
+                    <p className="text-2xl font-bold text-foreground">
+                      {supplier.productsList?.length ?? supplier.products}
+                    </p>
+                    <p className="text-sm text-muted-foreground">Productos</p>
+                  </div>
+                )}
                 <div className="text-center">
                   <p className="text-2xl font-bold text-foreground">
-                    {supplier.productsList?.length ?? supplier.products}
+                    {isSupplierParty || !canViewCustomerSales
+                      ? formatCurrency(Number(supplier.totalPurchases))
+                      : customerSalesLoading && customerPurchaseSummary == null
+                        ? '…'
+                        : formatCurrency(customerPurchaseSummary?.totalPurchases ?? 0)}
                   </p>
-                  <p className="text-sm text-muted-foreground">Productos</p>
+                  <p className="text-sm text-muted-foreground">
+                    {isSupplierParty ? 'Total Compras' : 'Total comprado'}
+                  </p>
                 </div>
                 <div className="text-center">
                   <p className="text-2xl font-bold text-foreground">
-                    {formatCurrency(Number(supplier.totalPurchases))}
+                    {isSupplierParty || !canViewCustomerSales
+                      ? supplier.lastOrder
+                      : customerSalesLoading && customerPurchaseSummary == null
+                        ? '…'
+                        : customerPurchaseSummary?.lastSaleDate
+                          ? formatDate(customerPurchaseSummary.lastSaleDate)
+                          : 'N/A'}
                   </p>
-                  <p className="text-sm text-muted-foreground">Total Compras</p>
-                </div>
-                <div className="text-center">
-                  <p className="text-2xl font-bold text-foreground">{supplier.lastOrder}</p>
-                  <p className="text-sm text-muted-foreground">Último Pedido</p>
+                  <p className="text-sm text-muted-foreground">
+                    {isSupplierParty ? 'Último Pedido' : 'Última compra'}
+                  </p>
                 </div>
               </div>
             </CardContent>
@@ -955,7 +997,8 @@ export default function SupplierDetailPage() {
             <CardHeader>
               <CardTitle>Entradas de mercancía</CardTitle>
               <p className="text-sm text-muted-foreground">
-                Registros de ingreso de productos asociados a este proveedor
+                Registros de ingreso de productos asociados a este proveedor.
+                {canDetails && ' Haz clic en una fila para ver el detalle.'}
               </p>
             </CardHeader>
             <CardContent>
@@ -976,14 +1019,24 @@ export default function SupplierDetailPage() {
                           <th className="text-left p-3 font-medium text-muted-foreground">Registrado por</th>
                           <th className="text-left p-3 font-medium text-muted-foreground">Productos</th>
                           <th className="text-right p-3 font-medium text-muted-foreground">Total</th>
-                          {canDetails && (
-                            <th className="text-center p-3 font-medium text-muted-foreground">Acciones</th>
-                          )}
                         </tr>
                       </thead>
                       <tbody>
                         {records.map((record) => (
-                          <tr key={record.id} className="border-b hover:bg-muted/50">
+                          <tr
+                            key={record.id}
+                            role={canDetails ? 'button' : undefined}
+                            tabIndex={canDetails ? 0 : undefined}
+                            className={`border-b hover:bg-muted/50${canDetails ? ' cursor-pointer' : ''}`}
+                            onClick={canDetails ? () => openMerchandiseDetail(record.id) : undefined}
+                            onKeyDown={(e) => {
+                              if (!canDetails) return
+                              if (e.key === 'Enter' || e.key === ' ') {
+                                e.preventDefault()
+                                openMerchandiseDetail(record.id)
+                              }
+                            }}
+                          >
                             <td className="p-3 text-sm">{formatDate(record.date)}</td>
                             <td className="p-3">
                               <div className="flex items-center gap-2">
@@ -997,22 +1050,6 @@ export default function SupplierDetailPage() {
                             <td className="p-3 text-right font-semibold">
                               {formatCurrency(record.totalValue)}
                             </td>
-                            {canDetails && (
-                              <td className="p-3">
-                                <div className="flex justify-center">
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => {
-                                      setDetailRecordId(record.id)
-                                      setIsDetailOpen(true)
-                                    }}
-                                  >
-                                    <Eye className="w-4 h-4" />
-                                  </Button>
-                                </div>
-                              </td>
-                            )}
                           </tr>
                         ))}
                       </tbody>
@@ -1061,6 +1098,8 @@ export default function SupplierDetailPage() {
                   Ventas donde el cliente coincide con este contacto (por nombre en la venta o por ID
                   fiscal). Si no ves ventas recientes, verifica que en el punto de venta se use el mismo
                   nombre o NIT que en la ficha del cliente.
+                  {saleRowClickable &&
+                    ' Haz clic en una fila para ver el detalle o la factura, según tus permisos.'}
                 </p>
               </CardHeader>
               <CardContent>
@@ -1082,16 +1121,24 @@ export default function SupplierDetailPage() {
                             <th className="text-right p-3 font-medium text-muted-foreground">Total</th>
                             <th className="text-center p-3 font-medium text-muted-foreground">Ítems</th>
                             <th className="text-left p-3 font-medium text-muted-foreground">Estado</th>
-                            {canViewSaleInvoice && (
-                              <th className="text-center p-3 font-medium text-muted-foreground">
-                                Factura
-                              </th>
-                            )}
                           </tr>
                         </thead>
                         <tbody>
                           {saleRows.map((sale) => (
-                            <tr key={sale.id} className="border-b hover:bg-muted/50">
+                            <tr
+                              key={sale.id}
+                              role={saleRowClickable ? 'button' : undefined}
+                              tabIndex={saleRowClickable ? 0 : undefined}
+                              className={`border-b hover:bg-muted/50${saleRowClickable ? ' cursor-pointer' : ''}`}
+                              onClick={saleRowClickable ? () => openSaleRow(sale) : undefined}
+                              onKeyDown={(e) => {
+                                if (!saleRowClickable) return
+                                if (e.key === 'Enter' || e.key === ' ') {
+                                  e.preventDefault()
+                                  openSaleRow(sale)
+                                }
+                              }}
+                            >
                               <td className="p-3 text-sm">{formatDate(sale.date)}</td>
                               <td className="p-3 text-sm font-medium">{sale.reference ?? sale.id}</td>
                               <td className="p-3 text-right font-semibold">
@@ -1101,19 +1148,6 @@ export default function SupplierDetailPage() {
                                 <Badge variant="secondary">{sale.items}</Badge>
                               </td>
                               <td className="p-3 text-sm">{sale.status?.name ?? '—'}</td>
-                              {canViewSaleInvoice && (
-                                <td className="p-3 text-center">
-                                  <Button variant="ghost" size="sm" asChild>
-                                    <Link
-                                      to={`/ventas/${sale.reference ?? sale.id}/factura`}
-                                      className="inline-flex items-center gap-1"
-                                    >
-                                      <Receipt className="w-4 h-4" />
-                                      Ver
-                                    </Link>
-                                  </Button>
-                                </td>
-                              )}
                             </tr>
                           ))}
                         </tbody>
@@ -1222,6 +1256,17 @@ export default function SupplierDetailPage() {
           )}
         </DialogContent>
       </Dialog>
+
+      <SaleDetailDialog
+        open={isSaleDetailOpen}
+        onOpenChange={(open) => {
+          setIsSaleDetailOpen(open)
+          if (!open) setSelectedSale(null)
+        }}
+        sale={selectedSale}
+        locale={locale}
+        currencyCode={currencyCode}
+      />
     </div>
   )
 }
