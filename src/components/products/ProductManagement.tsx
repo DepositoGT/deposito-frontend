@@ -48,6 +48,7 @@ import { Pagination } from '@/components/shared/Pagination'
 import { ImportDialog } from './components'
 import { useAuthPermissions } from '@/hooks/useAuthPermissions'
 import { useSystemSettings } from '@/hooks/useSystemSettings'
+import { usePersistedListUiState, useResetPageOnFilterChange } from '@/hooks/usePersistedListUiState'
 import { useNavigate } from 'react-router-dom'
 import { formatMoney } from '@/utils'
 
@@ -62,15 +63,19 @@ const ProductManagement = () => {
     const [searchTerm, setSearchTerm] = useState('')
     const [categoryFilter, setCategoryFilter] = useState('all')
 
-    // Pagination
-    const [currentPage, setCurrentPage] = useState(1)
-    const [pageSize, setPageSize] = useState(18) // Default page size
+    const {
+        page: currentPage,
+        setPage: setCurrentPage,
+        pageSize,
+        setPageSize,
+        viewMode,
+        setViewMode,
+    } = usePersistedListUiState('inventario/productos', { defaultPageSize: 18, defaultView: 'cards' })
 
     // Dialog states
     const [isScannerOpen, setIsScannerOpen] = useState(false)
     const [isImportDialogOpen, setIsImportDialogOpen] = useState(false)
     const [isExportDialogOpen, setIsExportDialogOpen] = useState(false)
-    const [viewMode, setViewMode] = useState<'table' | 'cards'>('cards')
     const EXPORT_COLUMNS: { id: string; label: string }[] = [
         { id: 'name', label: 'Nombre' },
         { id: 'category', label: 'Categoría' },
@@ -117,8 +122,7 @@ const ProductManagement = () => {
         return base.concat(['Whisky', 'Vinos', 'Cervezas', 'Rones', 'Vodkas', 'Tequilas', 'Ginebras'])
     }, [categoriesData])
 
-    // Reset page on filter change
-    useEffect(() => setCurrentPage(1), [searchTerm, categoryFilter, pageSize])
+    useResetPageOnFilterChange(setCurrentPage, [searchTerm, categoryFilter, pageSize])
 
     // Products are already filtered and paginated by the backend
     const paginatedProducts = products

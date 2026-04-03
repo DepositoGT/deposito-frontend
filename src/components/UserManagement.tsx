@@ -8,7 +8,7 @@
  * For licensing inquiries: GitHub @dpatzan2
  */
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -38,6 +38,7 @@ import { useAuthPermissions } from "@/hooks/useAuthPermissions";
 import type { User } from "@/services/userService";
 import { Pagination } from "@/components/shared/Pagination";
 import { useNavigate } from "react-router-dom";
+import { usePersistedListUiState, useResetPageOnFilterChange } from "@/hooks/usePersistedListUiState";
 
 // Componente para mostrar avatar de usuario con fallback
 const UserAvatar = ({ user }: { user: User }) => {
@@ -95,11 +96,15 @@ const UserManagement = () => {
   // Búsqueda y filtros
   const [searchTerm, setSearchTerm] = useState("");
   const [filterRole, setFilterRole] = useState<string>("all");
-  const [viewMode, setViewMode] = useState<"table" | "cards">("cards");
-  
-  // Paginación
-  const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(18);
+
+  const {
+    page: currentPage,
+    setPage: setCurrentPage,
+    pageSize,
+    setPageSize,
+    viewMode,
+    setViewMode,
+  } = usePersistedListUiState("usuarios/lista", { defaultPageSize: 18, defaultView: "cards" });
 
 
   // Queries
@@ -227,10 +232,7 @@ const UserManagement = () => {
     }
   };
 
-  // Resetear página cuando cambian los filtros o el tamaño de página
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [searchTerm, filterRole, pageSize]);
+  useResetPageOnFilterChange(setCurrentPage, [searchTerm, filterRole, pageSize]);
 
   // Los usuarios ya vienen filtrados del backend
   const filteredUsers = users;

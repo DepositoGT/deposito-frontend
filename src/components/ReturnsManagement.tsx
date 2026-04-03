@@ -30,6 +30,7 @@ import { useSystemSettings } from '@/hooks/useSystemSettings'
 import { useReturns, useUpdateReturnStatus } from '@/hooks/useReturns'
 import { Return } from '@/services/returnService'
 import { formatMoney, formatDateTime } from '@/utils'
+import { usePersistedListUiState, useResetPageOnFilterChange } from '@/hooks/usePersistedListUiState'
 
 type ReturnStatusName = 'Pendiente' | 'Aprobada' | 'Rechazada' | 'Completada'
 
@@ -40,7 +41,8 @@ const ReturnsManagement = () => {
   // Filters
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [searchTerm, setSearchTerm] = useState('')
-  const [page, setPage] = useState(1)
+  const { page, setPage } = usePersistedListUiState('devoluciones/lista', { defaultPage: 1, defaultPageSize: 10 })
+  useResetPageOnFilterChange(setPage, [statusFilter, searchTerm])
 
   // Fetch returns with filters
   const { data: returnsData, isLoading, refetch } = useReturns({
