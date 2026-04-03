@@ -21,6 +21,7 @@ import Login from "@/pages/Login";
 import NewReturn from "./pages/NewReturn";
 import HomePage from "./pages/HomePage";
 import ImportPage from "./pages/ImportPage";
+import DeletedProductsPage from "./pages/DeletedProductsPage";
 import SupplierImportPage from "./pages/SupplierImportPage";
 import CatalogImportPage from "./pages/CatalogImportPage";
 import UserImportPage from "./pages/UserImportPage";
@@ -183,6 +184,14 @@ const App = () => (
                       any={["inventory_count.view", "inventory_count.create", "inventory_count.count"]}
                     >
                       <InventoryCountListPage />
+                    </PermissionRoute>
+                  }
+                />
+                <Route
+                  path="/inventario/eliminados"
+                  element={
+                    <PermissionRoute any={["products.delete"]}>
+                      <DeletedProductsPage />
                     </PermissionRoute>
                   }
                 />

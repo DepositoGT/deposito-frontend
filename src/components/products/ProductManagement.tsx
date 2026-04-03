@@ -23,7 +23,7 @@ import { Label } from '@/components/ui/label'
 import {
     Plus, Search, Filter, Trash2, Eye, ScanLine, Download, MoreVertical,
     QrCode, PackagePlus, ChevronLeft, ChevronRight, Upload, LayoutGrid, List, Package,
-    ClipboardList, ChevronDown,
+    ClipboardList, ChevronDown, RotateCcw,
 } from 'lucide-react'
 import {
     DropdownMenu,
@@ -317,7 +317,19 @@ const ProductManagement = () => {
                                     )}
                                 </>
                             )}
-                            {(hasFileActions || hasStockActions) && <DropdownMenuSeparator />}
+                            {canDelete && (
+                                <>
+                                    {(hasFileActions || hasStockActions) && <DropdownMenuSeparator />}
+                                    <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
+                                        Productos
+                                    </DropdownMenuLabel>
+                                    <DropdownMenuItem onClick={() => navigate('/inventario/eliminados')}>
+                                        <RotateCcw className="mr-2 h-4 w-4" />
+                                        Productos eliminados
+                                    </DropdownMenuItem>
+                                </>
+                            )}
+                            {(hasFileActions || hasStockActions || canDelete) && <DropdownMenuSeparator />}
                             <DropdownMenuItem onClick={() => setIsScannerOpen(true)}>
                                 <ScanLine className="mr-2 h-4 w-4" />
                                 Escanear código
