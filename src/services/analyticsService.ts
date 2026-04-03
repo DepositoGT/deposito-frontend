@@ -12,6 +12,8 @@ import { getApiBaseUrl } from '@/services/api'
 
 export type AnalyticsResponse = {
   year: number;
+  /** Año calendario (zona GT) de la venta completada más antigua; si no hay ventas, año actual. */
+  firstSaleYear: number;
   totals: {
     totalSales: number; // Ventas netas (con devoluciones restadas)
     totalSalesGross?: number; // Ventas brutas (sin restar devoluciones)
@@ -35,5 +37,11 @@ export type AnalyticsResponse = {
 export async function getAnalytics(year: number | 'all'): Promise<AnalyticsResponse> {
   const res = await fetch(`${getApiBaseUrl()}/analytics/summary?year=${year}`)
   if (!res.ok) throw new Error('No se pudo obtener el resumen de análisis')
+  return res.json()
+}
+
+export async function getAnalyticsFirstSaleYear(): Promise<{ firstSaleYear: number }> {
+  const res = await fetch(`${getApiBaseUrl()}/analytics/first-sale-year`)
+  if (!res.ok) throw new Error('No se pudo obtener el año de la primera venta')
   return res.json()
 }
