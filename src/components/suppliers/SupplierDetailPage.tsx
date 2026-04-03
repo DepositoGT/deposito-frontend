@@ -30,6 +30,8 @@ import {
   Eye,
   Edit,
   Receipt,
+  Trash2,
+  Loader2,
 } from 'lucide-react'
 import { useSupplier } from '@/hooks/useSupplier'
 import { useCustomerSales } from '@/hooks/useCustomerSales'
@@ -49,8 +51,19 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { Input } from '@/components/ui/input'
 import { useUpdateSupplier } from '@/hooks/useUpdateSupplier'
+import { useDeleteSupplier } from '@/hooks/useDeleteSupplier'
 import type { IncomingMerchandise } from '@/services/incomingMerchandiseService'
 import { useCategories } from '@/hooks/useCategories'
 import { usePaymentTerms } from '@/hooks/usePaymentTerms'
@@ -175,9 +188,17 @@ export default function SupplierDetailPage() {
     partyType === 'CUSTOMER'
       ? hasPermission('contacts.clients.edit')
       : hasPermission('contacts.suppliers.edit')
+  const canDeleteSupplier =
+    partyType === 'CUSTOMER'
+      ? hasPermission('contacts.clients.delete')
+      : hasPermission('contacts.suppliers.delete')
 
   const updateSupplierMutation = useUpdateSupplier()
   const { mutateAsync: updateSupplierAsync, isPending: isUpdating } = updateSupplierMutation
+
+  const deleteMutation = useDeleteSupplier()
+  const { mutateAsync: deleteSupplierAsync, isPending: deleteIsLoading } = deleteMutation
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
 
   const { data: categoriesData } = useCategories()
   const { data: paymentTermsData } = usePaymentTerms()
@@ -222,6 +243,22 @@ export default function SupplierDetailPage() {
     setEditEstado(supplier.estado !== undefined && supplier.estado !== null ? Number(supplier.estado) : 1)
     setEditEntityKind(supplier.entityKind ?? 'ORGANIZATION')
   }, [supplier])
+
+  const handleDeleteSupplier = async () => {
+    if (!id) return
+    try {
+      await deleteSupplierAsync(id)
+      setIsDeleteDialogOpen(false)
+      toast({ title: 'Contacto eliminado', description: 'Se eliminó correctamente.' })
+      navigate('/contactos')
+    } catch (e) {
+      toast({
+        title: 'Error',
+        description: (e as Error)?.message ?? 'No se pudo eliminar el contacto',
+        variant: 'destructive',
+      })
+    }
+  }
 
   const handleSave = async () => {
     if (!supplier || !id) return
@@ -302,7 +339,7 @@ export default function SupplierDetailPage() {
             </p>
           </div>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2 justify-end">
           {canEditSupplier && !isEditing && (
             <Button
               variant="outline"
@@ -311,6 +348,12 @@ export default function SupplierDetailPage() {
             >
               <Edit className="w-4 h-4 mr-2" />
               Editar
+            </Button>
+          )}
+          {canDeleteSupplier && !isEditing && (
+            <Button variant="destructive" onClick={() => setIsDeleteDialogOpen(true)} disabled={deleteIsLoading}>
+              <Trash2 className="w-4 h-4 mr-2" />
+              Eliminar
             </Button>
           )}
           <Button
@@ -323,6 +366,37 @@ export default function SupplierDetailPage() {
           </Button>
         </div>
       </div>
+
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar contacto?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Se eliminará «{supplier.name}» del listado de contactos. Esta acción no se puede deshacer.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleteIsLoading}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={deleteIsLoading}
+              onClick={(e) => {
+                e.preventDefault()
+                void handleDeleteSupplier()
+              }}
+            >
+              {deleteIsLoading ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Eliminando…
+                </>
+              ) : (
+                'Eliminar'
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Diálogo: qué información incluir en el PDF */}
       <Dialog open={isPdfOptionsOpen} onOpenChange={setIsPdfOptionsOpen}>
