@@ -17,8 +17,6 @@ import { Badge } from '@/components/ui/badge'
 import { Label } from '@/components/ui/label'
 import {
   Search,
-  Eye,
-  FileText,
   Package,
   Calendar,
   User,
@@ -185,7 +183,10 @@ const IncomingMerchandiseManagement = () => {
       <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:justify-between">
         <div className="min-w-0">
           <h2 className="text-lg sm:text-2xl font-bold text-foreground">Registros de Mercancía</h2>
-          <p className="text-xs sm:text-sm text-muted-foreground">Gestiona los ingresos de mercancía</p>
+          <p className="text-xs sm:text-sm text-muted-foreground">
+            Gestiona los ingresos de mercancía.
+            {canDetails ? ' Haz clic en una fila o tarjeta para ver el detalle del registro.' : ''}
+          </p>
         </div>
         <div className="flex gap-2 overflow-x-auto pb-1 -mx-3 px-3 sm:mx-0 sm:px-0 sm:overflow-visible">
           {canReports && (
@@ -345,12 +346,31 @@ const IncomingMerchandiseManagement = () => {
                     <th className="text-left p-2 font-semibold">Registrado por</th>
                     <th className="text-left p-2 font-semibold">Productos</th>
                     <th className="text-right p-2 font-semibold">Total</th>
-                    <th className="text-center p-2 font-semibold">Acciones</th>
                   </tr>
                 </thead>
                 <tbody>
                   {records.map((record) => (
-                    <tr key={record.id} className="border-b hover:bg-muted/50">
+                    <tr
+                      key={record.id}
+                      role={canDetails ? 'button' : undefined}
+                      tabIndex={canDetails ? 0 : undefined}
+                      className={
+                        canDetails
+                          ? 'border-b hover:bg-muted/50 cursor-pointer transition-colors'
+                          : 'border-b hover:bg-muted/50'
+                      }
+                      onClick={canDetails ? () => handleViewDetails(record.id) : undefined}
+                      onKeyDown={
+                        canDetails
+                          ? (e) => {
+                              if (e.key === 'Enter' || e.key === ' ') {
+                                e.preventDefault()
+                                handleViewDetails(record.id)
+                              }
+                            }
+                          : undefined
+                      }
+                    >
                       <td className="p-2 text-sm">{formatDate(record.date)}</td>
                       <td className="p-2">
                         <div className="flex items-center gap-2">
@@ -370,19 +390,6 @@ const IncomingMerchandiseManagement = () => {
                       <td className="p-2 text-right font-semibold">
                         {formatCurrency(record.totalValue)}
                       </td>
-                      <td className="p-2">
-                        <div className="flex justify-center gap-2">
-                          {canDetails && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleViewDetails(record.id)}
-                            >
-                              <Eye className="w-4 h-4" />
-                            </Button>
-                          )}
-                        </div>
-                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -391,7 +398,27 @@ const IncomingMerchandiseManagement = () => {
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {records.map((record) => (
-                <Card key={record.id} className="hover:shadow-md transition-shadow">
+                <Card
+                  key={record.id}
+                  role={canDetails ? 'button' : undefined}
+                  tabIndex={canDetails ? 0 : undefined}
+                  className={
+                    canDetails
+                      ? 'hover:shadow-md transition-shadow cursor-pointer'
+                      : 'hover:shadow-md transition-shadow'
+                  }
+                  onClick={canDetails ? () => handleViewDetails(record.id) : undefined}
+                  onKeyDown={
+                    canDetails
+                      ? (e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault()
+                            handleViewDetails(record.id)
+                          }
+                        }
+                      : undefined
+                  }
+                >
                   <CardHeader className="pb-3">
                     <div className="flex items-start justify-between">
                       <div className="space-y-1">
@@ -403,15 +430,6 @@ const IncomingMerchandiseManagement = () => {
                           {formatDate(record.date)}
                         </p>
                       </div>
-                      {canDetails && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleViewDetails(record.id)}
-                        >
-                          <Eye className="w-4 h-4" />
-                        </Button>
-                      )}
                     </div>
                   </CardHeader>
                   <CardContent className="space-y-3">
@@ -463,7 +481,13 @@ const IncomingMerchandiseManagement = () => {
       </Card>
 
       {/* Detail Dialog */}
-      <Dialog open={isDetailOpen} onOpenChange={setIsDetailOpen}>
+      <Dialog
+        open={isDetailOpen}
+        onOpenChange={(open) => {
+          setIsDetailOpen(open)
+          if (!open) setSelectedRecordId(null)
+        }}
+      >
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Detalle del Registro</DialogTitle>
