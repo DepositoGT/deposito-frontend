@@ -8,7 +8,7 @@
  * For licensing inquiries: GitHub @dpatzan2
  */
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { 
@@ -25,7 +25,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useAnalytics } from "@/hooks/useAnalytics";
+import { useAnalytics, useAnalyticsFirstSaleYear } from "@/hooks/useAnalytics";
 import { useSystemSettings } from "@/hooks/useSystemSettings";
 
 const Analytics = () => {
@@ -34,15 +34,24 @@ const Analytics = () => {
     new Intl.NumberFormat(locale || 'es-GT', { style: 'currency', currency: currencyCode || 'GTQ', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n);
   const formatNumber = (n: number) => (n ?? 0).toLocaleString(locale || 'es-GT');
 
-  // Filtro de año desde 2025 hasta el actual, con opción "Todos"
   const currentYear = new Date().getFullYear();
-  const initialYear = currentYear < 2025 ? 2025 : currentYear;
-  const [selectedYear, setSelectedYear] = useState<number | 'all'>(initialYear);
+  const { data: yearMeta } = useAnalyticsFirstSaleYear();
+  const minYear = yearMeta?.firstSaleYear ?? currentYear;
+  const [selectedYear, setSelectedYear] = useState<number | 'all'>(currentYear);
   const years = useMemo(() => {
     const list: number[] = [];
-    for (let y = 2025; y <= currentYear; y++) list.push(y);
+    const from = Math.min(minYear, currentYear);
+    const to = Math.max(minYear, currentYear);
+    for (let y = from; y <= to; y++) list.push(y);
     return list;
-  }, [currentYear]);
+  }, [minYear, currentYear]);
+
+  useEffect(() => {
+    if (typeof selectedYear !== "number") return;
+    if (selectedYear < minYear || selectedYear > currentYear) {
+      setSelectedYear(Math.min(Math.max(selectedYear, minYear), currentYear));
+    }
+  }, [minYear, currentYear, selectedYear]);
 
   const { data, isLoading } = useAnalytics(selectedYear);
   const salesData = useMemo(() => {

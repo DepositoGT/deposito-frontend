@@ -111,6 +111,12 @@ export interface Sale {
 /** Misma forma que GET /sales/:id — el POST devuelve la venta completa para evitar un GET extra (ticket, etc.). */
 export type CreateSaleResponse = Sale;
 
+/** Presente en GET /sales?customer_contact_id=… — totales solo ventas «Completada». */
+export interface CustomerPurchaseSummary {
+  totalPurchases: number;
+  lastSaleDate: string | null;
+}
+
 export interface SalesListResponse {
   items: Sale[];
   page: number;
@@ -119,6 +125,7 @@ export interface SalesListResponse {
   totalItems: number;
   nextPage: number | null;
   prevPage: number | null;
+  customerPurchaseSummary?: CustomerPurchaseSummary;
 }
 
 /** Ventas asociadas a un contacto cliente (coincidencia por nombre o ID fiscal en la venta). */

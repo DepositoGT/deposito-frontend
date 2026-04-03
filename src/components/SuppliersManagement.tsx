@@ -24,9 +24,7 @@ import {
   MapPin,
   Package,
   TrendingUp,
-  Eye,
   Edit,
-  Trash2,
   Users,
   FileUp,
   LayoutGrid,
@@ -47,17 +45,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
 import { Supplier, SupplierStats } from "@/types";
 import { useToast } from "@/hooks/use-toast";
 import { useSuppliers } from "@/hooks/useSuppliers";
@@ -65,10 +52,10 @@ import { useCategories } from "@/hooks/useCategories";
 import { usePaymentTerms } from "@/hooks/usePaymentTerms";
 import { useSupplier } from "@/hooks/useSupplier";
 import { useUpdateSupplier } from "@/hooks/useUpdateSupplier";
-import { useDeleteSupplier } from "@/hooks/useDeleteSupplier";
 import { SupplierImportDialog } from "@/components/suppliers/SupplierImportDialog";
 import { Pagination } from "@/components/shared/Pagination";
 import { useAuthPermissions } from "@/hooks/useAuthPermissions";
+import { usePersistedListUiState, useResetPageOnFilterChange } from "@/hooks/usePersistedListUiState";
 import {
   Popover,
   PopoverContent,
@@ -88,9 +75,14 @@ import { cn } from "@/lib/utils";
 const SuppliersManagement = () => {
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState("");
-  const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(18);
-  const [viewMode, setViewMode] = useState<"table" | "cards">("cards");
+  const {
+    page: currentPage,
+    setPage: setCurrentPage,
+    pageSize,
+    setPageSize,
+    viewMode,
+    setViewMode,
+  } = usePersistedListUiState("contactos/lista", { defaultPageSize: 18, defaultView: "cards" });
   const [partyFilter, setPartyFilter] = useState<"all" | "SUPPLIER" | "CUSTOMER">("all");
   const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(null);
   const [isImportOpen, setIsImportOpen] = useState(false);
@@ -136,19 +128,12 @@ const SuppliersManagement = () => {
     hasPermission("contacts.suppliers.create") || hasPermission("contacts.clients.create");
   const canEditSup = hasPermission("contacts.suppliers.edit");
   const canEditCli = hasPermission("contacts.clients.edit");
-  const canDeleteSup = hasPermission("contacts.suppliers.delete");
-  const canDeleteCli = hasPermission("contacts.clients.delete");
   const canImport = hasPermission("contacts.suppliers.import");
 
   const canEditContact = (s: Supplier) =>
     s.party_type === "CUSTOMER" ? canEditCli : canEditSup;
-  const canDeleteContact = (s: Supplier) =>
-    s.party_type === "CUSTOMER" ? canDeleteCli : canDeleteSup;
 
-  // Reset page when search term or page size changes
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [searchTerm, pageSize, partyFilter]);
+  useResetPageOnFilterChange(setCurrentPage, [searchTerm, pageSize, partyFilter]);
 
   // Abrir modal de edición si venimos desde el detalle con un id específico
   useEffect(() => {
@@ -225,30 +210,6 @@ const SuppliersManagement = () => {
     setIsEditOpen(true);
   };
 
-  const deleteMutation = useDeleteSupplier();
-  const deleteMutateAsync = deleteMutation.mutateAsync;
-  const deleteIsLoading = deleteMutation.isPending;
-
-  const deleteSupplier = async (supplierId: string) => {
-    try {
-      await deleteMutateAsync(supplierId);
-      toast({ title: "Contacto eliminado", description: "Se eliminó correctamente" });
-      
-      // If current page becomes empty after deletion, go to previous page
-      if (suppliers.length === 1 && currentPage > 1) {
-        setCurrentPage(currentPage - 1);
-      }
-    } catch (err: unknown) {
-      let message = "No se pudo eliminar el contacto";
-      if (err && typeof err === "object" && "message" in err) {
-        const m = (err as { message?: unknown }).message;
-        if (m !== undefined) message = String(m) || message;
-      }
-      toast({ title: "Error", description: message });
-    }
-  };
-
-
   const getStatusBadge = (status: string | undefined) => {
     return status === "active"
       ? <Badge className="bg-liquor-gold text-liquor-bronze">Activo</Badge>
@@ -261,7 +222,9 @@ const SuppliersManagement = () => {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold text-foreground">Contactos</h2>
-          <p className="text-muted-foreground">Proveedores y clientes</p>
+          <p className="text-muted-foreground">
+            Haz clic en una fila o tarjeta para abrir el detalle. Proveedores y clientes.
+          </p>
         </div>
 
         <div className="flex gap-2">
@@ -424,12 +387,23 @@ const SuppliersManagement = () => {
                         <th className="text-left p-4 font-medium">Email</th>
                         <th className="text-left p-4 font-medium">Dirección</th>
                         <th className="text-left p-4 font-medium">Estado</th>
-                        <th className="text-right p-4 font-medium">Acciones</th>
                       </tr>
                     </thead>
                     <tbody>
                       {suppliers.map((supplier) => (
-                        <tr key={supplier.id} className="border-b hover:bg-muted/50 transition-colors">
+                        <tr
+                          key={supplier.id}
+                          role="button"
+                          tabIndex={0}
+                          className="border-b hover:bg-muted/50 transition-colors cursor-pointer"
+                          onClick={() => viewSupplier(supplier)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" || e.key === " ") {
+                              e.preventDefault();
+                              viewSupplier(supplier);
+                            }
+                          }}
+                        >
                           <td className="p-4">
                             <div className="font-medium">{supplier.name}</div>
                           </td>
@@ -472,60 +446,6 @@ const SuppliersManagement = () => {
                           <td className="p-4">
                             {getStatusBadge(String(supplier.status))}
                           </td>
-                          <td className="p-4">
-                            <div className="flex items-center justify-end gap-2">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => viewSupplier(supplier)}
-                                disabled={deleteIsLoading || updateIsLoading}
-                              >
-                                <Eye className="w-4 h-4 mr-1" />
-                                Ver
-                              </Button>
-                              <AlertDialog>
-                                <AlertDialogTrigger asChild>
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    className="text-destructive hover:text-destructive"
-                                    disabled={deleteIsLoading || !canDeleteContact(supplier)}
-                                  >
-                                    <Trash2 className="w-4 h-4 mr-1" />
-                                    Eliminar
-                                  </Button>
-                                </AlertDialogTrigger>
-                                <AlertDialogContent>
-                                  <AlertDialogHeader>
-                                    <AlertDialogTitle>¿Eliminar contacto?</AlertDialogTitle>
-                                    <AlertDialogDescription>
-                                      Esta acción no se puede deshacer. Se eliminará el contacto &quot;{supplier.name}&quot;.
-                                    </AlertDialogDescription>
-                                  </AlertDialogHeader>
-                                  <AlertDialogFooter>
-                                    <AlertDialogCancel disabled={deleteIsLoading}>Cancelar</AlertDialogCancel>
-                                    <AlertDialogAction
-                                      onClick={() => deleteSupplier(supplier.id)}
-                                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                                      disabled={deleteIsLoading}
-                                    >
-                                      {deleteIsLoading ? (
-                                        <>
-                                          <svg className="animate-spin w-4 h-4 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
-                                          </svg>
-                                          Eliminando...
-                                        </>
-                                      ) : (
-                                        "Eliminar"
-                                      )}
-                                    </AlertDialogAction>
-                                  </AlertDialogFooter>
-                                </AlertDialogContent>
-                              </AlertDialog>
-                            </div>
-                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -538,8 +458,17 @@ const SuppliersManagement = () => {
               {suppliers.map((supplier, index) => (
               <Card
                 key={supplier.id}
-                className="animate-bounce-in hover:shadow-card transition-all duration-300"
+                role="button"
+                tabIndex={0}
+                className="animate-bounce-in hover:shadow-card transition-all duration-300 cursor-pointer"
                 style={{ animationDelay: `${index * 100}ms` }}
+                onClick={() => viewSupplier(supplier)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    viewSupplier(supplier);
+                  }
+                }}
               >
                 <CardHeader className="pb-2">
                   <div className="flex items-start justify-between">
@@ -580,61 +509,6 @@ const SuppliersManagement = () => {
                       <MapPin className="w-3.5 h-3.5 text-muted-foreground mr-2 flex-shrink-0" />
                       <span className="text-foreground truncate">{supplier.address}</span>
                     </div>
-                  </div>
-
-                  {/* Acciones */}
-                  <div className="flex justify-end space-x-2 pt-3 border-t border-border">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => viewSupplier(supplier)}
-                      className="h-7 text-xs"
-                      disabled={deleteIsLoading || updateIsLoading}
-                    >
-                      <Eye className="w-3 h-3 mr-1" />
-                      Ver
-                    </Button>
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="text-destructive hover:text-destructive h-7 text-xs"
-                          disabled={deleteIsLoading || !canDeleteContact(supplier)}
-                        >
-                          <Trash2 className="w-3 h-3 mr-1" />
-                          Eliminar
-                        </Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent>
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>¿Eliminar contacto?</AlertDialogTitle>
-                          <AlertDialogDescription>
-                            Esta acción no se puede deshacer. Se eliminará el contacto &quot;{supplier.name}&quot;.
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel disabled={deleteIsLoading}>Cancelar</AlertDialogCancel>
-                          <AlertDialogAction
-                            onClick={() => deleteSupplier(supplier.id)}
-                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                            disabled={deleteIsLoading}
-                          >
-                            {deleteIsLoading ? (
-                              <>
-                                <svg className="animate-spin w-4 h-4 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
-                                </svg>
-                                Eliminando...
-                              </>
-                            ) : (
-                              "Eliminar"
-                            )}
-                          </AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
                   </div>
                 </CardContent>
               </Card>

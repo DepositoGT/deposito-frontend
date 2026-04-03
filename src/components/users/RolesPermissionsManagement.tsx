@@ -12,39 +12,30 @@ import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useRolesWithPermissions } from "@/hooks/usePermissions";
-import { useToast } from "@/hooks/use-toast";
 import { useAuthPermissions } from "@/hooks/useAuthPermissions";
-import type { Role, Permission } from "@/services/userService";
-import { deleteRole } from "@/services/userService";
-import { Shield, ArrowLeft, CheckSquare, List, LayoutGrid, Trash2, Loader2 } from "lucide-react";
+import type { Role } from "@/services/userService";
+import { Shield, ArrowLeft, List, LayoutGrid } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Pagination } from "@/components/shared/Pagination";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+import { usePersistedListUiState } from "@/hooks/usePersistedListUiState";
 
 const RolesPermissionsManagement = () => {
   const { hasPermission, isAdmin } = useAuthPermissions();
   const navigate = useNavigate();
-  const { toast } = useToast();
 
   const canViewRoles = isAdmin || hasPermission("roles.view") || hasPermission("roles.manage");
   const canManageRoles = isAdmin || hasPermission("roles.manage");
 
-  const [viewMode, setViewMode] = useState<"cards" | "table">("cards");
-  const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(18);
-  const [deletingId, setDeletingId] = useState<number | null>(null);
-  const [roleToDelete, setRoleToDelete] = useState<Role | null>(null);
+  const {
+    page: currentPage,
+    setPage: setCurrentPage,
+    pageSize,
+    setPageSize,
+    viewMode,
+    setViewMode,
+  } = usePersistedListUiState("usuarios/roles-permisos", { defaultPageSize: 18, defaultView: "cards" });
 
   const {
     data: rolesData,
@@ -56,52 +47,6 @@ const RolesPermissionsManagement = () => {
   const totalPages = rolesData?.totalPages ?? 1;
 
   const rolePermissionsCount = (role: Role) => role.permissions?.length ?? 0;
-
-  const isProtectedRole = (role: Role) => {
-    const name = role.name.toLowerCase();
-    return name === "admin" || name === "sin rol";
-  };
-
-  const handleDeleteClick = (event: React.MouseEvent<HTMLButtonElement>, role: Role) => {
-    event.stopPropagation();
-    if (isProtectedRole(role)) {
-      toast({
-        title: "Rol protegido",
-        description: `El rol "${role.name}" no puede eliminarse.`,
-        variant: "destructive",
-      });
-      return;
-    }
-    setRoleToDelete(role);
-  };
-
-  const executeDeleteRole = async (role: Role) => {
-    try {
-      setDeletingId(role.id);
-      const result = await deleteRole(role.id);
-      toast({
-        title: "Rol eliminado",
-        description:
-          result.reassignedUsers && result.reassignedUsers > 0
-            ? `Rol eliminado correctamente. ${result.reassignedUsers} usuario(s) fueron movidos a un rol neutro sin permisos.`
-            : "Rol eliminado correctamente.",
-      });
-      await refetchRoles();
-      setRoleToDelete(null);
-    } catch (error: unknown) {
-      let message = "No se pudo eliminar el rol";
-      if (error && typeof error === "object" && "message" in error) {
-        message = String((error as { message?: string }).message) || message;
-      }
-      toast({
-        title: "Error",
-        description: message,
-        variant: "destructive",
-      });
-    } finally {
-      setDeletingId(null);
-    }
-  };
 
   if (!canViewRoles) {
     return (
@@ -197,19 +142,22 @@ const RolesPermissionsManagement = () => {
                         <th className="text-left p-3 font-medium text-muted-foreground">
                           Permisos
                         </th>
-                        {canManageRoles && (
-                          <th className="text-right p-3 font-medium text-muted-foreground">
-                            Acciones
-                          </th>
-                        )}
                       </tr>
                     </thead>
                     <tbody>
                       {roles.map((role: Role) => (
                         <tr
                           key={role.id}
-                          className="border-b hover:bg-muted/50 cursor-pointer"
+                          role="button"
+                          tabIndex={0}
+                          className="border-b hover:bg-muted/50 cursor-pointer transition-colors"
                           onClick={() => navigate(`/usuarios/roles-permisos/${role.id}`)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" || e.key === " ") {
+                              e.preventDefault();
+                              navigate(`/usuarios/roles-permisos/${role.id}`);
+                            }
+                          }}
                         >
                           <td className="p-3">
                             <div className="flex items-center gap-2">
@@ -225,25 +173,6 @@ const RolesPermissionsManagement = () => {
                           <td className="p-3 text-sm text-muted-foreground">
                             {rolePermissionsCount(role)} permisos
                           </td>
-                          {canManageRoles && (
-                            <td className="p-3 text-right">
-                              {!isProtectedRole(role) && (
-                                <Button
-                                  variant="destructive"
-                                  size="icon"
-                                  className="h-8 w-8"
-                                  onClick={(event) => handleDeleteClick(event, role)}
-                                  disabled={deletingId === role.id}
-                                >
-                                  {deletingId === role.id ? (
-                                    <Loader2 className="w-4 h-4 animate-spin" />
-                                  ) : (
-                                    <Trash2 className="w-4 h-4" />
-                                  )}
-                                </Button>
-                              )}
-                            </td>
-                          )}
                         </tr>
                       ))}
                     </tbody>
@@ -254,7 +183,15 @@ const RolesPermissionsManagement = () => {
                   {roles.map((role: Role) => (
                     <div
                       key={role.id}
+                      role="button"
+                      tabIndex={0}
                       onClick={() => navigate(`/usuarios/roles-permisos/${role.id}`)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          navigate(`/usuarios/roles-permisos/${role.id}`);
+                        }
+                      }}
                       className="border rounded-lg p-4 text-left hover:bg-muted/60 transition-colors cursor-pointer flex flex-col gap-2"
                     >
                       <div className="flex items-center justify-between gap-2">
@@ -267,21 +204,6 @@ const RolesPermissionsManagement = () => {
                             </span>
                           )}
                         </div>
-                        {canManageRoles && !isProtectedRole(role) && (
-                          <Button
-                            variant="destructive"
-                            size="icon"
-                            className="h-8 w-8"
-                            onClick={(event) => handleDeleteClick(event, role)}
-                            disabled={deletingId === role.id}
-                          >
-                            {deletingId === role.id ? (
-                              <Loader2 className="w-4 h-4 animate-spin" />
-                            ) : (
-                              <Trash2 className="w-4 h-4" />
-                            )}
-                          </Button>
-                        )}
                       </div>
                       <div className="text-xs text-muted-foreground">
                         {rolePermissionsCount(role)} permisos asignados
@@ -323,28 +245,6 @@ const RolesPermissionsManagement = () => {
           </div>
         </CardContent>
       </Card>
-
-      <AlertDialog open={!!roleToDelete} onOpenChange={(open) => !open && setRoleToDelete(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>¿Eliminar rol?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Esta acción no se puede deshacer. Se eliminará el rol &quot;{roleToDelete?.name}&quot;.
-              Los usuarios que lo tengan quedarán sin rol (asignados a un rol neutro sin permisos) y se eliminarán sus permisos asociados.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={roleToDelete != null && deletingId === roleToDelete?.id}>Cancelar</AlertDialogCancel>
-            <AlertDialogAction
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              disabled={roleToDelete != null && deletingId === roleToDelete.id}
-              onClick={() => roleToDelete && executeDeleteRole(roleToDelete)}
-            >
-              {roleToDelete && deletingId === roleToDelete.id ? "Eliminando..." : "Eliminar"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 };

@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Label } from '@/components/ui/label'
-import { ArrowLeft, Edit, QrCode, Check, ChevronsUpDown } from 'lucide-react'
+import { ArrowLeft, Edit, QrCode, Check, ChevronsUpDown, Trash2 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { useAuthPermissions } from '@/hooks/useAuthPermissions'
 import { useSystemSettings } from '@/hooks/useSystemSettings'
@@ -24,6 +24,17 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { getApiBaseUrl, getAuthToken } from '@/services/api'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
+import { useDeleteProduct } from '@/hooks/useDeleteProduct'
 
 type CategoryItem = { id: number | string; name: string }
 
@@ -43,6 +54,7 @@ export default function ProductDetailPage() {
   const { toast } = useToast()
   const { hasPermission } = useAuthPermissions()
   const canEdit = hasPermission('products.edit')
+  const canDelete = hasPermission('products.delete')
   const canViewCost = hasPermission('products.create')
   const { locale, currencyCode } = useSystemSettings()
   const fmt = (n: number) => formatMoney(n, locale, currencyCode)
@@ -60,6 +72,10 @@ export default function ProductDetailPage() {
   const [isLoading, setIsLoading] = useState(false)
   const updateMutation = useUpdateProduct()
   const { mutateAsync: updateProductAsync, isPending: isSaving } = updateMutation
+  const deleteMutation = useDeleteProduct()
+  const { mutateAsync: deleteProductAsync, isPending: deleteIsLoading } = deleteMutation
+
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
 
   useEffect(() => {
     const load = async () => {
@@ -163,6 +179,19 @@ export default function ProductDetailPage() {
     )
   }
 
+  const handleDeleteProduct = async () => {
+    if (!product) return
+    try {
+      await deleteProductAsync(product.id)
+      setIsDeleteDialogOpen(false)
+      toast({ title: 'Producto eliminado', description: 'El producto fue eliminado correctamente.' })
+      navigate('/inventario')
+    } catch (err: unknown) {
+      const message = (err as { message?: string })?.message || 'No se pudo eliminar el producto'
+      toast({ title: 'Error', description: message, variant: 'destructive' })
+    }
+  }
+
   const resetEditState = () => {
     if (!product || !rawProduct) return
     setEditName(product.name ?? '')
@@ -193,15 +222,46 @@ export default function ProductDetailPage() {
             <p className="text-sm text-muted-foreground">Detalle del producto</p>
           </div>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2 justify-end">
           {canEdit && !isEditing && (
             <Button variant="outline" onClick={() => setIsEditing(true)}>
               <Edit className="w-4 h-4 mr-2" />
               Editar
             </Button>
           )}
+          {canDelete && !isEditing && (
+            <Button variant="destructive" onClick={() => setIsDeleteDialogOpen(true)}>
+              <Trash2 className="w-4 h-4 mr-2" />
+              Eliminar
+            </Button>
+          )}
         </div>
       </div>
+
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar producto?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Se eliminará «{product.name}» del inventario. Si tu sistema usa eliminación lógica, podrás restaurarlo
+              desde Inventario → Acciones → Productos eliminados.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleteIsLoading}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={deleteIsLoading}
+              onClick={(e) => {
+                e.preventDefault()
+                void handleDeleteProduct()
+              }}
+            >
+              {deleteIsLoading ? 'Eliminando…' : 'Eliminar'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <Card className={isEditing && canEdit ? 'ring-2 ring-liquor-amber/30' : ''}>
         <CardHeader>

@@ -14,7 +14,7 @@
  * This component orchestrates the cash closure management feature.
  * All UI components and business logic are extracted to sub-modules.
  */
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
@@ -49,6 +49,7 @@ import {
 } from './components'
 import { generateClosurePDF } from './generatePDF'
 import type { CashClosure } from './types'
+import { readListUiPersisted } from '@/hooks/usePersistedListUiState'
 
 const CashClosureManagement = () => {
     const { toast } = useToast()
@@ -83,12 +84,31 @@ const CashClosureManagement = () => {
     const [supervisorName] = useState(user?.name || user?.email || '')
     const [showConfirmSaveDialog, setShowConfirmSaveDialog] = useState(false)
 
-    // Load closures on mount and when filters change
+    const historyFilterSigRef = useRef<string | null>(null)
+    const historyFirstLoadRef = useRef(true)
+
+    // Load closures on mount and when filters change (restaura página al volver; pág. 1 si cambian filtros)
     useEffect(() => {
         const filters = (historyStatus || historyStartDate || historyEndDate)
             ? { status: historyStatus || undefined, startDate: historyStartDate || undefined, endDate: historyEndDate || undefined }
             : undefined
-        api.fetchClosures(1, form.isSeller, undefined, filters)
+        const sig = JSON.stringify({
+            st: filters?.status ?? '',
+            sd: filters?.startDate ?? '',
+            ed: filters?.endDate ?? '',
+        })
+        let page = 1
+        if (historyFirstLoadRef.current) {
+            historyFirstLoadRef.current = false
+            const s = readListUiPersisted('cierre-caja/historial')
+            page = Math.max(1, Number(s.page) || 1)
+        } else if (historyFilterSigRef.current !== sig) {
+            page = 1
+        } else {
+            page = api.currentPage
+        }
+        historyFilterSigRef.current = sig
+        void api.fetchClosures(page, form.isSeller, undefined, filters)
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [historyStatus, historyStartDate, historyEndDate])
 
@@ -363,6 +383,9 @@ const CashClosureManagement = () => {
                         <FileText className="h-5 w-5" />
                         {form.isSeller ? 'Último Cierre de Caja' : 'Historial de Cierres'}
                     </CardTitle>
+                    <p className="text-sm text-muted-foreground pt-1">
+                        Haz clic en un cierre para ver el detalle, descargar PDF o aprobar / rechazar según tu rol.
+                    </p>
                 </CardHeader>
                 <CardContent>
                     <div className="space-y-4">

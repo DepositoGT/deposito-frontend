@@ -21,7 +21,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
-import { ArrowLeft, Edit, Mail, Phone, MapPin, Calendar, Briefcase, Loader2 } from 'lucide-react'
+import { ArrowLeft, Edit, Mail, Phone, MapPin, Calendar, Briefcase, Loader2, Trash2 } from 'lucide-react'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { useToast } from '@/hooks/use-toast'
@@ -36,6 +36,17 @@ import {
   type Role,
   type UpdateUserPayload,
 } from '@/services/userService'
+import { useDeleteUser } from '@/hooks/useDeleteUser'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 
 export default function UserDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -45,6 +56,11 @@ export default function UserDetailPage() {
   const { hasPermission } = useAuthPermissions()
 
   const canEdit = hasPermission('users.edit')
+  const canDelete = hasPermission('users.delete')
+
+  const deleteUserMutation = useDeleteUser()
+  const { mutateAsync: deleteUserAsync, isPending: deleteIsLoading } = deleteUserMutation
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
 
   const [user, setUser] = useState<User | null>(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -121,6 +137,30 @@ export default function UserDetailPage() {
     setEditHireDate(user.hire_date ? format(new Date(user.hire_date), 'yyyy-MM-dd') : '')
     setEditPassword('')
     setEditRoleId(String(user.role_id))
+  }
+
+  const handleDeleteUser = async () => {
+    if (!user) return
+    if (currentUser?.id === user.id) {
+      toast({
+        title: 'Acción no permitida',
+        description: 'No puedes eliminar tu propia cuenta',
+        variant: 'destructive',
+      })
+      return
+    }
+    try {
+      await deleteUserAsync(user.id)
+      setIsDeleteDialogOpen(false)
+      toast({ title: 'Usuario eliminado', description: 'El usuario ha sido eliminado correctamente.' })
+      navigate('/usuarios')
+    } catch (err: unknown) {
+      let message = 'No se pudo eliminar el usuario'
+      if (err && typeof err === 'object' && 'message' in err) {
+        message = String((err as { message?: unknown }).message) || message
+      }
+      toast({ title: 'Error', description: message, variant: 'destructive' })
+    }
   }
 
   const handleSave = async () => {
@@ -250,15 +290,53 @@ export default function UserDetailPage() {
             <p className="text-sm text-muted-foreground">Detalle del usuario</p>
           </div>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2 justify-end">
           {canEdit && !isEditing && (
             <Button variant="outline" onClick={() => setIsEditing(true)}>
               <Edit className="w-4 h-4 mr-2" />
               Editar
             </Button>
           )}
+          {canDelete && !isEditing && currentUser?.id !== user.id && (
+            <Button variant="destructive" onClick={() => setIsDeleteDialogOpen(true)} disabled={deleteIsLoading}>
+              <Trash2 className="w-4 h-4 mr-2" />
+              Eliminar
+            </Button>
+          )}
         </div>
       </div>
+
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar usuario?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta acción no se puede deshacer. Se eliminará permanentemente el usuario «{user.name}» del
+              sistema.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleteIsLoading}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={deleteIsLoading}
+              onClick={(e) => {
+                e.preventDefault()
+                void handleDeleteUser()
+              }}
+            >
+              {deleteIsLoading ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Eliminando…
+                </>
+              ) : (
+                'Eliminar'
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <Card className={isEditing && canEdit ? 'ring-2 ring-liquor-amber/30' : ''}>
         <CardHeader>

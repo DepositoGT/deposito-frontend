@@ -8,30 +8,26 @@
  * For licensing inquiries: GitHub @dpatzan2
  */
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { useUsers } from "@/hooks/useUsers";
 import { useUpdateUser } from "@/hooks/useUpdateUser";
-import { useDeleteUser } from "@/hooks/useDeleteUser";
 import { useRoles } from "@/hooks/useRoles";
 import {
   UserPlus,
   Edit,
-  Trash2,
   Shield,
   Mail,
   User as UserIcon,
   Search,
   X,
-  Eye,
   LayoutGrid,
   List,
   FileUp,
@@ -42,6 +38,7 @@ import { useAuthPermissions } from "@/hooks/useAuthPermissions";
 import type { User } from "@/services/userService";
 import { Pagination } from "@/components/shared/Pagination";
 import { useNavigate } from "react-router-dom";
+import { usePersistedListUiState, useResetPageOnFilterChange } from "@/hooks/usePersistedListUiState";
 
 // Componente para mostrar avatar de usuario con fallback
 const UserAvatar = ({ user }: { user: User }) => {
@@ -99,11 +96,15 @@ const UserManagement = () => {
   // Búsqueda y filtros
   const [searchTerm, setSearchTerm] = useState("");
   const [filterRole, setFilterRole] = useState<string>("all");
-  const [viewMode, setViewMode] = useState<"table" | "cards">("cards");
-  
-  // Paginación
-  const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(18);
+
+  const {
+    page: currentPage,
+    setPage: setCurrentPage,
+    pageSize,
+    setPageSize,
+    viewMode,
+    setViewMode,
+  } = usePersistedListUiState("usuarios/lista", { defaultPageSize: 18, defaultView: "cards" });
 
 
   // Queries
@@ -119,11 +120,9 @@ const UserManagement = () => {
 
   // Mutations
   const updateUserMutation = useUpdateUser();
-  const deleteUserMutation = useDeleteUser();
 
   // Estados de carga
   const [isUpdating, setIsUpdating] = useState(false);
-  const [deletingUserId, setDeletingUserId] = useState<string | null>(null);
 
   // Función para resetear formulario de creación
   // Función para abrir modal de edición
@@ -233,50 +232,7 @@ const UserManagement = () => {
     }
   };
 
-  // Función para eliminar usuario
-  const handleDeleteUser = async (userId: string) => {
-    // No permitir eliminar el usuario actual
-    if (currentUser?.id === userId) {
-      toast({ 
-        title: "Acción no permitida", 
-        description: "No puedes eliminar tu propia cuenta",
-        variant: "destructive" 
-      });
-      return;
-    }
-
-    setDeletingUserId(userId);
-    try {
-      await deleteUserMutation.mutateAsync(userId);
-      toast({ 
-        title: "Usuario eliminado", 
-        description: "El usuario ha sido eliminado correctamente" 
-      });
-      // Refrescar la lista de usuarios
-      const result = await refetchUsers();
-      // Si la página actual queda vacía y hay páginas anteriores, ir a la anterior
-      if (result.data && result.data.items.length === 0 && result.data.page > 1) {
-        setCurrentPage(result.data.page - 1);
-      }
-    } catch (err: unknown) {
-      let message = "No se pudo eliminar el usuario";
-      if (err && typeof err === "object" && "message" in err) {
-        message = String(err.message) || message;
-      }
-      toast({ 
-        title: "Error", 
-        description: message,
-        variant: "destructive" 
-      });
-    } finally {
-      setDeletingUserId(null);
-    }
-  };
-
-  // Resetear página cuando cambian los filtros o el tamaño de página
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [searchTerm, filterRole, pageSize]);
+  useResetPageOnFilterChange(setCurrentPage, [searchTerm, filterRole, pageSize]);
 
   // Los usuarios ya vienen filtrados del backend
   const filteredUsers = users;
@@ -322,7 +278,7 @@ const UserManagement = () => {
         <div>
           <h2 className="text-3xl font-bold tracking-tight">Gestión de Usuarios</h2>
           <p className="text-muted-foreground">
-            Administra usuarios del sistema
+            Haz clic en una fila o tarjeta para ver el detalle. Administra usuarios del sistema.
           </p>
         </div>
         <div className="flex gap-2">
@@ -485,12 +441,23 @@ const UserManagement = () => {
                     <th className="text-left p-4 font-medium">Usuario</th>
                     <th className="text-left p-4 font-medium">Email</th>
                     <th className="text-left p-4 font-medium">Rol</th>
-                    <th className="text-right p-4 font-medium">Acciones</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filteredUsers.map((user: User) => (
-                    <tr key={user.id} className="border-b hover:bg-muted/50 transition-colors">
+                    <tr
+                      key={user.id}
+                      role="button"
+                      tabIndex={0}
+                      className="border-b hover:bg-muted/50 transition-colors cursor-pointer"
+                      onClick={() => navigate(`/usuarios/${user.id}`)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          navigate(`/usuarios/${user.id}`);
+                        }
+                      }}
+                    >
                       <td className="p-4">
                         <div className="flex items-center gap-3">
                           <UserAvatar user={user} />
@@ -511,60 +478,6 @@ const UserManagement = () => {
                       <td className="p-4">
                         {getRoleBadge(user.role?.name || 'Sin rol')}
                       </td>
-                      <td className="p-4">
-                        <div className="flex items-center justify-end gap-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => navigate(`/usuarios/${user.id}`)}
-                          >
-                            <Eye className="w-4 h-4 mr-1" />
-                            Ver
-                          </Button>
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className="text-destructive hover:text-destructive"
-                                disabled={currentUser?.id === user.id || deletingUserId === user.id}
-                              >
-                                {deletingUserId === user.id ? (
-                                  <>
-                                    <svg className="animate-spin w-4 h-4 mr-1" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
-                                    </svg>
-                                    Eliminando...
-                                  </>
-                                ) : (
-                                  <>
-                                    <Trash2 className="w-4 h-4 mr-1" />
-                                    Eliminar
-                                  </>
-                                )}
-                              </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>¿Eliminar Usuario?</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  Esta acción no se puede deshacer. Se eliminará permanentemente el usuario "{user.name}" del sistema.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                <AlertDialogAction
-                                  onClick={() => handleDeleteUser(user.id)}
-                                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                                >
-                                  Eliminar
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
-                        </div>
-                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -575,8 +488,16 @@ const UserManagement = () => {
               {filteredUsers.map((user: User) => (
                 <div
                   key={user.id}
+                  role="button"
+                  tabIndex={0}
                   className="border rounded-lg p-4 hover:bg-muted/50 transition-colors cursor-pointer"
                   onClick={() => navigate(`/usuarios/${user.id}`)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      navigate(`/usuarios/${user.id}`);
+                    }
+                  }}
                 >
                   <div className="flex items-center gap-3 mb-3">
                     <UserAvatar user={user} />
@@ -593,57 +514,6 @@ const UserManagement = () => {
                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
                     <Mail className="w-3 h-3 flex-shrink-0" />
                     <span className="truncate">{user.email}</span>
-                  </div>
-                  <div className="flex items-center justify-end gap-2 mt-3 pt-3 border-t">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        navigate(`/usuarios/${user.id}`)
-                      }}
-                      className="flex-1"
-                    >
-                      <Eye className="w-4 h-4 mr-1" />
-                      Ver
-                    </Button>
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="text-destructive hover:text-destructive"
-                          disabled={currentUser?.id === user.id || deletingUserId === user.id}
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          {deletingUserId === user.id ? (
-                            <svg className="animate-spin w-4 h-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
-                            </svg>
-                          ) : (
-                            <Trash2 className="w-4 h-4" />
-                          )}
-                        </Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent>
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>¿Eliminar Usuario?</AlertDialogTitle>
-                          <AlertDialogDescription>
-                            Esta acción no se puede deshacer. Se eliminará permanentemente el usuario "{user.name}" del sistema.
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                          <AlertDialogAction
-                            onClick={() => handleDeleteUser(user.id)}
-                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                          >
-                            Eliminar
-                          </AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
                   </div>
                 </div>
               ))}

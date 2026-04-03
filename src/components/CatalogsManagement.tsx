@@ -8,7 +8,7 @@
  * For licensing inquiries: GitHub @dpatzan2
  */
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs'
 import { Button } from './ui/button'
@@ -30,6 +30,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from './ui/dialog'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from './ui/alert-dialog'
 import { Badge } from './ui/badge'
 import { useToast } from '../hooks/use-toast'
 import {
@@ -48,13 +58,11 @@ import {
   useRestoreProductCategory,
   ProductCategory,
 } from '../hooks/useProductCategories'
-import { useProducts, useRestoreProduct } from '../hooks/useProducts'
-import { adaptApiProduct } from '../services/productService'
-import type { Product } from '../types'
 import { Pencil, Trash2, Plus, RotateCcw, Loader2, FileUp } from 'lucide-react'
 import { CatalogImportDialog } from './catalogs/CatalogImportDialog'
 import { Pagination } from './shared/Pagination'
 import { useAuthPermissions } from '../hooks/useAuthPermissions'
+import { usePersistedListUiState, useResetPageOnFilterChange } from '../hooks/usePersistedListUiState'
 
 // Tipos para los diálogos
 type PaymentTermDialogState = {
@@ -100,10 +108,9 @@ export function CatalogsManagement() {
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <div className="overflow-x-auto -mx-3 px-3 sm:mx-0 sm:px-0">
-          <TabsList className="inline-flex w-auto min-w-full sm:grid sm:grid-cols-3">
+          <TabsList className="inline-flex w-auto min-w-full sm:grid sm:grid-cols-2">
             <TabsTrigger value="payment-terms" className="text-xs sm:text-sm whitespace-nowrap">Términos de Pago</TabsTrigger>
             <TabsTrigger value="categories" className="text-xs sm:text-sm whitespace-nowrap">Categorías</TabsTrigger>
-            <TabsTrigger value="deleted-products" className="text-xs sm:text-sm whitespace-nowrap">Eliminados</TabsTrigger>
           </TabsList>
         </div>
 
@@ -131,10 +138,6 @@ export function CatalogsManagement() {
               setIsImportDialogOpen(true)
             }}
           />
-        </TabsContent>
-
-        <TabsContent value="deleted-products" className="space-y-4">
-          <DeletedProductsTab />
         </TabsContent>
       </Tabs>
 
@@ -177,8 +180,11 @@ function PaymentTermsTab({
   const { toast } = useToast()
   const { hasPermission } = useAuthPermissions()
   const canManageCatalogs = hasPermission('catalogs.manage')
-  const [currentPage, setCurrentPage] = useState(1)
-  const [pageSize] = useState(10)
+  const { page: currentPage, setPage: setCurrentPage, pageSize } = usePersistedListUiState(
+    'catalogs/payment-terms',
+    { defaultPage: 1, defaultPageSize: 10 }
+  )
+  useResetPageOnFilterChange(setCurrentPage, [showDeleted])
   
   const { data: paymentTermsData, isLoading } = usePaymentTerms({
     page: currentPage,
@@ -186,22 +192,17 @@ function PaymentTermsTab({
     includeDeleted: showDeleted,
   })
   const paymentTerms = paymentTermsData?.items || []
-  
-  // Debug: verificar datos de paginación
-  console.log('PaymentTermsData:', paymentTermsData)
+
   const deleteMutation = useDeletePaymentTerm()
   const restoreMutation = useRestorePaymentTerm()
-  
-  // Reset page when showDeleted changes
-  useEffect(() => {
-    setCurrentPage(1)
-  }, [showDeleted])
+  const [deleteConfirmTerm, setDeleteConfirmTerm] = useState<PaymentTerm | null>(null)
+  const [restoreConfirmTerm, setRestoreConfirmTerm] = useState<PaymentTerm | null>(null)
 
-  const handleDelete = async (id: number) => {
-    if (!confirm('¿Estás seguro de eliminar este término de pago?')) return
-
+  const confirmDeletePaymentTerm = async () => {
+    if (!deleteConfirmTerm) return
     try {
-      await deleteMutation.mutateAsync(id)
+      await deleteMutation.mutateAsync(deleteConfirmTerm.id)
+      setDeleteConfirmTerm(null)
       toast({
         title: 'Término eliminado',
         description: 'El término de pago ha sido eliminado correctamente',
@@ -216,9 +217,11 @@ function PaymentTermsTab({
     }
   }
 
-  const handleRestore = async (id: number) => {
+  const confirmRestorePaymentTerm = async () => {
+    if (!restoreConfirmTerm) return
     try {
-      await restoreMutation.mutateAsync(id)
+      await restoreMutation.mutateAsync(restoreConfirmTerm.id)
+      setRestoreConfirmTerm(null)
       toast({
         title: 'Término restaurado',
         description: 'El término de pago ha sido restaurado correctamente',
@@ -316,7 +319,7 @@ function PaymentTermsTab({
                             <Button
                               variant="outline"
                               size="icon"
-                              onClick={() => handleRestore(term.id)}
+                              onClick={() => setRestoreConfirmTerm(term)}
                               disabled={restoreMutation.isPending}
                             >
                               {restoreMutation.isPending ? (
@@ -337,7 +340,7 @@ function PaymentTermsTab({
                               <Button
                                 variant="destructive"
                                 size="icon"
-                                onClick={() => handleDelete(term.id)}
+                                onClick={() => setDeleteConfirmTerm(term)}
                                 disabled={deleteMutation.isPending}
                               >
                                 {deleteMutation.isPending ? (
@@ -370,6 +373,67 @@ function PaymentTermsTab({
           </div>
         )}
       </CardContent>
+
+      <AlertDialog
+        open={!!deleteConfirmTerm}
+        onOpenChange={(open) => {
+          if (!open) setDeleteConfirmTerm(null)
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar término de pago?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {deleteConfirmTerm
+                ? `Se marcará como eliminado «${deleteConfirmTerm.name}». Podrás restaurarlo desde «Ver eliminados».`
+                : ''}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleteMutation.isPending}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={deleteMutation.isPending}
+              onClick={(e) => {
+                e.preventDefault()
+                void confirmDeletePaymentTerm()
+              }}
+            >
+              {deleteMutation.isPending ? 'Eliminando…' : 'Eliminar'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={!!restoreConfirmTerm}
+        onOpenChange={(open) => {
+          if (!open) setRestoreConfirmTerm(null)
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Restaurar término de pago?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {restoreConfirmTerm
+                ? `«${restoreConfirmTerm.name}» volverá a estar activo y disponible para asignar a proveedores.`
+                : ''}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={restoreMutation.isPending}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={restoreMutation.isPending}
+              onClick={(e) => {
+                e.preventDefault()
+                void confirmRestorePaymentTerm()
+              }}
+            >
+              {restoreMutation.isPending ? 'Restaurando…' : 'Restaurar'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   )
 }
@@ -391,8 +455,11 @@ function ProductCategoriesTab({
   const { toast } = useToast()
   const { hasPermission } = useAuthPermissions()
   const canManageCatalogs = hasPermission('catalogs.manage')
-  const [currentPage, setCurrentPage] = useState(1)
-  const [pageSize] = useState(10)
+  const { page: currentPage, setPage: setCurrentPage, pageSize } = usePersistedListUiState(
+    'catalogs/categories',
+    { defaultPage: 1, defaultPageSize: 10 }
+  )
+  useResetPageOnFilterChange(setCurrentPage, [showDeleted])
   
   const { data: categoriesData, isLoading } = useProductCategories({
     page: currentPage,
@@ -400,22 +467,17 @@ function ProductCategoriesTab({
     includeDeleted: showDeleted,
   })
   const categories = categoriesData?.items || []
-  
-  // Debug: verificar datos de paginación
-  console.log('CategoriesData:', categoriesData)
+
   const deleteMutation = useDeleteProductCategory()
   const restoreMutation = useRestoreProductCategory()
-  
-  // Reset page when showDeleted changes
-  useEffect(() => {
-    setCurrentPage(1)
-  }, [showDeleted])
+  const [deleteConfirmCategory, setDeleteConfirmCategory] = useState<ProductCategory | null>(null)
+  const [restoreConfirmCategory, setRestoreConfirmCategory] = useState<ProductCategory | null>(null)
 
-  const handleDelete = async (id: number) => {
-    if (!confirm('¿Estás seguro de eliminar esta categoría?')) return
-
+  const confirmDeleteCategory = async () => {
+    if (!deleteConfirmCategory) return
     try {
-      await deleteMutation.mutateAsync(id)
+      await deleteMutation.mutateAsync(deleteConfirmCategory.id)
+      setDeleteConfirmCategory(null)
       toast({
         title: 'Categoría eliminada',
         description: 'La categoría ha sido eliminada correctamente',
@@ -430,9 +492,11 @@ function ProductCategoriesTab({
     }
   }
 
-  const handleRestore = async (id: number) => {
+  const confirmRestoreCategory = async () => {
+    if (!restoreConfirmCategory) return
     try {
-      await restoreMutation.mutateAsync(id)
+      await restoreMutation.mutateAsync(restoreConfirmCategory.id)
+      setRestoreConfirmCategory(null)
       toast({
         title: 'Categoría restaurada',
         description: 'La categoría ha sido restaurada correctamente',
@@ -532,7 +596,7 @@ function ProductCategoriesTab({
                             <Button
                               variant="outline"
                               size="icon"
-                              onClick={() => handleRestore(category.id)}
+                              onClick={() => setRestoreConfirmCategory(category)}
                               disabled={restoreMutation.isPending}
                             >
                               {restoreMutation.isPending ? (
@@ -553,7 +617,7 @@ function ProductCategoriesTab({
                               <Button
                                 variant="destructive"
                                 size="icon"
-                                onClick={() => handleDelete(category.id)}
+                                onClick={() => setDeleteConfirmCategory(category)}
                                 disabled={deleteMutation.isPending}
                               >
                                 {deleteMutation.isPending ? (
@@ -586,6 +650,67 @@ function ProductCategoriesTab({
           </div>
         )}
       </CardContent>
+
+      <AlertDialog
+        open={!!deleteConfirmCategory}
+        onOpenChange={(open) => {
+          if (!open) setDeleteConfirmCategory(null)
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar categoría?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {deleteConfirmCategory
+                ? `Se marcará como eliminada «${deleteConfirmCategory.name}». Podrás restaurarla desde «Ver eliminados».`
+                : ''}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleteMutation.isPending}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={deleteMutation.isPending}
+              onClick={(e) => {
+                e.preventDefault()
+                void confirmDeleteCategory()
+              }}
+            >
+              {deleteMutation.isPending ? 'Eliminando…' : 'Eliminar'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={!!restoreConfirmCategory}
+        onOpenChange={(open) => {
+          if (!open) setRestoreConfirmCategory(null)
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Restaurar categoría?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {restoreConfirmCategory
+                ? `«${restoreConfirmCategory.name}» volverá a estar activa y disponible para productos.`
+                : ''}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={restoreMutation.isPending}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={restoreMutation.isPending}
+              onClick={(e) => {
+                e.preventDefault()
+                void confirmRestoreCategory()
+              }}
+            >
+              {restoreMutation.isPending ? 'Restaurando…' : 'Restaurar'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   )
 }
@@ -816,155 +941,3 @@ function ProductCategoryDialog({
   )
 }
 
-// ========================================
-// Deleted Products Tab Component
-// ========================================
-
-function DeletedProductsTab() {
-  const { toast } = useToast()
-  const [currentPage, setCurrentPage] = useState(1)
-  const [pageSize] = useState(20)
-  
-  // Fetch all products with includeDeleted=true, then filter deleted ones
-  // Use a large pageSize to get all deleted products, then paginate client-side
-  const { data: allProductsData, isLoading: isLoadingAll, error } = useProducts({
-    page: 1,
-    pageSize: 1000,
-    includeDeleted: true,
-  })
-  
-  // Filter only deleted products and paginate client-side
-  const allDeletedProducts = (allProductsData?.items || [])
-    .map(adaptApiProduct)
-    .filter((p) => p.deleted === true)
-  
-  const totalPages = Math.max(1, Math.ceil(allDeletedProducts.length / pageSize))
-  const startIndex = (currentPage - 1) * pageSize
-  const endIndex = startIndex + pageSize
-  const products = allDeletedProducts.slice(startIndex, endIndex)
-  
-  const restoreMutation = useRestoreProduct()
-  
-  // Reset to page 1 if current page is out of bounds
-  useEffect(() => {
-    if (currentPage > totalPages && totalPages > 0) {
-      setCurrentPage(1)
-    }
-  }, [currentPage, totalPages])
-
-  const handleRestore = async (product: Product) => {
-    if (!confirm(`¿Restaurar el producto "${product.name}"?`)) return
-
-    try {
-      await restoreMutation.mutateAsync(product.id)
-      toast({
-        title: 'Producto restaurado',
-        description: `El producto "${product.name}" ha sido restaurado exitosamente`,
-      })
-    } catch (error) {
-      const apiError = error as { response?: { data?: { message?: string } } }
-      toast({
-        title: 'Error',
-        description: apiError.response?.data?.message || 'No se pudo restaurar el producto',
-        variant: 'destructive',
-      })
-    }
-  }
-
-  if (error) {
-    return (
-      <Card>
-        <CardContent className="pt-6">
-          <p className="text-center text-red-600">Error al cargar productos eliminados</p>
-        </CardContent>
-      </Card>
-    )
-  }
-
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Productos Eliminados</CardTitle>
-        <CardDescription>
-          Restaura productos que fueron eliminados anteriormente
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        {isLoadingAll ? (
-          <div className="flex justify-center py-8">
-            <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
-          </div>
-        ) : products.length === 0 ? (
-          <p className="text-center text-muted-foreground py-8">
-            No hay productos eliminados
-          </p>
-        ) : (
-          <div className="rounded-md border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Nombre</TableHead>
-                  <TableHead>Categoría</TableHead>
-                  <TableHead>Marca</TableHead>
-                  <TableHead>Stock</TableHead>
-                  <TableHead>Proveedor</TableHead>
-                  <TableHead className="text-right">Acciones</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {products.map((product) => (
-                  <TableRow key={product.id}>
-                    <TableCell className="font-medium">{product.name}</TableCell>
-                    <TableCell>
-                      {typeof product.category === 'string'
-                        ? product.category
-                        : (product.category as { name: string }).name || '-'}
-                    </TableCell>
-                    <TableCell>{product.brand || '-'}</TableCell>
-                    <TableCell>
-                      <Badge variant={product.stock > 0 ? 'default' : 'secondary'}>
-                        {product.stock}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      {typeof product.supplier === 'string'
-                        ? product.supplier
-                        : (product.supplier as { name: string })?.name || '-'}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => handleRestore(product)}
-                        disabled={restoreMutation.isPending}
-                      >
-                        {restoreMutation.isPending ? (
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                        ) : (
-                          <>
-                            <RotateCcw className="w-4 h-4 mr-2" />
-                            Restaurar
-                          </>
-                        )}
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        )}
-        {totalPages > 1 && (
-          <Pagination
-            currentPage={currentPage}
-            totalPages={totalPages}
-            onPageChange={setCurrentPage}
-            hasNextPage={currentPage < totalPages}
-            hasPrevPage={currentPage > 1}
-            loading={isLoadingAll}
-          />
-        )}
-      </CardContent>
-    </Card>
-  )
-}
