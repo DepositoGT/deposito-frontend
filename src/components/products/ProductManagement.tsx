@@ -21,8 +21,8 @@ import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Label } from '@/components/ui/label'
 import {
-    Plus, Search, Filter, Trash2, Eye, ScanLine, Download, MoreVertical,
-    QrCode, PackagePlus, ChevronLeft, ChevronRight, Upload, LayoutGrid, List, Package,
+    Plus, Search, Filter, ScanLine, Download,
+    QrCode, Upload, LayoutGrid, List, Package,
     ClipboardList, ChevronDown, RotateCcw,
 } from 'lucide-react'
 import {
@@ -35,17 +35,12 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import {
-    AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
-    AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle
-} from '@/components/ui/alert-dialog'
 import { Checkbox } from '@/components/ui/checkbox'
 import { useToast } from '@/hooks/use-toast'
 import type { Product } from '@/types'
 import { useProducts } from '@/hooks/useProducts'
 import { useSuppliers } from '@/hooks/useSuppliers'
 import { useCategories } from '@/hooks/useCategories'
-import { useDeleteProduct } from '@/hooks/useDeleteProduct'
 import { adaptApiProduct, fetchAllProducts } from '@/services/productService'
 import { Pagination } from '@/components/shared/Pagination'
 
@@ -72,9 +67,7 @@ const ProductManagement = () => {
     const [pageSize, setPageSize] = useState(18) // Default page size
 
     // Dialog states
-    const [isViewProductOpen, setIsViewProductOpen] = useState(false)
     const [isScannerOpen, setIsScannerOpen] = useState(false)
-    const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
     const [isImportDialogOpen, setIsImportDialogOpen] = useState(false)
     const [isExportDialogOpen, setIsExportDialogOpen] = useState(false)
     const [viewMode, setViewMode] = useState<'table' | 'cards'>('cards')
@@ -99,13 +92,10 @@ const ProductManagement = () => {
     const [selectedIds, setSelectedIds] = useState<string[]>([])
     const [selectingAllPages, setSelectingAllPages] = useState(false)
 
-    // Selected product
-    const [selectedProduct, setSelectedProduct] = useState<Product | null>(null)
-    const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null)
     const [scannedCode, setScannedCode] = useState('')
 
     // Data hooks
-    const { data: productsData, isLoading, isError, refetch: refetchProducts } = useProducts({
+    const { data: productsData, isLoading, isError } = useProducts({
         page: currentPage,
         pageSize: pageSize,
         search: searchTerm || undefined,
@@ -118,10 +108,6 @@ const ProductManagement = () => {
         if (!productsData?.items) return []
         return productsData.items.map(adaptApiProduct)
     }, [productsData])
-    // Mutations
-    const deleteMutation = useDeleteProduct()
-    const { mutateAsync: deleteMutateAsync, isPending: deleteIsLoading } = deleteMutation
-
     // Categories list
     const categories = useMemo(() => {
         const base = ['all'] as string[]
@@ -168,7 +154,6 @@ const ProductManagement = () => {
     const canImport = hasPermission('products.import')
     const canExport = canImport && hasPermission('products.view', 'reports.view')
     const canCreate = hasPermission('products.create')
-    const canEdit = hasPermission('products.edit')
     const canDelete = hasPermission('products.delete')
     const canRegisterIncoming = hasPermission('products.register_incoming')
     const canInventoryCount = hasPermission(
@@ -207,26 +192,6 @@ const ProductManagement = () => {
         return <Badge className="bg-liquor-gold text-liquor-bronze">Disponible</Badge>
     }
 
-    // CRUD handlers
-    const handleDeleteProduct = async () => {
-        if (!deleteTargetId) return
-        try {
-            await deleteMutateAsync(deleteTargetId)
-            setIsDeleteDialogOpen(false)
-            setDeleteTargetId(null)
-            toast({ title: 'Producto eliminado', description: 'El producto fue eliminado correctamente' })
-            // Ajustar página si es necesario
-            const result = await refetchProducts()
-            if (result.data && result.data.items.length === 0 && result.data.page > 1) {
-                setCurrentPage(result.data.page - 1)
-            }
-        } catch (err: unknown) {
-            const message = (err as { message?: string })?.message || 'No se pudo eliminar el producto'
-            toast({ title: 'Error', description: message, variant: 'destructive' })
-        }
-    }
-
-
     // View/Edit handlers
     const viewProduct = (product: Product) => {
         navigate(`/inventario/${product.id}`)
@@ -251,7 +216,8 @@ const ProductManagement = () => {
                 <div className="min-w-0 flex-1">
                     <h2 className="text-lg sm:text-2xl font-bold text-foreground">Inventario</h2>
                     <p className="text-xs sm:text-sm text-muted-foreground">
-                        Busca y filtra abajo. Las demás operaciones están en <span className="font-medium text-foreground/80">Acciones</span>.
+                        Haz clic en una fila o tarjeta para abrir el detalle. Busca y filtra abajo; las demás operaciones están en{' '}
+                        <span className="font-medium text-foreground/80">Acciones</span>.
                     </p>
                 </div>
                 <div className="flex flex-wrap items-center justify-end gap-2 shrink-0">
@@ -480,13 +446,29 @@ const ProductManagement = () => {
                                                 <th className="text-center p-3 font-medium text-muted-foreground">Stock</th>
                                                 <th className="text-right p-3 font-medium text-muted-foreground">Precio</th>
                                                 <th className="text-center p-3 font-medium text-muted-foreground">Estado</th>
-                                                <th className="text-center p-3 font-medium text-muted-foreground">Acciones</th>
                                             </tr>
                                         </thead>
                                         <tbody>
                                             {paginatedProducts.map((product, index) => (
-                                                <tr key={product.id} className="border-b border-border hover:bg-muted transition-colors animate-slide-up" style={{ animationDelay: `${index * 50}ms` }}>
-                                                    <td className="p-3 w-10">
+                                                <tr
+                                                    key={product.id}
+                                                    role="button"
+                                                    tabIndex={0}
+                                                    className="border-b border-border hover:bg-muted transition-colors animate-slide-up cursor-pointer"
+                                                    style={{ animationDelay: `${index * 50}ms` }}
+                                                    onClick={() => viewProduct(product)}
+                                                    onKeyDown={(e) => {
+                                                        if (e.key === 'Enter' || e.key === ' ') {
+                                                            e.preventDefault()
+                                                            viewProduct(product)
+                                                        }
+                                                    }}
+                                                >
+                                                    <td
+                                                        className="p-3 w-10"
+                                                        onClick={(e) => e.stopPropagation()}
+                                                        onKeyDown={(e) => e.stopPropagation()}
+                                                    >
                                                         <Checkbox
                                                             checked={selectedSet.has(product.id)}
                                                             onCheckedChange={() => toggleSelection(product.id)}
@@ -510,25 +492,6 @@ const ProductManagement = () => {
                                                         )}
                                                     </td>
                                                     <td className="p-3 text-center">{getStatusBadge(product)}</td>
-                                                    <td className="p-3 text-center">
-                                                        <DropdownMenu>
-                                                            <DropdownMenuTrigger asChild>
-                                                                <Button variant="ghost" size="sm"><MoreVertical className="w-4 h-4" /></Button>
-                                                            </DropdownMenuTrigger>
-                                                            <DropdownMenuContent align="end" className="bg-popover border-border">
-                                                                <DropdownMenuItem onClick={() => viewProduct(product)}><Eye className="w-4 h-4 mr-2" />Ver Detalles</DropdownMenuItem>
-                                                                <DropdownMenuItem onClick={() => viewProduct(product)}><ScanLine className="w-4 h-4 mr-2" />Ver Código</DropdownMenuItem>
-                                                                {canDelete && (
-                                                                    <DropdownMenuItem
-                                                                        className="text-destructive"
-                                                                        onClick={() => { setDeleteTargetId(product.id); setIsDeleteDialogOpen(true) }}
-                                                                    >
-                                                                        <Trash2 className="w-4 h-4 mr-2" />Eliminar
-                                                                    </DropdownMenuItem>
-                                                                )}
-                                                            </DropdownMenuContent>
-                                                        </DropdownMenu>
-                                                    </td>
                                                 </tr>
                                             ))}
                                         </tbody>
@@ -540,8 +503,17 @@ const ProductManagement = () => {
                                     {paginatedProducts.map((product, index) => (
                                         <div
                                             key={product.id}
-                                            className="border border-border rounded-lg p-4 bg-card shadow-sm hover:shadow-md transition-shadow animate-slide-up"
+                                            role="button"
+                                            tabIndex={0}
+                                            className="border border-border rounded-lg p-4 bg-card shadow-sm hover:shadow-md transition-shadow animate-slide-up cursor-pointer"
                                             style={{ animationDelay: `${index * 50}ms` }}
+                                            onClick={() => viewProduct(product)}
+                                            onKeyDown={(e) => {
+                                                if (e.key === 'Enter' || e.key === ' ') {
+                                                    e.preventDefault()
+                                                    viewProduct(product)
+                                                }
+                                            }}
                                         >
                                             <div className="flex items-start gap-3">
                                                 <div className="w-16 h-16 rounded-md overflow-hidden bg-muted flex items-center justify-center border border-border">
@@ -588,20 +560,6 @@ const ProductManagement = () => {
                                                     </div>
                                                 </div>
                                             </div>
-                                            <div className="mt-3 flex flex-wrap gap-2">
-                                                <Button size="sm" variant="outline" onClick={() => viewProduct(product)}>
-                                                    <Eye className="w-3 h-3 mr-1" /> Detalles
-                                                </Button>
-                                                {canDelete && (
-                                                    <Button
-                                                        size="sm"
-                                                        variant="destructive"
-                                                        onClick={() => { setDeleteTargetId(product.id); setIsDeleteDialogOpen(true) }}
-                                                    >
-                                                        <Trash2 className="w-3 h-3 mr-1" /> Eliminar
-                                                    </Button>
-                                                )}
-                                            </div>
                                         </div>
                                     ))}
                                 </div>
@@ -640,30 +598,6 @@ const ProductManagement = () => {
                     )}
                 </CardContent>
             </Card>
-
-            {/* Delete Confirmation */}
-            <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-                <AlertDialogContent>
-                    <AlertDialogHeader>
-                        <AlertDialogTitle>¿Eliminar Producto?</AlertDialogTitle>
-                        <AlertDialogDescription>
-                            Esta acción no se puede deshacer. Se eliminará permanentemente el producto seleccionado.
-                        </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                        <AlertDialogCancel onClick={() => { setDeleteTargetId(null); setIsDeleteDialogOpen(false) }} disabled={deleteIsLoading}>
-                            Cancelar
-                        </AlertDialogCancel>
-                        <AlertDialogAction
-                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                            disabled={deleteIsLoading}
-                            onClick={handleDeleteProduct}
-                        >
-                            {deleteIsLoading ? 'Eliminando...' : 'Eliminar'}
-                        </AlertDialogAction>
-                    </AlertDialogFooter>
-                </AlertDialogContent>
-            </AlertDialog>
 
             {/* Import Dialog */}
             <ImportDialog
