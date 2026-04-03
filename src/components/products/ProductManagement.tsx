@@ -21,26 +21,26 @@ import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Label } from '@/components/ui/label'
 import {
-    Plus, Search, Filter, Trash2, Eye, ScanLine, Download, MoreVertical,
-    QrCode, PackagePlus, ChevronLeft, ChevronRight, Upload, LayoutGrid, List, Package,
-    ClipboardList,
+    Plus, Search, Filter, ScanLine, Download,
+    QrCode, Upload, LayoutGrid, List, Package,
+    ClipboardList, ChevronDown, RotateCcw,
 } from 'lucide-react'
 import {
-    DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+    DropdownMenuSeparator,
+    DropdownMenuLabel,
 } from '@/components/ui/dropdown-menu'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
-import {
-    AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
-    AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle
-} from '@/components/ui/alert-dialog'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Checkbox } from '@/components/ui/checkbox'
 import { useToast } from '@/hooks/use-toast'
 import type { Product } from '@/types'
 import { useProducts } from '@/hooks/useProducts'
 import { useSuppliers } from '@/hooks/useSuppliers'
 import { useCategories } from '@/hooks/useCategories'
-import { useDeleteProduct } from '@/hooks/useDeleteProduct'
 import { adaptApiProduct, fetchAllProducts } from '@/services/productService'
 import { Pagination } from '@/components/shared/Pagination'
 
@@ -48,6 +48,7 @@ import { Pagination } from '@/components/shared/Pagination'
 import { ImportDialog } from './components'
 import { useAuthPermissions } from '@/hooks/useAuthPermissions'
 import { useSystemSettings } from '@/hooks/useSystemSettings'
+import { usePersistedListUiState, useResetPageOnFilterChange } from '@/hooks/usePersistedListUiState'
 import { useNavigate } from 'react-router-dom'
 import { formatMoney } from '@/utils'
 
@@ -62,17 +63,19 @@ const ProductManagement = () => {
     const [searchTerm, setSearchTerm] = useState('')
     const [categoryFilter, setCategoryFilter] = useState('all')
 
-    // Pagination
-    const [currentPage, setCurrentPage] = useState(1)
-    const [pageSize, setPageSize] = useState(18) // Default page size
+    const {
+        page: currentPage,
+        setPage: setCurrentPage,
+        pageSize,
+        setPageSize,
+        viewMode,
+        setViewMode,
+    } = usePersistedListUiState('inventario/productos', { defaultPageSize: 18, defaultView: 'cards' })
 
     // Dialog states
-    const [isViewProductOpen, setIsViewProductOpen] = useState(false)
     const [isScannerOpen, setIsScannerOpen] = useState(false)
-    const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
     const [isImportDialogOpen, setIsImportDialogOpen] = useState(false)
     const [isExportDialogOpen, setIsExportDialogOpen] = useState(false)
-    const [viewMode, setViewMode] = useState<'table' | 'cards'>('cards')
     const EXPORT_COLUMNS: { id: string; label: string }[] = [
         { id: 'name', label: 'Nombre' },
         { id: 'category', label: 'Categoría' },
@@ -94,13 +97,10 @@ const ProductManagement = () => {
     const [selectedIds, setSelectedIds] = useState<string[]>([])
     const [selectingAllPages, setSelectingAllPages] = useState(false)
 
-    // Selected product
-    const [selectedProduct, setSelectedProduct] = useState<Product | null>(null)
-    const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null)
     const [scannedCode, setScannedCode] = useState('')
 
     // Data hooks
-    const { data: productsData, isLoading, isError, refetch: refetchProducts } = useProducts({
+    const { data: productsData, isLoading, isError } = useProducts({
         page: currentPage,
         pageSize: pageSize,
         search: searchTerm || undefined,
@@ -113,10 +113,6 @@ const ProductManagement = () => {
         if (!productsData?.items) return []
         return productsData.items.map(adaptApiProduct)
     }, [productsData])
-    // Mutations
-    const deleteMutation = useDeleteProduct()
-    const { mutateAsync: deleteMutateAsync, isPending: deleteIsLoading } = deleteMutation
-
     // Categories list
     const categories = useMemo(() => {
         const base = ['all'] as string[]
@@ -126,8 +122,7 @@ const ProductManagement = () => {
         return base.concat(['Whisky', 'Vinos', 'Cervezas', 'Rones', 'Vodkas', 'Tequilas', 'Ginebras'])
     }, [categoriesData])
 
-    // Reset page on filter change
-    useEffect(() => setCurrentPage(1), [searchTerm, categoryFilter, pageSize])
+    useResetPageOnFilterChange(setCurrentPage, [searchTerm, categoryFilter, pageSize])
 
     // Products are already filtered and paginated by the backend
     const paginatedProducts = products
@@ -163,7 +158,6 @@ const ProductManagement = () => {
     const canImport = hasPermission('products.import')
     const canExport = canImport && hasPermission('products.view', 'reports.view')
     const canCreate = hasPermission('products.create')
-    const canEdit = hasPermission('products.edit')
     const canDelete = hasPermission('products.delete')
     const canRegisterIncoming = hasPermission('products.register_incoming')
     const canInventoryCount = hasPermission(
@@ -171,6 +165,8 @@ const ProductManagement = () => {
         'inventory_count.count',
         'inventory_count.create'
     )
+    const hasFileActions = canExport || canImport
+    const hasStockActions = canRegisterIncoming || canInventoryCount
 
     // Export handler: pass selected fields for table PDF, or none for full card layout. If selectedIds.length > 0, only those products are exported.
     const handleExport = async (fields?: string[], ids?: string[], includeSummary?: boolean) => {
@@ -200,26 +196,6 @@ const ProductManagement = () => {
         return <Badge className="bg-liquor-gold text-liquor-bronze">Disponible</Badge>
     }
 
-    // CRUD handlers
-    const handleDeleteProduct = async () => {
-        if (!deleteTargetId) return
-        try {
-            await deleteMutateAsync(deleteTargetId)
-            setIsDeleteDialogOpen(false)
-            setDeleteTargetId(null)
-            toast({ title: 'Producto eliminado', description: 'El producto fue eliminado correctamente' })
-            // Ajustar página si es necesario
-            const result = await refetchProducts()
-            if (result.data && result.data.items.length === 0 && result.data.page > 1) {
-                setCurrentPage(result.data.page - 1)
-            }
-        } catch (err: unknown) {
-            const message = (err as { message?: string })?.message || 'No se pudo eliminar el producto'
-            toast({ title: 'Error', description: message, variant: 'destructive' })
-        }
-    }
-
-
     // View/Edit handlers
     const viewProduct = (product: Product) => {
         navigate(`/inventario/${product.id}`)
@@ -240,86 +216,137 @@ const ProductManagement = () => {
     return (
         <div className="p-3 sm:p-6 space-y-4 sm:space-y-6 animate-fade-in">
             {/* Header */}
-            <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:justify-between">
-                <div className="min-w-0">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div className="min-w-0 flex-1">
                     <h2 className="text-lg sm:text-2xl font-bold text-foreground">Inventario</h2>
-                    <p className="text-xs sm:text-sm text-muted-foreground">Administra tu catálogo</p>
+                    <p className="text-xs sm:text-sm text-muted-foreground">
+                        Haz clic en una fila o tarjeta para abrir el detalle. Busca y filtra abajo; las demás operaciones están en{' '}
+                        <span className="font-medium text-foreground/80">Acciones</span>.
+                    </p>
                 </div>
-                <div className="flex gap-2 overflow-x-auto pb-1 -mx-3 px-3 sm:mx-0 sm:px-0 sm:overflow-visible">
-                    {canExport && (
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            className="shrink-0"
-                            onClick={() => {
-                                if (selectedIds.length > 0 && viewMode === 'cards') setExportSelectedFields([])
-                                setIsExportDialogOpen(true)
-                            }}
-                        >
-                            <Download className="w-4 h-4 sm:mr-2" /><span className="hidden sm:inline">Exportar</span>
-                        </Button>
-                    )}
-                    {canImport && (
-                        <Button variant="outline" onClick={() => setIsImportDialogOpen(true)} size="sm" className="shrink-0">
-                            <Upload className="w-4 h-4 sm:mr-2" /><span className="hidden sm:inline">Importar</span>
-                        </Button>
-                    )}
-                    {canRegisterIncoming && (
-                        <Button
-                            variant="outline"
-                            onClick={() => navigate('/inventario/registrar-ingreso')}
-                            size="sm"
-                            className="shrink-0"
-                        >
-                            <Package className="w-4 h-4 sm:mr-2" /><span className="hidden sm:inline">Registrar Ingreso</span>
-                        </Button>
-                    )}
-                    {canInventoryCount && (
-                        <Button
-                            variant="outline"
-                            onClick={() => navigate('/inventario/inventariado')}
-                            size="sm"
-                            className="shrink-0"
-                        >
-                            <ClipboardList className="w-4 h-4 sm:mr-2" /><span className="hidden sm:inline">Inventariado</span>
-                        </Button>
-                    )}
-                    <Dialog open={isScannerOpen} onOpenChange={setIsScannerOpen}>
-                        <DialogTrigger asChild>
-                            <Button variant="outline" size="sm" className="shrink-0"><ScanLine className="w-4 h-4 sm:mr-2" /><span className="hidden sm:inline">Escanear</span></Button>
-                        </DialogTrigger>
-                        <DialogContent className="max-w-md">
-                            <DialogHeader><DialogTitle>Escáner de Códigos</DialogTitle></DialogHeader>
-                            <div className="space-y-4">
-                                <div className="text-center">
-                                    <QrCode className="w-24 h-24 mx-auto text-muted-foreground mb-4" />
-                                    <p className="text-muted-foreground">Ingrese el código de barras manualmente</p>
-                                </div>
-                                <div>
-                                    <Label htmlFor="scannedCode">Código de Barras</Label>
-                                    <Input
-                                        id="scannedCode"
-                                        placeholder="7501001234567"
-                                        value={scannedCode}
-                                        onChange={e => setScannedCode(e.target.value)}
-                                        onKeyPress={e => e.key === 'Enter' && searchByBarcode()}
-                                    />
-                                </div>
-                                <div className="flex space-x-2">
-                                    <Button variant="outline" className="flex-1" onClick={() => setIsScannerOpen(false)}>Cancelar</Button>
-                                    <Button className="flex-1" onClick={searchByBarcode}>Buscar</Button>
-                                </div>
-                            </div>
-                        </DialogContent>
-                    </Dialog>
+                <div className="flex flex-wrap items-center justify-end gap-2 shrink-0">
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                className="gap-1.5 min-w-[7.5rem] sm:min-w-0"
+                                aria-label="Menú de acciones del inventario"
+                            >
+                                Acciones
+                                <ChevronDown className="h-4 w-4 opacity-70 shrink-0" aria-hidden />
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-56">
+                            {hasFileActions && (
+                                <>
+                                    <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
+                                        Importar / exportar
+                                    </DropdownMenuLabel>
+                                    {canExport && (
+                                        <DropdownMenuItem
+                                            onClick={() => {
+                                                if (selectedIds.length > 0 && viewMode === 'cards') {
+                                                    setExportSelectedFields([])
+                                                }
+                                                setIsExportDialogOpen(true)
+                                            }}
+                                        >
+                                            <Download className="mr-2 h-4 w-4" />
+                                            Exportar PDF
+                                        </DropdownMenuItem>
+                                    )}
+                                    {canImport && (
+                                        <DropdownMenuItem onClick={() => setIsImportDialogOpen(true)}>
+                                            <Upload className="mr-2 h-4 w-4" />
+                                            Importar
+                                        </DropdownMenuItem>
+                                    )}
+                                </>
+                            )}
+                            {hasFileActions && hasStockActions && <DropdownMenuSeparator />}
+                            {hasStockActions && (
+                                <>
+                                    <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
+                                        Almacén
+                                    </DropdownMenuLabel>
+                                    {canRegisterIncoming && (
+                                        <DropdownMenuItem
+                                            onClick={() => navigate('/inventario/registrar-ingreso')}
+                                        >
+                                            <Package className="mr-2 h-4 w-4" />
+                                            Registrar ingreso
+                                        </DropdownMenuItem>
+                                    )}
+                                    {canInventoryCount && (
+                                        <DropdownMenuItem onClick={() => navigate('/inventario/inventariado')}>
+                                            <ClipboardList className="mr-2 h-4 w-4" />
+                                            Inventariado
+                                        </DropdownMenuItem>
+                                    )}
+                                </>
+                            )}
+                            {canDelete && (
+                                <>
+                                    {(hasFileActions || hasStockActions) && <DropdownMenuSeparator />}
+                                    <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
+                                        Productos
+                                    </DropdownMenuLabel>
+                                    <DropdownMenuItem onClick={() => navigate('/inventario/eliminados')}>
+                                        <RotateCcw className="mr-2 h-4 w-4" />
+                                        Productos eliminados
+                                    </DropdownMenuItem>
+                                </>
+                            )}
+                            {(hasFileActions || hasStockActions || canDelete) && <DropdownMenuSeparator />}
+                            <DropdownMenuItem onClick={() => setIsScannerOpen(true)}>
+                                <ScanLine className="mr-2 h-4 w-4" />
+                                Escanear código
+                            </DropdownMenuItem>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
                     {canCreate && (
-                        <Button size="sm" className="shrink-0" onClick={() => navigate('/inventario/nuevo')}>
-                            <Plus className="w-4 h-4 sm:mr-2" />
-                            <span className="hidden sm:inline">Nuevo Producto</span>
+                        <Button size="sm" className="shrink-0 gap-1.5" onClick={() => navigate('/inventario/nuevo')}>
+                            <Plus className="h-4 w-4 shrink-0" />
+                            <span className="sm:hidden">Nuevo</span>
+                            <span className="hidden sm:inline">Nuevo producto</span>
                         </Button>
                     )}
                 </div>
             </div>
+
+            <Dialog open={isScannerOpen} onOpenChange={setIsScannerOpen}>
+                <DialogContent className="max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>Escáner de códigos</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4">
+                        <div className="text-center">
+                            <QrCode className="w-24 h-24 mx-auto text-muted-foreground mb-4" />
+                            <p className="text-muted-foreground text-sm">Ingrese el código de barras manualmente</p>
+                        </div>
+                        <div>
+                            <Label htmlFor="scannedCode">Código de barras</Label>
+                            <Input
+                                id="scannedCode"
+                                placeholder="7501001234567"
+                                value={scannedCode}
+                                onChange={(e) => setScannedCode(e.target.value)}
+                                onKeyDown={(e) => e.key === 'Enter' && searchByBarcode()}
+                            />
+                        </div>
+                        <div className="flex gap-2">
+                            <Button variant="outline" className="flex-1" onClick={() => setIsScannerOpen(false)}>
+                                Cancelar
+                            </Button>
+                            <Button className="flex-1" onClick={searchByBarcode}>
+                                Buscar
+                            </Button>
+                        </div>
+                    </div>
+                </DialogContent>
+            </Dialog>
 
             {/* Filters */}
             <Card>
@@ -423,13 +450,29 @@ const ProductManagement = () => {
                                                 <th className="text-center p-3 font-medium text-muted-foreground">Stock</th>
                                                 <th className="text-right p-3 font-medium text-muted-foreground">Precio</th>
                                                 <th className="text-center p-3 font-medium text-muted-foreground">Estado</th>
-                                                <th className="text-center p-3 font-medium text-muted-foreground">Acciones</th>
                                             </tr>
                                         </thead>
                                         <tbody>
                                             {paginatedProducts.map((product, index) => (
-                                                <tr key={product.id} className="border-b border-border hover:bg-muted transition-colors animate-slide-up" style={{ animationDelay: `${index * 50}ms` }}>
-                                                    <td className="p-3 w-10">
+                                                <tr
+                                                    key={product.id}
+                                                    role="button"
+                                                    tabIndex={0}
+                                                    className="border-b border-border hover:bg-muted transition-colors animate-slide-up cursor-pointer"
+                                                    style={{ animationDelay: `${index * 50}ms` }}
+                                                    onClick={() => viewProduct(product)}
+                                                    onKeyDown={(e) => {
+                                                        if (e.key === 'Enter' || e.key === ' ') {
+                                                            e.preventDefault()
+                                                            viewProduct(product)
+                                                        }
+                                                    }}
+                                                >
+                                                    <td
+                                                        className="p-3 w-10"
+                                                        onClick={(e) => e.stopPropagation()}
+                                                        onKeyDown={(e) => e.stopPropagation()}
+                                                    >
                                                         <Checkbox
                                                             checked={selectedSet.has(product.id)}
                                                             onCheckedChange={() => toggleSelection(product.id)}
@@ -453,25 +496,6 @@ const ProductManagement = () => {
                                                         )}
                                                     </td>
                                                     <td className="p-3 text-center">{getStatusBadge(product)}</td>
-                                                    <td className="p-3 text-center">
-                                                        <DropdownMenu>
-                                                            <DropdownMenuTrigger asChild>
-                                                                <Button variant="ghost" size="sm"><MoreVertical className="w-4 h-4" /></Button>
-                                                            </DropdownMenuTrigger>
-                                                            <DropdownMenuContent align="end" className="bg-popover border-border">
-                                                                <DropdownMenuItem onClick={() => viewProduct(product)}><Eye className="w-4 h-4 mr-2" />Ver Detalles</DropdownMenuItem>
-                                                                <DropdownMenuItem onClick={() => viewProduct(product)}><ScanLine className="w-4 h-4 mr-2" />Ver Código</DropdownMenuItem>
-                                                                {canDelete && (
-                                                                    <DropdownMenuItem
-                                                                        className="text-destructive"
-                                                                        onClick={() => { setDeleteTargetId(product.id); setIsDeleteDialogOpen(true) }}
-                                                                    >
-                                                                        <Trash2 className="w-4 h-4 mr-2" />Eliminar
-                                                                    </DropdownMenuItem>
-                                                                )}
-                                                            </DropdownMenuContent>
-                                                        </DropdownMenu>
-                                                    </td>
                                                 </tr>
                                             ))}
                                         </tbody>
@@ -483,8 +507,17 @@ const ProductManagement = () => {
                                     {paginatedProducts.map((product, index) => (
                                         <div
                                             key={product.id}
-                                            className="border border-border rounded-lg p-4 bg-card shadow-sm hover:shadow-md transition-shadow animate-slide-up"
+                                            role="button"
+                                            tabIndex={0}
+                                            className="border border-border rounded-lg p-4 bg-card shadow-sm hover:shadow-md transition-shadow animate-slide-up cursor-pointer"
                                             style={{ animationDelay: `${index * 50}ms` }}
+                                            onClick={() => viewProduct(product)}
+                                            onKeyDown={(e) => {
+                                                if (e.key === 'Enter' || e.key === ' ') {
+                                                    e.preventDefault()
+                                                    viewProduct(product)
+                                                }
+                                            }}
                                         >
                                             <div className="flex items-start gap-3">
                                                 <div className="w-16 h-16 rounded-md overflow-hidden bg-muted flex items-center justify-center border border-border">
@@ -531,20 +564,6 @@ const ProductManagement = () => {
                                                     </div>
                                                 </div>
                                             </div>
-                                            <div className="mt-3 flex flex-wrap gap-2">
-                                                <Button size="sm" variant="outline" onClick={() => viewProduct(product)}>
-                                                    <Eye className="w-3 h-3 mr-1" /> Detalles
-                                                </Button>
-                                                {canDelete && (
-                                                    <Button
-                                                        size="sm"
-                                                        variant="destructive"
-                                                        onClick={() => { setDeleteTargetId(product.id); setIsDeleteDialogOpen(true) }}
-                                                    >
-                                                        <Trash2 className="w-3 h-3 mr-1" /> Eliminar
-                                                    </Button>
-                                                )}
-                                            </div>
                                         </div>
                                     ))}
                                 </div>
@@ -583,30 +602,6 @@ const ProductManagement = () => {
                     )}
                 </CardContent>
             </Card>
-
-            {/* Delete Confirmation */}
-            <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-                <AlertDialogContent>
-                    <AlertDialogHeader>
-                        <AlertDialogTitle>¿Eliminar Producto?</AlertDialogTitle>
-                        <AlertDialogDescription>
-                            Esta acción no se puede deshacer. Se eliminará permanentemente el producto seleccionado.
-                        </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                        <AlertDialogCancel onClick={() => { setDeleteTargetId(null); setIsDeleteDialogOpen(false) }} disabled={deleteIsLoading}>
-                            Cancelar
-                        </AlertDialogCancel>
-                        <AlertDialogAction
-                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                            disabled={deleteIsLoading}
-                            onClick={handleDeleteProduct}
-                        >
-                            {deleteIsLoading ? 'Eliminando...' : 'Eliminar'}
-                        </AlertDialogAction>
-                    </AlertDialogFooter>
-                </AlertDialogContent>
-            </AlertDialog>
 
             {/* Import Dialog */}
             <ImportDialog

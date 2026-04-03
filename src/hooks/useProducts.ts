@@ -37,21 +37,21 @@ export const useAllProducts = () => {
   });
 };
 
-export const useDeletedProducts = () => {
+export const useDeletedProducts = (options?: { enabled?: boolean }) => {
+  const enabled = options?.enabled !== false;
   return useQuery<Product[], Error>({
     queryKey: ["products", "deleted"],
     queryFn: async () => {
-      // Fetch all deleted products with a large page size
-      const response = await fetchProducts({ 
-        page: 1, 
-        pageSize: 1000, 
-        includeDeleted: true 
+      const response = await fetchProducts({
+        page: 1,
+        pageSize: 1000,
+        includeDeleted: true,
       });
-      // Adapt and filter only deleted products from the response
       const allProducts = response.items.map(adaptApiProduct);
       return allProducts.filter((p) => p.deleted === true);
     },
-    staleTime: 30 * 1000, // 30 seconds
+    staleTime: 30 * 1000,
+    enabled,
   });
 };
 

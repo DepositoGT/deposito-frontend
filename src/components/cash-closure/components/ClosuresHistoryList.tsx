@@ -13,7 +13,7 @@
  */
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Eye, ChevronLeft, ChevronRight } from 'lucide-react'
+import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { useSystemSettings } from '@/hooks/useSystemSettings'
 import type { CashClosure } from '../types'
 import { formatCurrency, formatDateTime, toNumber } from '../types'
@@ -63,9 +63,18 @@ export const ClosuresHistoryList = ({
                 {closures.map((closure) => (
                     <div
                         key={closure.id}
-                        className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors"
+                        role="button"
+                        tabIndex={0}
+                        className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors cursor-pointer"
+                        onClick={() => onViewClosure(closure.id)}
+                        onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                                e.preventDefault()
+                                onViewClosure(closure.id)
+                            }
+                        }}
                     >
-                        <div className="space-y-1">
+                        <div className="space-y-1 min-w-0">
                             <div className="flex items-center gap-2">
                                 <span className="font-semibold">Cierre #{closure.closure_number}</span>
                                 {getStatusBadge(closure.status)}
@@ -75,16 +84,13 @@ export const ClosuresHistoryList = ({
                                 <p>Cajero: {closure.cashier_name}</p>
                             </div>
                         </div>
-                        <div className="flex items-center gap-4">
+                        <div className="flex items-center gap-4 shrink-0">
                             <div className="text-right">
                                 <p className="font-bold">{formatCurrency(closure.actual_total, currencyCode, locale)}</p>
                                 <p className={`text-sm ${toNumber(closure.difference) === 0 ? 'text-green-600' : toNumber(closure.difference) > 0 ? 'text-orange-600' : 'text-red-600'}`}>
                                     {toNumber(closure.difference) >= 0 ? '+' : ''}{formatCurrency(closure.difference, currencyCode, locale)}
                                 </p>
                             </div>
-                            <Button variant="outline" size="sm" onClick={() => onViewClosure(closure.id)}>
-                                <Eye className="h-4 w-4" />
-                            </Button>
                         </div>
                     </div>
                 ))}

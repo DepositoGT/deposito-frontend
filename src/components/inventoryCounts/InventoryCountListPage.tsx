@@ -4,10 +4,10 @@
  * Lista de sesiones de inventariado.
  */
 
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { useState } from "react";
-import { ClipboardList, Plus, Play, ArrowRight } from "lucide-react";
+import { ClipboardList, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -26,19 +26,15 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { useToast } from "@/hooks/use-toast";
 import { useAuthPermissions } from "@/hooks/useAuthPermissions";
 import {
   listInventorySessions,
-  startInventorySession,
   statusLabel,
   type InventoryCountSessionSummary,
 } from "@/services/inventoryCountService";
 
 export default function InventoryCountListPage() {
   const navigate = useNavigate();
-  const { toast } = useToast();
-  const queryClient = useQueryClient();
   const { hasPermission } = useAuthPermissions();
 
   const canCreate = hasPermission("inventory_count.create");
@@ -50,19 +46,6 @@ export default function InventoryCountListPage() {
         limit: 80,
         ...(statusFilter ? { status: statusFilter } : {}),
       }),
-  });
-
-  const startMut = useMutation({
-    mutationFn: (id: string) => startInventorySession(id),
-    onSuccess: (_, id) => {
-      queryClient.invalidateQueries({ queryKey: ["inventory-sessions"] });
-      toast({ title: "Conteo iniciado", description: "Ya puede registrar cantidades." });
-      navigate(`/inventario/inventariado/${id}`);
-    },
-    onError: (err: unknown) => {
-      const msg = err instanceof Error ? err.message : "No se pudo iniciar";
-      toast({ title: "Error", description: msg, variant: "destructive" });
-    },
   });
 
   const sessions = data?.data ?? [];
@@ -96,7 +79,12 @@ export default function InventoryCountListPage() {
 
       <Card>
         <CardHeader className="pb-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 space-y-0">
-          <CardTitle className="text-base">Sesiones</CardTitle>
+          <div className="space-y-1">
+            <CardTitle className="text-base">Sesiones</CardTitle>
+            <p className="text-xs sm:text-sm text-muted-foreground font-normal">
+              Haz clic en una fila para abrir la sesión. En borrador, use «Iniciar conteo» en el detalle.
+            </p>
+          </div>
           <Select value={statusFilter || "all"} onValueChange={(v) => setStatusFilter(v === "all" ? "" : v)}>
             <SelectTrigger className="w-full sm:w-[200px]">
               <SelectValue placeholder="Todos los estados" />
@@ -129,15 +117,27 @@ export default function InventoryCountListPage() {
                     <TableHead>Nombre / ID</TableHead>
                     <TableHead>Estado</TableHead>
                     <TableHead className="text-right">Progreso</TableHead>
-                    <TableHead className="text-right">Acciones</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {sessions.map((row) => {
                     const prog = row.progress;
                     const label = row.name?.trim() || row.id.slice(0, 8);
+                    const go = () => navigate(`/inventario/inventariado/${row.id}`);
                     return (
-                      <TableRow key={row.id}>
+                      <TableRow
+                        key={row.id}
+                        role="button"
+                        tabIndex={0}
+                        className="cursor-pointer hover:bg-muted/50"
+                        onClick={go}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            go();
+                          }
+                        }}
+                      >
                         <TableCell className="font-medium max-w-[200px] truncate" title={row.id}>
                           {label}
                         </TableCell>
@@ -150,36 +150,6 @@ export default function InventoryCountListPage() {
                           {prog
                             ? `${prog.countedLines}/${prog.totalLines} (${prog.pct}%)`
                             : "—"}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex justify-end gap-1 flex-wrap">
-                            {row.status === "DRAFT" && canCreate && (
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                disabled={startMut.isPending}
-                                onClick={() => startMut.mutate(row.id)}
-                              >
-                                <Play className="h-3 w-3 mr-1" />
-                                Iniciar
-                              </Button>
-                            )}
-                            {(row.status === "IN_PROGRESS" ||
-                              row.status === "IN_REVIEW" ||
-                              row.status === "APPROVED" ||
-                              row.status === "CANCELLED") && (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => navigate(`/inventario/inventariado/${row.id}`)}
-                              >
-                                <ArrowRight className="h-3 w-3 mr-1" />
-                                {row.status === "IN_PROGRESS" || row.status === "IN_REVIEW"
-                                  ? "Abrir"
-                                  : "Ver"}
-                              </Button>
-                            )}
-                          </div>
                         </TableCell>
                       </TableRow>
                     );

@@ -11,13 +11,16 @@
 /**
  * useCashClosureAPI - Hook for cash closure API operations
  */
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { useToast } from '@/hooks/use-toast'
+import { readListUiPersisted, writeListUiPersisted } from '@/hooks/usePersistedListUiState'
 import { useSystemSettings } from '@/hooks/useSystemSettings'
 import { getApiBaseUrl, getAuthToken } from '@/services/api'
 import type { CashClosure, TheoreticalData, PaymentMethodBreakdown, Denomination } from '../types'
 
 const API_URL = getApiBaseUrl()
+const CLOSURE_HISTORY_KEY = 'cierre-caja/historial'
+const CLOSURE_PAGE_SIZES = [5, 10, 25, 50, 100] as const
 
 interface FetchClosuresResponse {
     closures: CashClosure[]
@@ -105,9 +108,20 @@ export const useCashClosureAPI = (): UseCashClosureAPIReturn => {
     const [isLoadingClosures, setIsLoadingClosures] = useState(false)
     const [theoreticalData, setTheoreticalData] = useState<TheoreticalData | null>(null)
     const [closures, setClosures] = useState<CashClosure[]>([])
-    const [currentPage, setCurrentPage] = useState(1)
+    const [currentPage, setCurrentPage] = useState(() => {
+        const s = readListUiPersisted(CLOSURE_HISTORY_KEY)
+        return Math.max(1, Number(s.page) || 1)
+    })
     const [totalPages, setTotalPages] = useState(1)
-    const [pageSize, setPageSize] = useState(10)
+    const [pageSize, setPageSize] = useState(() => {
+        const s = readListUiPersisted(CLOSURE_HISTORY_KEY)
+        const n = Number(s.pageSize)
+        return CLOSURE_PAGE_SIZES.includes(n as (typeof CLOSURE_PAGE_SIZES)[number]) ? n : 10
+    })
+
+    useEffect(() => {
+        writeListUiPersisted(CLOSURE_HISTORY_KEY, { page: currentPage, pageSize })
+    }, [currentPage, pageSize])
 
     const getAuthHeaders = () => ({
         'Content-Type': 'application/json',
@@ -282,7 +296,7 @@ export const useCashClosureAPI = (): UseCashClosureAPIReturn => {
         } finally {
             setIsLoadingClosures(false)
         }
-    }, [toast])
+    }, [toast, pageSize])
 
     const fetchClosureDetail = useCallback(async (closureId: string): Promise<CashClosure | null> => {
         try {

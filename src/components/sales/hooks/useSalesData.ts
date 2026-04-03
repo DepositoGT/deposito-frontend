@@ -11,8 +11,9 @@
 /**
  * useSalesData - Custom hook for managing sales data and filters
  */
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useSalesByStatus } from '@/hooks/useSales'
+import { readListUiPersisted, writeListUiPersisted } from '@/hooks/usePersistedListUiState'
 import { Sale, PaymentMethod, SaleStatus } from '@/types'
 import type { SaleStatusKey, SaleFilters } from '../types'
 
@@ -32,6 +33,20 @@ const mapStatusNameToKey = (name?: string): SaleStatusKey => {
     if (n.includes('complet')) return 'completed'
     if (n.includes('cancel')) return 'cancelled'
     return 'completed'
+}
+
+const SALES_LIST_KEY = 'ventas/list'
+
+function readSalesPagesState(): Record<SaleStatusKey, number> {
+    const s = readListUiPersisted(SALES_LIST_KEY)
+    const sp = s.salesPages as Record<string, unknown> | undefined
+    if (sp && typeof sp === 'object') {
+        return {
+            completed: Math.max(1, Number(sp.completed) || 1),
+            cancelled: Math.max(1, Number(sp.cancelled) || 1),
+        }
+    }
+    return { completed: 1, cancelled: 1 }
 }
 
 export const normalizeRawSale = (raw: unknown): Sale => {
@@ -218,12 +233,20 @@ export const useSalesData = (): UseSalesDataReturn => {
     const [paymentFilter, setPaymentFilter] = useState<PaymentMethod | 'all'>('all')
     const [period, setPeriod] = useState('today')
 
-    const [pages, setPages] = useState<Record<SaleStatusKey, number>>({
-        completed: 1,
-        cancelled: 1,
+    const [pages, setPages] = useState<Record<SaleStatusKey, number>>(readSalesPagesState)
+
+    const [pageSize, setPageSize] = useState(() => {
+        const s = readListUiPersisted(SALES_LIST_KEY)
+        const n = Number(s.salesPageSize)
+        return Number.isFinite(n) && n >= 1 ? Math.floor(n) : 10
     })
 
-    const [pageSize, setPageSize] = useState(10)
+    useEffect(() => {
+        writeListUiPersisted(SALES_LIST_KEY, {
+            salesPages: { completed: pages.completed, cancelled: pages.cancelled },
+            salesPageSize: pageSize,
+        })
+    }, [pages, pageSize])
 
     // Queries per status (solo Completada y Cancelada)
     const completedQuery = useSalesByStatus('Completada', { period, page: pages.completed, pageSize })
