@@ -23,13 +23,18 @@ import { Label } from '@/components/ui/label'
 import {
     Plus, Search, Filter, Trash2, Eye, ScanLine, Download, MoreVertical,
     QrCode, PackagePlus, ChevronLeft, ChevronRight, Upload, LayoutGrid, List, Package,
-    ClipboardList,
+    ClipboardList, ChevronDown,
 } from 'lucide-react'
 import {
-    DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+    DropdownMenuSeparator,
+    DropdownMenuLabel,
 } from '@/components/ui/dropdown-menu'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import {
     AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
     AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle
@@ -171,6 +176,8 @@ const ProductManagement = () => {
         'inventory_count.count',
         'inventory_count.create'
     )
+    const hasFileActions = canExport || canImport
+    const hasStockActions = canRegisterIncoming || canInventoryCount
 
     // Export handler: pass selected fields for table PDF, or none for full card layout. If selectedIds.length > 0, only those products are exported.
     const handleExport = async (fields?: string[], ids?: string[], includeSummary?: boolean) => {
@@ -240,86 +247,124 @@ const ProductManagement = () => {
     return (
         <div className="p-3 sm:p-6 space-y-4 sm:space-y-6 animate-fade-in">
             {/* Header */}
-            <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:justify-between">
-                <div className="min-w-0">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div className="min-w-0 flex-1">
                     <h2 className="text-lg sm:text-2xl font-bold text-foreground">Inventario</h2>
-                    <p className="text-xs sm:text-sm text-muted-foreground">Administra tu catálogo</p>
+                    <p className="text-xs sm:text-sm text-muted-foreground">
+                        Busca y filtra abajo. Las demás operaciones están en <span className="font-medium text-foreground/80">Acciones</span>.
+                    </p>
                 </div>
-                <div className="flex gap-2 overflow-x-auto pb-1 -mx-3 px-3 sm:mx-0 sm:px-0 sm:overflow-visible">
-                    {canExport && (
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            className="shrink-0"
-                            onClick={() => {
-                                if (selectedIds.length > 0 && viewMode === 'cards') setExportSelectedFields([])
-                                setIsExportDialogOpen(true)
-                            }}
-                        >
-                            <Download className="w-4 h-4 sm:mr-2" /><span className="hidden sm:inline">Exportar</span>
-                        </Button>
-                    )}
-                    {canImport && (
-                        <Button variant="outline" onClick={() => setIsImportDialogOpen(true)} size="sm" className="shrink-0">
-                            <Upload className="w-4 h-4 sm:mr-2" /><span className="hidden sm:inline">Importar</span>
-                        </Button>
-                    )}
-                    {canRegisterIncoming && (
-                        <Button
-                            variant="outline"
-                            onClick={() => navigate('/inventario/registrar-ingreso')}
-                            size="sm"
-                            className="shrink-0"
-                        >
-                            <Package className="w-4 h-4 sm:mr-2" /><span className="hidden sm:inline">Registrar Ingreso</span>
-                        </Button>
-                    )}
-                    {canInventoryCount && (
-                        <Button
-                            variant="outline"
-                            onClick={() => navigate('/inventario/inventariado')}
-                            size="sm"
-                            className="shrink-0"
-                        >
-                            <ClipboardList className="w-4 h-4 sm:mr-2" /><span className="hidden sm:inline">Inventariado</span>
-                        </Button>
-                    )}
-                    <Dialog open={isScannerOpen} onOpenChange={setIsScannerOpen}>
-                        <DialogTrigger asChild>
-                            <Button variant="outline" size="sm" className="shrink-0"><ScanLine className="w-4 h-4 sm:mr-2" /><span className="hidden sm:inline">Escanear</span></Button>
-                        </DialogTrigger>
-                        <DialogContent className="max-w-md">
-                            <DialogHeader><DialogTitle>Escáner de Códigos</DialogTitle></DialogHeader>
-                            <div className="space-y-4">
-                                <div className="text-center">
-                                    <QrCode className="w-24 h-24 mx-auto text-muted-foreground mb-4" />
-                                    <p className="text-muted-foreground">Ingrese el código de barras manualmente</p>
-                                </div>
-                                <div>
-                                    <Label htmlFor="scannedCode">Código de Barras</Label>
-                                    <Input
-                                        id="scannedCode"
-                                        placeholder="7501001234567"
-                                        value={scannedCode}
-                                        onChange={e => setScannedCode(e.target.value)}
-                                        onKeyPress={e => e.key === 'Enter' && searchByBarcode()}
-                                    />
-                                </div>
-                                <div className="flex space-x-2">
-                                    <Button variant="outline" className="flex-1" onClick={() => setIsScannerOpen(false)}>Cancelar</Button>
-                                    <Button className="flex-1" onClick={searchByBarcode}>Buscar</Button>
-                                </div>
-                            </div>
-                        </DialogContent>
-                    </Dialog>
+                <div className="flex flex-wrap items-center justify-end gap-2 shrink-0">
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                className="gap-1.5 min-w-[7.5rem] sm:min-w-0"
+                                aria-label="Menú de acciones del inventario"
+                            >
+                                Acciones
+                                <ChevronDown className="h-4 w-4 opacity-70 shrink-0" aria-hidden />
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-56">
+                            {hasFileActions && (
+                                <>
+                                    <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
+                                        Importar / exportar
+                                    </DropdownMenuLabel>
+                                    {canExport && (
+                                        <DropdownMenuItem
+                                            onClick={() => {
+                                                if (selectedIds.length > 0 && viewMode === 'cards') {
+                                                    setExportSelectedFields([])
+                                                }
+                                                setIsExportDialogOpen(true)
+                                            }}
+                                        >
+                                            <Download className="mr-2 h-4 w-4" />
+                                            Exportar PDF
+                                        </DropdownMenuItem>
+                                    )}
+                                    {canImport && (
+                                        <DropdownMenuItem onClick={() => setIsImportDialogOpen(true)}>
+                                            <Upload className="mr-2 h-4 w-4" />
+                                            Importar
+                                        </DropdownMenuItem>
+                                    )}
+                                </>
+                            )}
+                            {hasFileActions && hasStockActions && <DropdownMenuSeparator />}
+                            {hasStockActions && (
+                                <>
+                                    <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
+                                        Almacén
+                                    </DropdownMenuLabel>
+                                    {canRegisterIncoming && (
+                                        <DropdownMenuItem
+                                            onClick={() => navigate('/inventario/registrar-ingreso')}
+                                        >
+                                            <Package className="mr-2 h-4 w-4" />
+                                            Registrar ingreso
+                                        </DropdownMenuItem>
+                                    )}
+                                    {canInventoryCount && (
+                                        <DropdownMenuItem onClick={() => navigate('/inventario/inventariado')}>
+                                            <ClipboardList className="mr-2 h-4 w-4" />
+                                            Inventariado
+                                        </DropdownMenuItem>
+                                    )}
+                                </>
+                            )}
+                            {(hasFileActions || hasStockActions) && <DropdownMenuSeparator />}
+                            <DropdownMenuItem onClick={() => setIsScannerOpen(true)}>
+                                <ScanLine className="mr-2 h-4 w-4" />
+                                Escanear código
+                            </DropdownMenuItem>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
                     {canCreate && (
-                        <Button size="sm" className="shrink-0" onClick={() => navigate('/inventario/nuevo')}>
-                            <Plus className="w-4 h-4 sm:mr-2" />
-                            <span className="hidden sm:inline">Nuevo Producto</span>
+                        <Button size="sm" className="shrink-0 gap-1.5" onClick={() => navigate('/inventario/nuevo')}>
+                            <Plus className="h-4 w-4 shrink-0" />
+                            <span className="sm:hidden">Nuevo</span>
+                            <span className="hidden sm:inline">Nuevo producto</span>
                         </Button>
                     )}
                 </div>
             </div>
+
+            <Dialog open={isScannerOpen} onOpenChange={setIsScannerOpen}>
+                <DialogContent className="max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>Escáner de códigos</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4">
+                        <div className="text-center">
+                            <QrCode className="w-24 h-24 mx-auto text-muted-foreground mb-4" />
+                            <p className="text-muted-foreground text-sm">Ingrese el código de barras manualmente</p>
+                        </div>
+                        <div>
+                            <Label htmlFor="scannedCode">Código de barras</Label>
+                            <Input
+                                id="scannedCode"
+                                placeholder="7501001234567"
+                                value={scannedCode}
+                                onChange={(e) => setScannedCode(e.target.value)}
+                                onKeyDown={(e) => e.key === 'Enter' && searchByBarcode()}
+                            />
+                        </div>
+                        <div className="flex gap-2">
+                            <Button variant="outline" className="flex-1" onClick={() => setIsScannerOpen(false)}>
+                                Cancelar
+                            </Button>
+                            <Button className="flex-1" onClick={searchByBarcode}>
+                                Buscar
+                            </Button>
+                        </div>
+                    </div>
+                </DialogContent>
+            </Dialog>
 
             {/* Filters */}
             <Card>
