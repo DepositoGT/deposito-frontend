@@ -30,6 +30,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from './ui/dialog'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from './ui/alert-dialog'
 import { Badge } from './ui/badge'
 import { useToast } from '../hooks/use-toast'
 import {
@@ -186,22 +196,22 @@ function PaymentTermsTab({
     includeDeleted: showDeleted,
   })
   const paymentTerms = paymentTermsData?.items || []
-  
-  // Debug: verificar datos de paginación
-  console.log('PaymentTermsData:', paymentTermsData)
+
   const deleteMutation = useDeletePaymentTerm()
   const restoreMutation = useRestorePaymentTerm()
+  const [deleteConfirmTerm, setDeleteConfirmTerm] = useState<PaymentTerm | null>(null)
+  const [restoreConfirmTerm, setRestoreConfirmTerm] = useState<PaymentTerm | null>(null)
   
   // Reset page when showDeleted changes
   useEffect(() => {
     setCurrentPage(1)
   }, [showDeleted])
 
-  const handleDelete = async (id: number) => {
-    if (!confirm('¿Estás seguro de eliminar este término de pago?')) return
-
+  const confirmDeletePaymentTerm = async () => {
+    if (!deleteConfirmTerm) return
     try {
-      await deleteMutation.mutateAsync(id)
+      await deleteMutation.mutateAsync(deleteConfirmTerm.id)
+      setDeleteConfirmTerm(null)
       toast({
         title: 'Término eliminado',
         description: 'El término de pago ha sido eliminado correctamente',
@@ -216,9 +226,11 @@ function PaymentTermsTab({
     }
   }
 
-  const handleRestore = async (id: number) => {
+  const confirmRestorePaymentTerm = async () => {
+    if (!restoreConfirmTerm) return
     try {
-      await restoreMutation.mutateAsync(id)
+      await restoreMutation.mutateAsync(restoreConfirmTerm.id)
+      setRestoreConfirmTerm(null)
       toast({
         title: 'Término restaurado',
         description: 'El término de pago ha sido restaurado correctamente',
@@ -316,7 +328,7 @@ function PaymentTermsTab({
                             <Button
                               variant="outline"
                               size="icon"
-                              onClick={() => handleRestore(term.id)}
+                              onClick={() => setRestoreConfirmTerm(term)}
                               disabled={restoreMutation.isPending}
                             >
                               {restoreMutation.isPending ? (
@@ -337,7 +349,7 @@ function PaymentTermsTab({
                               <Button
                                 variant="destructive"
                                 size="icon"
-                                onClick={() => handleDelete(term.id)}
+                                onClick={() => setDeleteConfirmTerm(term)}
                                 disabled={deleteMutation.isPending}
                               >
                                 {deleteMutation.isPending ? (
@@ -370,6 +382,67 @@ function PaymentTermsTab({
           </div>
         )}
       </CardContent>
+
+      <AlertDialog
+        open={!!deleteConfirmTerm}
+        onOpenChange={(open) => {
+          if (!open) setDeleteConfirmTerm(null)
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar término de pago?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {deleteConfirmTerm
+                ? `Se marcará como eliminado «${deleteConfirmTerm.name}». Podrás restaurarlo desde «Ver eliminados».`
+                : ''}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleteMutation.isPending}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={deleteMutation.isPending}
+              onClick={(e) => {
+                e.preventDefault()
+                void confirmDeletePaymentTerm()
+              }}
+            >
+              {deleteMutation.isPending ? 'Eliminando…' : 'Eliminar'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={!!restoreConfirmTerm}
+        onOpenChange={(open) => {
+          if (!open) setRestoreConfirmTerm(null)
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Restaurar término de pago?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {restoreConfirmTerm
+                ? `«${restoreConfirmTerm.name}» volverá a estar activo y disponible para asignar a proveedores.`
+                : ''}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={restoreMutation.isPending}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={restoreMutation.isPending}
+              onClick={(e) => {
+                e.preventDefault()
+                void confirmRestorePaymentTerm()
+              }}
+            >
+              {restoreMutation.isPending ? 'Restaurando…' : 'Restaurar'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   )
 }
@@ -400,22 +473,22 @@ function ProductCategoriesTab({
     includeDeleted: showDeleted,
   })
   const categories = categoriesData?.items || []
-  
-  // Debug: verificar datos de paginación
-  console.log('CategoriesData:', categoriesData)
+
   const deleteMutation = useDeleteProductCategory()
   const restoreMutation = useRestoreProductCategory()
+  const [deleteConfirmCategory, setDeleteConfirmCategory] = useState<ProductCategory | null>(null)
+  const [restoreConfirmCategory, setRestoreConfirmCategory] = useState<ProductCategory | null>(null)
   
   // Reset page when showDeleted changes
   useEffect(() => {
     setCurrentPage(1)
   }, [showDeleted])
 
-  const handleDelete = async (id: number) => {
-    if (!confirm('¿Estás seguro de eliminar esta categoría?')) return
-
+  const confirmDeleteCategory = async () => {
+    if (!deleteConfirmCategory) return
     try {
-      await deleteMutation.mutateAsync(id)
+      await deleteMutation.mutateAsync(deleteConfirmCategory.id)
+      setDeleteConfirmCategory(null)
       toast({
         title: 'Categoría eliminada',
         description: 'La categoría ha sido eliminada correctamente',
@@ -430,9 +503,11 @@ function ProductCategoriesTab({
     }
   }
 
-  const handleRestore = async (id: number) => {
+  const confirmRestoreCategory = async () => {
+    if (!restoreConfirmCategory) return
     try {
-      await restoreMutation.mutateAsync(id)
+      await restoreMutation.mutateAsync(restoreConfirmCategory.id)
+      setRestoreConfirmCategory(null)
       toast({
         title: 'Categoría restaurada',
         description: 'La categoría ha sido restaurada correctamente',
@@ -532,7 +607,7 @@ function ProductCategoriesTab({
                             <Button
                               variant="outline"
                               size="icon"
-                              onClick={() => handleRestore(category.id)}
+                              onClick={() => setRestoreConfirmCategory(category)}
                               disabled={restoreMutation.isPending}
                             >
                               {restoreMutation.isPending ? (
@@ -553,7 +628,7 @@ function ProductCategoriesTab({
                               <Button
                                 variant="destructive"
                                 size="icon"
-                                onClick={() => handleDelete(category.id)}
+                                onClick={() => setDeleteConfirmCategory(category)}
                                 disabled={deleteMutation.isPending}
                               >
                                 {deleteMutation.isPending ? (
@@ -586,6 +661,67 @@ function ProductCategoriesTab({
           </div>
         )}
       </CardContent>
+
+      <AlertDialog
+        open={!!deleteConfirmCategory}
+        onOpenChange={(open) => {
+          if (!open) setDeleteConfirmCategory(null)
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar categoría?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {deleteConfirmCategory
+                ? `Se marcará como eliminada «${deleteConfirmCategory.name}». Podrás restaurarla desde «Ver eliminados».`
+                : ''}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleteMutation.isPending}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={deleteMutation.isPending}
+              onClick={(e) => {
+                e.preventDefault()
+                void confirmDeleteCategory()
+              }}
+            >
+              {deleteMutation.isPending ? 'Eliminando…' : 'Eliminar'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={!!restoreConfirmCategory}
+        onOpenChange={(open) => {
+          if (!open) setRestoreConfirmCategory(null)
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Restaurar categoría?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {restoreConfirmCategory
+                ? `«${restoreConfirmCategory.name}» volverá a estar activa y disponible para productos.`
+                : ''}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={restoreMutation.isPending}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={restoreMutation.isPending}
+              onClick={(e) => {
+                e.preventDefault()
+                void confirmRestoreCategory()
+              }}
+            >
+              {restoreMutation.isPending ? 'Restaurando…' : 'Restaurar'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   )
 }
@@ -844,7 +980,8 @@ function DeletedProductsTab() {
   const products = allDeletedProducts.slice(startIndex, endIndex)
   
   const restoreMutation = useRestoreProduct()
-  
+  const [restoreConfirmProduct, setRestoreConfirmProduct] = useState<Product | null>(null)
+
   // Reset to page 1 if current page is out of bounds
   useEffect(() => {
     if (currentPage > totalPages && totalPages > 0) {
@@ -852,14 +989,14 @@ function DeletedProductsTab() {
     }
   }, [currentPage, totalPages])
 
-  const handleRestore = async (product: Product) => {
-    if (!confirm(`¿Restaurar el producto "${product.name}"?`)) return
-
+  const confirmRestoreDeletedProduct = async () => {
+    if (!restoreConfirmProduct) return
     try {
-      await restoreMutation.mutateAsync(product.id)
+      await restoreMutation.mutateAsync(restoreConfirmProduct.id)
+      setRestoreConfirmProduct(null)
       toast({
         title: 'Producto restaurado',
-        description: `El producto "${product.name}" ha sido restaurado exitosamente`,
+        description: `El producto "${restoreConfirmProduct.name}" ha sido restaurado exitosamente`,
       })
     } catch (error) {
       const apiError = error as { response?: { data?: { message?: string } } }
@@ -935,7 +1072,7 @@ function DeletedProductsTab() {
                       <Button
                         size="sm"
                         variant="outline"
-                        onClick={() => handleRestore(product)}
+                        onClick={() => setRestoreConfirmProduct(product)}
                         disabled={restoreMutation.isPending}
                       >
                         {restoreMutation.isPending ? (
@@ -965,6 +1102,36 @@ function DeletedProductsTab() {
           />
         )}
       </CardContent>
+
+      <AlertDialog
+        open={!!restoreConfirmProduct}
+        onOpenChange={(open) => {
+          if (!open) setRestoreConfirmProduct(null)
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Restaurar producto?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {restoreConfirmProduct
+                ? `«${restoreConfirmProduct.name}» volverá al inventario y estará disponible de nuevo.`
+                : ''}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={restoreMutation.isPending}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={restoreMutation.isPending}
+              onClick={(e) => {
+                e.preventDefault()
+                void confirmRestoreDeletedProduct()
+              }}
+            >
+              {restoreMutation.isPending ? 'Restaurando…' : 'Restaurar'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   )
 }
