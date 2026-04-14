@@ -32,6 +32,13 @@ export interface ApiSupplier {
   categories?: { id: number | string; name: string }[] | null;
   categoryNames?: string[] | null;
   payment_term?: { id: number | string; name: string } | null;
+  /** Varios términos (respuesta API normalizada) */
+  payment_terms?: Array<{
+    payment_term_id: number;
+    is_default?: boolean;
+    sort_order?: number;
+    name?: string;
+  }>;
   productsList?: ApiProduct[] | null;
   party_type?: string | null;
   tax_id?: string | null;
@@ -98,7 +105,37 @@ export const adaptApiSupplier = (s: ApiSupplier): Supplier => {
       ? categoryNamesFromApi.join(", ")
       : (s.category?.name ?? "");
   const statusRaw: string | number | undefined = s.estado !== undefined && s.estado !== null ? Number(s.estado) : undefined;
-  const paymentTerms = s.payment_term?.name ?? "";
+
+  const ptLinksRaw = Array.isArray(s.payment_terms) ? s.payment_terms : [];
+  const ptLinksSorted = [...ptLinksRaw].sort(
+    (a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0)
+  );
+  const paymentTerms =
+    ptLinksSorted.length > 0
+      ? ptLinksSorted
+          .map((x) =>
+            x.is_default
+              ? `${x.name ?? ""} (predeterminado)`.trim()
+              : (x.name ?? "").trim()
+          )
+          .filter(Boolean)
+          .join(", ")
+      : (s.payment_term?.name ?? "");
+  const defPt = ptLinksSorted.find((x) => x.is_default) || ptLinksSorted[0];
+  const payment_terms_id =
+    defPt?.payment_term_id != null
+      ? Number(defPt.payment_term_id)
+      : s.payment_terms_id != null
+        ? Number(s.payment_terms_id)
+        : undefined;
+  const paymentTermsList =
+    ptLinksSorted.length > 0
+      ? ptLinksSorted.map((x) => ({
+          id: Number(x.payment_term_id),
+          name: String(x.name ?? ""),
+          isDefault: Boolean(x.is_default),
+        }))
+      : undefined;
 
   const productsList = Array.isArray(s.productsList)
     ? s.productsList.map(adaptApiProduct)
@@ -126,6 +163,8 @@ export const adaptApiSupplier = (s: ApiSupplier): Supplier => {
     estado: s.estado !== undefined && s.estado !== null ? Number(s.estado) : 1,
     status: mapStatus(statusRaw),
     paymentTerms: paymentTerms,
+    paymentTermsList,
+    payment_terms_id,
     categories: categoriesFromApi,
     categoriesLabel: categoryLabel || undefined,
     productsList,
@@ -140,6 +179,13 @@ export interface SuppliersQueryParams {
   /** Filtra por tipo de contacto en API (SUPPLIER | CUSTOMER) */
   party_type?: string;
 }
+
+/** Desplegables de proveedor (productos, ingreso mercancía): solo contactos tipo proveedor, no clientes. */
+export const SUPPLIERS_DROPDOWN_PARAMS: SuppliersQueryParams = {
+  party_type: "SUPPLIER",
+  page: 1,
+  pageSize: 100,
+};
 
 export interface SuppliersResponse {
   items: Supplier[];
@@ -198,7 +244,14 @@ export interface CreateSupplierPayload {
   category_ids?: Array<number | string>;
   /** 0 = inactivo, 1 = activo */
   estado?: number;
+  /** Un término (compat); preferir payment_terms */
   payment_terms_id?: number | string;
+  /** Varios términos; exactamente uno con is_default true */
+  payment_terms?: Array<{
+    payment_term_id: number;
+    is_default: boolean;
+    sort_order?: number;
+  }>;
   rating?: number;
   /** ID fiscal (NIT, VAT, RFC, …); opcional */
   tax_id?: string | null;

@@ -18,6 +18,7 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Separator } from '@/components/ui/separator'
 import { useSuppliers } from '@/hooks/useSuppliers'
+import { SUPPLIERS_DROPDOWN_PARAMS } from '@/services/supplierService'
 import { useCategories } from '@/hooks/useCategories'
 import useUpdateProduct from '@/hooks/useUpdateProduct'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
@@ -59,7 +60,7 @@ export default function ProductDetailPage() {
   const { locale, currencyCode } = useSystemSettings()
   const fmt = (n: number) => formatMoney(n, locale, currencyCode)
 
-  const { data: suppliersData } = useSuppliers()
+  const { data: suppliersData } = useSuppliers(SUPPLIERS_DROPDOWN_PARAMS)
   const { data: categoriesData } = useCategories()
   const suppliers = useMemo(() => suppliersData?.items ?? [], [suppliersData])
   const categories = useMemo((): CategoryItem[] => {
@@ -356,10 +357,18 @@ export default function ProductDetailPage() {
                           headers: { Authorization: `Bearer ${token}` },
                           body: formData,
                         })
-                        if (!response.ok) throw new Error('No se pudo subir la imagen')
-                        const data = (await response.json()) as { url?: string }
-                        if (!data.url) throw new Error('La respuesta no contiene la URL de la imagen')
-                        setEditImageUrl(data.url)
+                        const data = (await response.json()) as {
+                          imageUrl?: string
+                          url?: string
+                          message?: string
+                        }
+                        if (!response.ok) {
+                          const msg = typeof data.message === 'string' ? data.message : 'No se pudo subir la imagen'
+                          throw new Error(msg)
+                        }
+                        const imageUrl = data.imageUrl ?? data.url
+                        if (!imageUrl) throw new Error('La respuesta no contiene la URL de la imagen')
+                        setEditImageUrl(imageUrl)
                         toast({ title: 'Imagen actualizada', description: 'La imagen se subió correctamente.' })
                       } catch (error) {
                         toast({ title: 'Error', description: (error as Error)?.message ?? 'Error al subir la imagen', variant: 'destructive' })

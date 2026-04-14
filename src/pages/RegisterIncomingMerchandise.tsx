@@ -29,6 +29,7 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { ArrowLeft, Plus, Trash2, Package, Check, ChevronsUpDown } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { useSuppliers } from '@/hooks/useSuppliers'
+import { SUPPLIERS_DROPDOWN_PARAMS } from '@/services/supplierService'
 import { useProducts } from '@/hooks/useProducts'
 import { apiFetch } from '@/services/api'
 import { adaptApiProduct } from '@/services/productService'
@@ -50,7 +51,7 @@ export const RegisterIncomingMerchandise = () => {
   const [items, setItems] = useState<IncomingItem[]>([])
   const [isSubmitting, setIsSubmitting] = useState(false)
 
-  const { data: suppliersData } = useSuppliers()
+  const { data: suppliersData } = useSuppliers(SUPPLIERS_DROPDOWN_PARAMS)
   const suppliers = useMemo(() => suppliersData?.items ?? [], [suppliersData])
 
   // Fetch products for selected supplier
