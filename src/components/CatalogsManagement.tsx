@@ -64,6 +64,14 @@ import { Pagination } from './shared/Pagination'
 import { useAuthPermissions } from '../hooks/useAuthPermissions'
 import { usePersistedListUiState, useResetPageOnFilterChange } from '../hooks/usePersistedListUiState'
 
+/** Filas de catálogo: API actual devuelve `_count.supplier_payment_terms`; respuestas antiguas `suppliers`. */
+function paymentTermSupplierUsageCount(term: {
+  _count?: { supplier_payment_terms?: number; suppliers?: number }
+}): number {
+  const c = term._count
+  return c?.supplier_payment_terms ?? c?.suppliers ?? 0
+}
+
 // Tipos para los diálogos
 type PaymentTermDialogState = {
   open: boolean
@@ -304,7 +312,7 @@ function PaymentTermsTab({
                   <TableRow key={term.id}>
                     <TableCell className="font-medium">{term.id}</TableCell>
                     <TableCell>{term.name}</TableCell>
-                    <TableCell>{term._count?.suppliers || 0}</TableCell>
+                    <TableCell>{paymentTermSupplierUsageCount(term)}</TableCell>
                     <TableCell>
                       {term.deleted ? (
                         <Badge variant="destructive">Eliminado</Badge>

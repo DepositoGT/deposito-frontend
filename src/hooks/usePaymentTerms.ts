@@ -16,7 +16,10 @@ export interface PaymentTerm {
   name: string
   deleted: boolean
   _count?: {
-    suppliers: number
+    /** Relación N:M proveedor–término (schema actual) */
+    supplier_payment_terms?: number
+    /** Compat: respuestas antiguas con relación directa */
+    suppliers?: number
   }
 }
 

@@ -44,6 +44,7 @@ import {
 import { useToast } from '@/hooks/use-toast'
 import { useIncomingMerchandise, useIncomingMerchandiseById } from '@/hooks/useIncomingMerchandise'
 import { useSuppliers } from '@/hooks/useSuppliers'
+import { SUPPLIERS_DROPDOWN_PARAMS } from '@/services/supplierService'
 import { Pagination } from '@/components/shared/Pagination'
 import { generateMerchandiseReport } from '@/services/incomingMerchandiseService'
 import { useAuthPermissions } from '@/hooks/useAuthPermissions'
@@ -92,7 +93,7 @@ const IncomingMerchandiseManagement = () => {
 
   const { data: detailData } = useIncomingMerchandiseById(selectedRecordId || undefined)
 
-  const { data: suppliersData } = useSuppliers()
+  const { data: suppliersData } = useSuppliers(SUPPLIERS_DROPDOWN_PARAMS)
   const suppliers = useMemo(() => suppliersData?.items ?? [], [suppliersData])
 
   const records: IncomingMerchandise[] = recordsData?.items ?? []

@@ -85,6 +85,7 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
 import { Check, ChevronsUpDown } from 'lucide-react'
+import { cn } from '@/lib/utils'
 
 const getStatusBadge = (status: string | undefined) =>
   status === 'active' ? (
@@ -230,7 +231,9 @@ export default function SupplierDetailPage() {
   const [editEmail, setEditEmail] = useState('')
   const [editAddress, setEditAddress] = useState('')
   const [editCategoryIds, setEditCategoryIds] = useState<string[]>([])
-  const [editPaymentTermId, setEditPaymentTermId] = useState<string | undefined>(undefined)
+  const [editPaymentTermIds, setEditPaymentTermIds] = useState<string[]>([])
+  const [editDefaultPaymentTermId, setEditDefaultPaymentTermId] = useState<string | undefined>(undefined)
+  const [paymentTermPopoverOpen, setPaymentTermPopoverOpen] = useState(false)
   const [editEstado, setEditEstado] = useState<number>(1)
   const [editTaxId, setEditTaxId] = useState('')
   const [editEntityKind, setEditEntityKind] = useState<'PERSON' | 'ORGANIZATION'>('ORGANIZATION')
@@ -244,10 +247,29 @@ export default function SupplierDetailPage() {
     setEditAddress(supplier.address ?? '')
     setEditTaxId(supplier.taxId ?? '')
     setEditCategoryIds([])
-    setEditPaymentTermId(undefined)
+    const ptList = supplier.paymentTermsList
+    if (ptList && ptList.length > 0) {
+      setEditPaymentTermIds(ptList.map((x) => String(x.id)))
+      const def = ptList.find((x) => x.isDefault) || ptList[0]
+      setEditDefaultPaymentTermId(String(def.id))
+    } else {
+      setEditPaymentTermIds([])
+      setEditDefaultPaymentTermId(undefined)
+    }
     setEditEstado(supplier.estado !== undefined && supplier.estado !== null ? Number(supplier.estado) : 1)
     setEditEntityKind(supplier.entityKind ?? 'ORGANIZATION')
   }, [supplier])
+
+  useEffect(() => {
+    if (editPaymentTermIds.length === 0) {
+      setEditDefaultPaymentTermId(undefined)
+      return
+    }
+    setEditDefaultPaymentTermId((prev) => {
+      if (prev && editPaymentTermIds.includes(prev)) return prev
+      return editPaymentTermIds[0]
+    })
+  }, [editPaymentTermIds])
 
   const handleDeleteSupplier = async () => {
     if (!id) return
@@ -285,6 +307,28 @@ export default function SupplierDetailPage() {
   const handleSave = async () => {
     if (!supplier || !id) return
     try {
+      let payment_terms:
+        | Array<{ payment_term_id: number; is_default: boolean; sort_order: number }>
+        | undefined
+      if (isSupplierParty) {
+        if (
+          editPaymentTermIds.length === 0 ||
+          !editDefaultPaymentTermId ||
+          !editPaymentTermIds.includes(editDefaultPaymentTermId)
+        ) {
+          toast({
+            title: 'Términos de pago',
+            description: 'Selecciona al menos un término y uno predeterminado',
+            variant: 'destructive',
+          })
+          return
+        }
+        payment_terms = editPaymentTermIds.map((tid, i) => ({
+          payment_term_id: Number(tid),
+          is_default: tid === editDefaultPaymentTermId,
+          sort_order: i,
+        }))
+      }
       await updateSupplierAsync({
         id,
         payload: {
@@ -297,7 +341,7 @@ export default function SupplierDetailPage() {
           tax_id: editTaxId.trim() || null,
           category_ids:
             isSupplierParty && editCategoryIds.length ? editCategoryIds : undefined,
-          payment_terms_id: editPaymentTermId,
+          ...(isSupplierParty && payment_terms ? { payment_terms } : {}),
           estado: editEstado,
         },
       })
@@ -621,7 +665,15 @@ export default function SupplierDetailPage() {
                           setEditEmail(supplier.email ?? '')
                           setEditAddress(supplier.address ?? '')
                           setEditCategoryIds([])
-                          setEditPaymentTermId(undefined)
+                          const ptList = supplier.paymentTermsList
+                          if (ptList && ptList.length > 0) {
+                            setEditPaymentTermIds(ptList.map((x) => String(x.id)))
+                            const def = ptList.find((x) => x.isDefault) || ptList[0]
+                            setEditDefaultPaymentTermId(String(def.id))
+                          } else {
+                            setEditPaymentTermIds([])
+                            setEditDefaultPaymentTermId(undefined)
+                          }
                           setEditEstado(supplier.estado !== undefined && supplier.estado !== null ? Number(supplier.estado) : 1)
                           setEditEntityKind(supplier.entityKind ?? 'ORGANIZATION')
                         }
@@ -816,70 +868,119 @@ export default function SupplierDetailPage() {
                       <div className="mt-1">{getStatusBadge(String(supplier.status))}</div>
                     )}
                   </div>
+                  {isSupplierParty && (
                   <div>
                     <Label className="text-muted-foreground">Términos de Pago</Label>
                     {isEditing && canEditSupplier ? (
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <Button
-                            variant="outline"
-                            role="combobox"
-                            className="w-full justify-between mt-1"
-                          >
-                            <span className="truncate text-left">
-                              {editPaymentTermId
-                                ? paymentTerms.find((t: any) => String(t.id) === editPaymentTermId)?.name ??
-                                  supplier.paymentTerms
-                                : supplier.paymentTerms || 'Seleccionar término de pago'}
-                            </span>
-                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                          </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-[260px] p-0" align="start">
-                          <Command>
-                            <CommandInput placeholder="Buscar término de pago..." />
-                            <CommandList>
-                              <CommandEmpty>Sin resultados.</CommandEmpty>
-                              <CommandGroup>
-                                <ScrollArea className="max-h-64">
-                                  {(paymentTerms.length > 0
-                                    ? paymentTerms
-                                    : [
-                                        { id: 1, name: '7 días' },
-                                        { id: 2, name: '15 días' },
-                                        { id: 3, name: '30 días' },
-                                        { id: 4, name: '45 días' },
-                                      ]
-                                  ).map((t: any) => {
-                                    const idStr = String(t.id)
-                                    const selected = editPaymentTermId === idStr
+                      <>
+                        <Popover open={paymentTermPopoverOpen} onOpenChange={setPaymentTermPopoverOpen}>
+                          <PopoverTrigger asChild>
+                            <Button
+                              variant="outline"
+                              role="combobox"
+                              className="w-full justify-between mt-1"
+                            >
+                              <span className="truncate text-left">
+                                {editPaymentTermIds.length === 0
+                                  ? 'Seleccionar términos'
+                                  : `${editPaymentTermIds.length} término(s) seleccionado(s)`}
+                              </span>
+                              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-[320px] p-0" align="start">
+                            <Command>
+                              <CommandInput placeholder="Buscar términos de pago..." />
+                              <CommandList>
+                                <CommandEmpty>No se encontraron términos.</CommandEmpty>
+                                <CommandGroup>
+                                  <ScrollArea className="h-48">
+                                    {(paymentTerms.length > 0
+                                      ? paymentTerms
+                                      : [
+                                          { id: 1, name: '7 días' },
+                                          { id: 2, name: '15 días' },
+                                          { id: 3, name: '30 días' },
+                                          { id: 4, name: '45 días' },
+                                        ]
+                                    ).map((t: { id: number | string; name: string }) => {
+                                      const idStr = String(t.id)
+                                      const selected = editPaymentTermIds.includes(idStr)
+                                      return (
+                                        <CommandItem
+                                          key={idStr}
+                                          value={t.name}
+                                          onSelect={() => {
+                                            setEditPaymentTermIds((prev) =>
+                                              prev.includes(idStr)
+                                                ? prev.filter((v) => v !== idStr)
+                                                : [...prev, idStr]
+                                            )
+                                          }}
+                                        >
+                                          <Check
+                                            className={cn(
+                                              'mr-2 h-4 w-4',
+                                              selected ? 'opacity-100' : 'opacity-0'
+                                            )}
+                                          />
+                                          {t.name}
+                                        </CommandItem>
+                                      )
+                                    })}
+                                  </ScrollArea>
+                                </CommandGroup>
+                              </CommandList>
+                            </Command>
+                          </PopoverContent>
+                        </Popover>
+                        {editPaymentTermIds.length > 0 && (
+                          <div className="mt-2 space-y-2">
+                            <div className="flex flex-wrap gap-1">
+                              {paymentTerms
+                                .filter((t: { id: number | string }) =>
+                                  editPaymentTermIds.includes(String(t.id))
+                                )
+                                .map((t: { id: number | string; name: string }) => (
+                                  <Badge key={String(t.id)} variant="secondary" className="text-xs">
+                                    {t.name}
+                                    {String(t.id) === editDefaultPaymentTermId
+                                      ? ' · predeterminado'
+                                      : ''}
+                                  </Badge>
+                                ))}
+                            </div>
+                            <div>
+                              <Label className="text-xs text-muted-foreground">Predeterminado</Label>
+                              <Select
+                                value={editDefaultPaymentTermId}
+                                onValueChange={setEditDefaultPaymentTermId}
+                              >
+                                <SelectTrigger className="mt-1 h-9">
+                                  <SelectValue placeholder="Elegir" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {editPaymentTermIds.map((tid) => {
+                                    const t = paymentTerms.find(
+                                      (x: { id: number | string }) => String(x.id) === tid
+                                    ) as { name: string } | undefined
                                     return (
-                                      <CommandItem
-                                        key={idStr}
-                                        value={t.name}
-                                        onSelect={() => {
-                                          setEditPaymentTermId(idStr)
-                                        }}
-                                      >
-                                        <Check
-                                          className={
-                                            'mr-2 h-4 w-4 ' + (selected ? 'opacity-100' : 'opacity-0')
-                                          }
-                                        />
-                                        {t.name}
-                                      </CommandItem>
+                                      <SelectItem key={tid} value={tid}>
+                                        {t?.name ?? tid}
+                                      </SelectItem>
                                     )
                                   })}
-                                </ScrollArea>
-                              </CommandGroup>
-                            </CommandList>
-                          </Command>
-                        </PopoverContent>
-                      </Popover>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          </div>
+                        )}
+                      </>
                     ) : (
-                      <p className="text-foreground font-medium">{supplier.paymentTerms}</p>
+                      <p className="text-foreground font-medium">{supplier.paymentTerms || '—'}</p>
                     )}
                   </div>
+                  )}
                   <div>
                     <Label className="text-muted-foreground">ID fiscal (facturación)</Label>
                     {isEditing && canEditSupplier ? (

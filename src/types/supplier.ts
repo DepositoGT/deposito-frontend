@@ -38,6 +38,10 @@ export interface Supplier extends BaseEntity {
   estado?: number;
   status: Status | string; // derivado de estado para UI (active/inactive)
   paymentTerms: string;
+  /** Términos de pago asociados (API: payment_terms) */
+  paymentTermsList?: { id: number; name: string; isDefault: boolean }[];
+  /** ID del término predeterminado (compatibilidad) */
+  payment_terms_id?: number;
   productsList?: Product[]; // productos asociados desde API
 }
 
