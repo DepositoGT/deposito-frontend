@@ -12,7 +12,7 @@
  * Vista para crear un nuevo proveedor. Mismo estilo que detalle/editar.
  * Conserva todos los atributos del formulario de proveedores.
  */
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -30,6 +30,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { cn } from '@/lib/utils'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 
 export default function SupplierCreatePage() {
   const navigate = useNavigate()
@@ -47,7 +48,8 @@ export default function SupplierCreatePage() {
   const [entityKind, setEntityKind] = useState<'PERSON' | 'ORGANIZATION'>('ORGANIZATION')
   const [partyKind, setPartyKind] = useState<'SUPPLIER' | 'CUSTOMER'>('SUPPLIER')
   const [newCategoryIds, setNewCategoryIds] = useState<string[]>([])
-  const [newPaymentTermId, setNewPaymentTermId] = useState<string | undefined>(undefined)
+  const [newPaymentTermIds, setNewPaymentTermIds] = useState<string[]>([])
+  const [newDefaultPaymentTermId, setNewDefaultPaymentTermId] = useState<string | undefined>(undefined)
   const [categoryPopoverOpen, setCategoryPopoverOpen] = useState(false)
   const [paymentTermPopoverOpen, setPaymentTermPopoverOpen] = useState(false)
 
@@ -62,11 +64,16 @@ export default function SupplierCreatePage() {
     return paymentTermsData?.items ?? []
   }, [paymentTermsData])
 
-  const paymentTermLabel = useMemo(() => {
-    if (!newPaymentTermId) return ''
-    const t = paymentTerms.find((x: { id: number | string }) => String(x.id) === String(newPaymentTermId))
-    return t ? (t as { name: string }).name : newPaymentTermId
-  }, [newPaymentTermId, paymentTerms])
+  useEffect(() => {
+    if (newPaymentTermIds.length === 0) {
+      setNewDefaultPaymentTermId(undefined)
+      return
+    }
+    setNewDefaultPaymentTermId((prev) => {
+      if (prev && newPaymentTermIds.includes(prev)) return prev
+      return newPaymentTermIds[0]
+    })
+  }, [newPaymentTermIds])
 
   const handleSubmit = async () => {
     if (!newName?.trim()) {
@@ -105,12 +112,21 @@ export default function SupplierCreatePage() {
       toast({ title: 'Campo requerido', description: 'Debes seleccionar al menos una categoría para un proveedor', variant: 'destructive' })
       return
     }
-    if (!newPaymentTermId) {
-      toast({ title: 'Campo requerido', description: 'Los términos de pago son obligatorios', variant: 'destructive' })
+    if (newPaymentTermIds.length === 0) {
+      toast({ title: 'Campo requerido', description: 'Selecciona al menos un término de pago', variant: 'destructive' })
+      return
+    }
+    if (!newDefaultPaymentTermId || !newPaymentTermIds.includes(newDefaultPaymentTermId)) {
+      toast({ title: 'Término predeterminado', description: 'Indica cuál es el término predeterminado', variant: 'destructive' })
       return
     }
 
     try {
+      const payment_terms = newPaymentTermIds.map((id, i) => ({
+        payment_term_id: Number(id),
+        is_default: id === newDefaultPaymentTermId,
+        sort_order: i,
+      }))
       const supplier = await createSupplierMutation.mutateAsync({
         party_type: partyKind,
         entity_kind: entityKind,
@@ -121,7 +137,7 @@ export default function SupplierCreatePage() {
         address: newAddress.trim(),
         tax_id: newTaxId.trim() || null,
         category_ids: partyKind === 'SUPPLIER' ? newCategoryIds.map((id) => Number(id)) : undefined,
-        payment_terms_id: Number(newPaymentTermId),
+        payment_terms,
       })
       toast({ title: 'Contacto agregado', description: 'El contacto se creó correctamente' })
       const id = (supplier as { id?: string })?.id
@@ -385,7 +401,9 @@ export default function SupplierCreatePage() {
                 <Popover open={paymentTermPopoverOpen} onOpenChange={setPaymentTermPopoverOpen}>
                   <PopoverTrigger asChild>
                     <Button variant="outline" role="combobox" className="w-full justify-between mt-1" id="terms">
-                      {paymentTermLabel || 'Seleccionar términos'}
+                      {newPaymentTermIds.length === 0
+                        ? 'Seleccionar términos'
+                        : `${newPaymentTermIds.length} término(s) seleccionado(s)`}
                       <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                     </Button>
                   </PopoverTrigger>
@@ -396,48 +414,72 @@ export default function SupplierCreatePage() {
                       <CommandList>
                         <CommandGroup>
                           <ScrollArea className="h-48">
-                            {paymentTerms.length > 0 ? (
-                              paymentTerms.map((t: { id: number | string; name: string }) => (
-                                <CommandItem
-                                  key={String(t.id)}
-                                  value={t.name}
-                                  onSelect={() => {
-                                    setNewPaymentTermId(String(t.id))
-                                    setPaymentTermPopoverOpen(false)
-                                  }}
-                                >
-                                  <Check className={cn('mr-2 h-4 w-4', String(t.id) === newPaymentTermId ? 'opacity-100' : 'opacity-0')} />
-                                  {t.name}
-                                </CommandItem>
-                              ))
-                            ) : (
-                              <>
-                                {[
+                            {(paymentTerms.length > 0
+                              ? paymentTerms
+                              : [
                                   { id: '1', name: '7 días' },
                                   { id: '2', name: '15 días' },
                                   { id: '3', name: '30 días' },
                                   { id: '4', name: '45 días' },
-                                ].map((t) => (
-                                  <CommandItem
-                                    key={t.id}
-                                    value={t.name}
-                                    onSelect={() => {
-                                      setNewPaymentTermId(t.id)
-                                      setPaymentTermPopoverOpen(false)
-                                    }}
-                                  >
-                                    <Check className={cn('mr-2 h-4 w-4', t.id === newPaymentTermId ? 'opacity-100' : 'opacity-0')} />
-                                    {t.name}
-                                  </CommandItem>
-                                ))}
-                              </>
-                            )}
+                                ]
+                            ).map((t: { id: number | string; name: string }) => {
+                              const idStr = String(t.id)
+                              const selected = newPaymentTermIds.includes(idStr)
+                              return (
+                                <CommandItem
+                                  key={idStr}
+                                  value={t.name}
+                                  onSelect={() => {
+                                    setNewPaymentTermIds((prev) =>
+                                      prev.includes(idStr) ? prev.filter((v) => v !== idStr) : [...prev, idStr]
+                                    )
+                                  }}
+                                >
+                                  <Check className={cn('mr-2 h-4 w-4', selected ? 'opacity-100' : 'opacity-0')} />
+                                  {t.name}
+                                </CommandItem>
+                              )
+                            })}
                           </ScrollArea>
                         </CommandGroup>
                       </CommandList>
                     </Command>
                   </PopoverContent>
                 </Popover>
+                {newPaymentTermIds.length > 0 && (
+                  <div className="mt-2 space-y-2">
+                    <div className="flex flex-wrap gap-1">
+                      {paymentTerms
+                        .filter((t: { id: number | string }) => newPaymentTermIds.includes(String(t.id)))
+                        .map((t: { id: number | string; name: string }) => (
+                          <Badge key={String(t.id)} variant="secondary" className="text-xs">
+                            {t.name}
+                            {String(t.id) === newDefaultPaymentTermId ? ' · predeterminado' : ''}
+                          </Badge>
+                        ))}
+                    </div>
+                    <div>
+                      <Label className="text-xs text-muted-foreground">Predeterminado</Label>
+                      <Select value={newDefaultPaymentTermId} onValueChange={setNewDefaultPaymentTermId}>
+                        <SelectTrigger className="mt-1 h-9">
+                          <SelectValue placeholder="Elegir" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {newPaymentTermIds.map((tid) => {
+                            const t = paymentTerms.find((x: { id: number | string }) => String(x.id) === tid) as
+                              | { name: string }
+                              | undefined
+                            return (
+                              <SelectItem key={tid} value={tid}>
+                                {t?.name ?? tid}
+                              </SelectItem>
+                            )
+                          })}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                )}
               </div>
               <div>
                 <Label htmlFor="address">Dirección *</Label>

@@ -26,6 +26,7 @@ import { useProductForm } from './hooks'
 import { useCreateProduct } from '@/hooks/useCreateProduct'
 import { useCategories } from '@/hooks/useCategories'
 import { useSuppliers } from '@/hooks/useSuppliers'
+import { SUPPLIERS_DROPDOWN_PARAMS } from '@/services/supplierService'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -50,7 +51,7 @@ export default function ProductCreatePage() {
   const productForm = useProductForm()
   const createProductMutation = useCreateProduct()
   const { data: categoriesData } = useCategories()
-  const { data: suppliersData } = useSuppliers()
+  const { data: suppliersData } = useSuppliers(SUPPLIERS_DROPDOWN_PARAMS)
 
   const [isUploadingImage, setIsUploadingImage] = useState(false)
   const [categoryPopoverOpen, setCategoryPopoverOpen] = useState(false)

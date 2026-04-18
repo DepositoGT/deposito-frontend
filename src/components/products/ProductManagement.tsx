@@ -39,7 +39,6 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { useToast } from '@/hooks/use-toast'
 import type { Product } from '@/types'
 import { useProducts } from '@/hooks/useProducts'
-import { useSuppliers } from '@/hooks/useSuppliers'
 import { useCategories } from '@/hooks/useCategories'
 import { adaptApiProduct, fetchAllProducts } from '@/services/productService'
 import { Pagination } from '@/components/shared/Pagination'
@@ -106,9 +105,7 @@ const ProductManagement = () => {
         search: searchTerm || undefined,
         category: categoryFilter !== 'all' ? categoryFilter : undefined,
     })
-    const { data: suppliersData } = useSuppliers()
     const { data: categoriesData } = useCategories()
-    const suppliers = useMemo(() => suppliersData?.items ?? [], [suppliersData])
     const products = useMemo(() => {
         if (!productsData?.items) return []
         return productsData.items.map(adaptApiProduct)
@@ -219,10 +216,6 @@ const ProductManagement = () => {
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div className="min-w-0 flex-1">
                     <h2 className="text-lg sm:text-2xl font-bold text-foreground">Inventario</h2>
-                    <p className="text-xs sm:text-sm text-muted-foreground">
-                        Haz clic en una fila o tarjeta para abrir el detalle. Busca y filtra abajo; las demás operaciones están en{' '}
-                        <span className="font-medium text-foreground/80">Acciones</span>.
-                    </p>
                 </div>
                 <div className="flex flex-wrap items-center justify-end gap-2 shrink-0">
                     <DropdownMenu>
@@ -502,14 +495,14 @@ const ProductManagement = () => {
                                     </table>
                                 </div>
                             ) : (
-                                // Vista de cuadros (cards) — sin selección
-                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                                // Vista de cuadros: miniatura con alto/ancho máximos fijos (imágenes muy altas se recortan)
+                                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
                                     {paginatedProducts.map((product, index) => (
                                         <div
                                             key={product.id}
                                             role="button"
                                             tabIndex={0}
-                                            className="border border-border rounded-lg p-4 bg-card shadow-sm hover:shadow-md transition-shadow animate-slide-up cursor-pointer"
+                                            className="border border-border rounded-xl p-3 sm:p-3.5 bg-card/95 shadow-sm hover:shadow-md hover:border-border/80 transition-all animate-slide-up cursor-pointer text-left flex flex-col min-h-0"
                                             style={{ animationDelay: `${index * 50}ms` }}
                                             onClick={() => viewProduct(product)}
                                             onKeyDown={(e) => {
@@ -519,48 +512,53 @@ const ProductManagement = () => {
                                                 }
                                             }}
                                         >
-                                            <div className="flex items-start gap-3">
-                                                <div className="w-16 h-16 rounded-md overflow-hidden bg-muted flex items-center justify-center border border-border">
+                                            <div className="flex gap-3 sm:gap-3.5 items-start flex-1">
+                                                {/* Imagen: caja de tamaño fijo (max alto) — imágenes grandes se recortan con object-cover */}
+                                                <div className="shrink-0 w-[7.25rem] h-[8.5rem] sm:w-[7.75rem] sm:h-[9rem] max-h-[9rem] rounded-xl overflow-hidden bg-muted border border-border flex items-center justify-center">
                                                     {product.imageUrl ? (
                                                         <img
                                                             src={product.imageUrl}
                                                             alt={product.name}
-                                                            className="w-full h-full object-cover"
+                                                            className="w-full h-full object-cover object-center"
                                                         />
                                                     ) : (
-                                                        <span className="text-xs text-muted-foreground text-center px-1">
-                                                            Sin imagen
-                                                        </span>
+                                                        <Package className="w-12 h-12 sm:w-14 sm:h-14 text-muted-foreground/40" aria-hidden />
                                                     )}
                                                 </div>
-                                                <div className="flex-1 min-w-0">
-                                                    <div className="flex items-center justify-between gap-2">
-                                                        <h3 className="font-semibold text-foreground truncate">{product.name}</h3>
-                                                        {getStatusBadge(product)}
-                                                    </div>
-                                                    <p className="text-xs text-muted-foreground truncate">
+                                                <div className="flex-1 min-w-0 flex flex-col gap-0.5 py-0.5">
+                                                    <h3 className="font-bold text-foreground leading-tight line-clamp-2">
+                                                        {product.name}
+                                                    </h3>
+                                                    <p className="text-sm text-muted-foreground truncate">
                                                         {product.brand} • {product.size}
                                                     </p>
-                                                    <p className="text-xs text-muted-foreground">
-                                                        Categoría: <span className="font-medium">{String(product.category)}</span>
+                                                    <p className="text-xs text-muted-foreground line-clamp-2">
+                                                        Categoría:{' '}
+                                                        <span className="font-medium text-foreground/90">{String(product.category)}</span>
                                                     </p>
-                                                </div>
-                                            </div>
-                                            <div className="mt-3 flex items-center justify-between text-sm">
-                                                <div>
-                                                    <div className="text-xs text-muted-foreground">Precio</div>
-                                                    <div className="font-semibold text-primary">{fmt(product.price)}</div>
-                                                    {canCreate && (
-                                                        <div className="text-[11px] text-muted-foreground">
-                                                            Costo: {fmt(product.cost)}
+                                                    <div className="mt-auto pt-2 border-t border-border/60">
+                                                        <div className="text-[11px] text-muted-foreground">Precio</div>
+                                                        <div className="text-xl font-bold text-primary tabular-nums leading-none">
+                                                            {fmt(product.price)}
                                                         </div>
-                                                    )}
+                                                        {canCreate && (
+                                                            <div className="text-[11px] text-muted-foreground mt-0.5">
+                                                                Costo: {fmt(product.cost)}
+                                                            </div>
+                                                        )}
+                                                    </div>
                                                 </div>
-                                                <div className="text-right">
-                                                    <div className="text-xs text-muted-foreground">Stock</div>
-                                                    <div className="font-semibold">{product.stock}</div>
-                                                    <div className="text-[11px] text-muted-foreground">
-                                                        Min: {product.minStock}
+                                                {/* Estado arriba + stock abajo: evita pt-11 y huecos */}
+                                                <div className="shrink-0 w-[4.75rem] sm:w-[5rem] flex flex-col items-end justify-between text-right border-l border-border/50 pl-2.5 sm:pl-3">
+                                                    <div className="shrink-0">{getStatusBadge(product)}</div>
+                                                    <div>
+                                                        <div className="text-[11px] text-muted-foreground">Stock</div>
+                                                        <div className="text-xl font-bold text-foreground tabular-nums leading-none">
+                                                            {product.stock}
+                                                        </div>
+                                                        <div className="text-[11px] text-muted-foreground mt-0.5">
+                                                            Min: {product.minStock}
+                                                        </div>
                                                     </div>
                                                 </div>
                                             </div>
