@@ -38,7 +38,7 @@ import {
 } from './components'
 import { STATUS_DB_NAMES, NegativeStockDialogState, SaleStatusKey } from './types'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { getApiBaseUrl } from '@/services/api'
+import { getApiBaseUrl, getAuthToken } from '@/services/api'
 import { hasNewSaleDraft } from '@/services/saleDraftStorage'
 
 const API_URL = getApiBaseUrl()
@@ -114,8 +114,13 @@ const SalesManagement = ({ onSectionChange }: SalesManagementProps) => {
     const handleCashClosure = async () => {
         setIsValidatingClosure(true)
         try {
+            const token = getAuthToken()
+            if (!token) {
+                toast({ title: 'Sesión', description: 'No hay token de acceso. Vuelve a iniciar sesión.', variant: 'destructive' })
+                return
+            }
             const response = await fetch(`${API_URL}/cash-closures/validate-stocks`, {
-                headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+                headers: { Authorization: `Bearer ${token}` },
             })
             const data = await response.json()
             if (!data.valid && data.products.length > 0) {

@@ -160,7 +160,9 @@ const SuppliersManagement = () => {
   const [editPhone, setEditPhone] = useState<string>("");
   const [editEmail, setEditEmail] = useState<string>("");
   const [editCategoryIds, setEditCategoryIds] = useState<string[]>([]);
-  const [editPaymentTermId, setEditPaymentTermId] = useState<string | undefined>(undefined);
+  const [editPaymentTermIds, setEditPaymentTermIds] = useState<string[]>([]);
+  const [editDefaultPaymentTermId, setEditDefaultPaymentTermId] = useState<string | undefined>(undefined);
+  const [paymentTermPopoverOpen, setPaymentTermPopoverOpen] = useState(false);
   const [editAddress, setEditAddress] = useState<string>("");
   const [editTaxId, setEditTaxId] = useState<string>("");
 
@@ -188,12 +190,35 @@ const SuppliersManagement = () => {
     } else {
       setEditCategoryIds([]);
     }
-    setEditPaymentTermId(supplierData.payment_terms_id ? String(supplierData.payment_terms_id) : undefined);
+    const ptRaw = Array.isArray(supplierData.payment_terms) ? supplierData.payment_terms : [];
+    const ptSorted = [...ptRaw].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
+    if (ptSorted.length > 0) {
+      setEditPaymentTermIds(ptSorted.map((x) => String(x.payment_term_id)));
+      const def = ptSorted.find((x) => x.is_default) || ptSorted[0];
+      setEditDefaultPaymentTermId(String(def.payment_term_id));
+    } else if (supplierData.payment_terms_id != null && supplierData.payment_terms_id !== "") {
+      setEditPaymentTermIds([String(supplierData.payment_terms_id)]);
+      setEditDefaultPaymentTermId(String(supplierData.payment_terms_id));
+    } else {
+      setEditPaymentTermIds([]);
+      setEditDefaultPaymentTermId(undefined);
+    }
     const rawTax = supplierData as { tax_id?: string | null };
     setEditTaxId(rawTax.tax_id != null && String(rawTax.tax_id).trim() ? String(rawTax.tax_id).trim() : "");
     const raw = supplierData as { estado?: number };
     setEditEstado(raw.estado !== undefined && raw.estado !== null ? Number(raw.estado) : 1);
   }, [supplierData]);
+
+  useEffect(() => {
+    if (editPaymentTermIds.length === 0) {
+      setEditDefaultPaymentTermId(undefined);
+      return;
+    }
+    setEditDefaultPaymentTermId((prev) => {
+      if (prev && editPaymentTermIds.includes(prev)) return prev;
+      return editPaymentTermIds[0];
+    });
+  }, [editPaymentTermIds]);
 
   // update mutation (TanStack Query v5 uses isPending, not isLoading)
   const updateMutation = useUpdateSupplier();
@@ -651,30 +676,108 @@ const SuppliersManagement = () => {
                   )}
                 </div>
                 )}
+                {selectedSupplier?.party_type !== "CUSTOMER" && (
                 <div>
                   <Label htmlFor="edit-terms">Términos de Pago</Label>
-                  <Select value={editPaymentTermId} onValueChange={(v) => setEditPaymentTermId(v)}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {paymentTerms.length > 0 ? (
-                        paymentTerms.map((t) => (
-                          <SelectItem key={String(t.id)} value={String(t.id)}>
-                            {t.name}
-                          </SelectItem>
-                        ))
-                      ) : (
-                        <>
-                          <SelectItem value="1">7 días</SelectItem>
-                          <SelectItem value="2">15 días</SelectItem>
-                          <SelectItem value="3">30 días</SelectItem>
-                          <SelectItem value="4">45 días</SelectItem>
-                        </>
-                      )}
-                    </SelectContent>
-                  </Select>
+                  <Popover open={paymentTermPopoverOpen} onOpenChange={setPaymentTermPopoverOpen}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        role="combobox"
+                        className="w-full justify-between"
+                        id="edit-terms"
+                      >
+                        <span className="truncate text-left">
+                          {editPaymentTermIds.length === 0
+                            ? "Seleccionar términos"
+                            : `${editPaymentTermIds.length} término(s) seleccionado(s)`}
+                        </span>
+                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-[320px] p-0" align="start">
+                      <Command>
+                        <CommandInput placeholder="Buscar términos de pago..." />
+                        <CommandEmpty>No se encontraron términos.</CommandEmpty>
+                        <CommandList>
+                          <CommandGroup>
+                            <ScrollArea className="h-48">
+                              {(paymentTerms.length > 0
+                                ? paymentTerms
+                                : [
+                                    { id: "1", name: "7 días" },
+                                    { id: "2", name: "15 días" },
+                                    { id: "3", name: "30 días" },
+                                    { id: "4", name: "45 días" },
+                                  ]
+                              ).map((t: { id: number | string; name: string }) => {
+                                const idStr = String(t.id);
+                                const selected = editPaymentTermIds.includes(idStr);
+                                return (
+                                  <CommandItem
+                                    key={idStr}
+                                    value={t.name}
+                                    onSelect={() => {
+                                      setEditPaymentTermIds((prev) =>
+                                        prev.includes(idStr)
+                                          ? prev.filter((v) => v !== idStr)
+                                          : [...prev, idStr]
+                                      );
+                                    }}
+                                  >
+                                    <Check
+                                      className={cn(
+                                        "mr-2 h-4 w-4",
+                                        selected ? "opacity-100" : "opacity-0"
+                                      )}
+                                    />
+                                    {t.name}
+                                  </CommandItem>
+                                );
+                              })}
+                            </ScrollArea>
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
+                  {editPaymentTermIds.length > 0 && (
+                    <div className="mt-2 space-y-2">
+                      <div className="flex flex-wrap gap-1">
+                        {paymentTerms
+                          .filter((t) => editPaymentTermIds.includes(String(t.id)))
+                          .map((t) => (
+                            <Badge key={String(t.id)} variant="secondary" className="text-xs">
+                              {t.name}
+                              {String(t.id) === editDefaultPaymentTermId ? " · predeterminado" : ""}
+                            </Badge>
+                          ))}
+                      </div>
+                      <div>
+                        <Label className="text-xs text-muted-foreground">Predeterminado</Label>
+                        <Select
+                          value={editDefaultPaymentTermId}
+                          onValueChange={setEditDefaultPaymentTermId}
+                        >
+                          <SelectTrigger className="mt-1 h-9">
+                            <SelectValue placeholder="Elegir" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {editPaymentTermIds.map((tid) => {
+                              const t = paymentTerms.find((x) => String(x.id) === tid);
+                              return (
+                                <SelectItem key={tid} value={tid}>
+                                  {t?.name ?? tid}
+                                </SelectItem>
+                              );
+                            })}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                  )}
                 </div>
+                )}
                 <div>
                   <Label htmlFor="edit-status">Estado</Label>
                   <Select value={String(editEstado)} onValueChange={(v) => setEditEstado(Number(v))}>
@@ -782,16 +885,32 @@ const SuppliersManagement = () => {
                   return;
                 }
 
-                if (!editPaymentTermId) {
-                  toast({
-                    title: "Campo requerido",
-                    description: "Los términos de pago son obligatorios",
-                    variant: "destructive"
-                  });
-                  return;
+                if (selectedSupplier.party_type !== "CUSTOMER") {
+                  if (
+                    editPaymentTermIds.length === 0 ||
+                    !editDefaultPaymentTermId ||
+                    !editPaymentTermIds.includes(editDefaultPaymentTermId)
+                  ) {
+                    toast({
+                      title: "Campo requerido",
+                      description: "Selecciona al menos un término de pago y uno predeterminado",
+                      variant: "destructive"
+                    });
+                    return;
+                  }
                 }
 
                 try {
+                  const payment_terms =
+                    selectedSupplier.party_type !== "CUSTOMER" &&
+                    editPaymentTermIds.length > 0 &&
+                    editDefaultPaymentTermId
+                      ? editPaymentTermIds.map((tid, i) => ({
+                          payment_term_id: Number(tid),
+                          is_default: tid === editDefaultPaymentTermId,
+                          sort_order: i,
+                        }))
+                      : undefined;
                   await updateMutateAsync({
                     id: selectedSupplier.id, payload: {
                       name: editName.trim(),
@@ -804,7 +923,7 @@ const SuppliersManagement = () => {
                         selectedSupplier.party_type === "CUSTOMER"
                           ? undefined
                           : editCategoryIds.map((id) => Number(id)),
-                      payment_terms_id: Number(editPaymentTermId),
+                      ...(payment_terms ? { payment_terms } : {}),
                       estado: editEstado,
                     }
                   });

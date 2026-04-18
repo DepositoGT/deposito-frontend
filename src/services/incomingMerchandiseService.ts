@@ -8,7 +8,7 @@
  * For licensing inquiries: GitHub @dpatzan2
  */
 
-import { apiFetch } from './api'
+import { apiFetch, getAuthToken } from './api'
 
 export interface IncomingMerchandiseItem {
   id: string
@@ -102,7 +102,7 @@ export const generateMerchandiseReport = async (params?: {
   const response = await fetch(`${import.meta.env.VITE_API_URL || ''}${url}`, {
     method: 'GET',
     headers: {
-      'Authorization': `Bearer ${localStorage.getItem('token') || ''}`,
+      Authorization: `Bearer ${getAuthToken() ?? ''}`,
     },
   })
 
