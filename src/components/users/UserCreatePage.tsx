@@ -26,6 +26,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Checkbox } from '@/components/ui/checkbox'
+import { ImageUploadDropzone } from '@/components/ui/image-upload-dropzone'
 import { cn } from '@/lib/utils'
 
 export default function UserCreatePage() {
@@ -192,35 +193,21 @@ export default function UserCreatePage() {
                     <span className="text-sm">Sin imagen</span>
                   </div>
                 )}
-                <Input
-                  type="file"
-                  accept="image/*"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0]
-                    if (!file) {
-                      setPhotoFile(null)
-                      return
-                    }
-                    if (!file.type.startsWith('image/')) {
-                      toast({ title: 'Solo se permiten imágenes', variant: 'destructive' })
-                      return
-                    }
-                    if (file.size > 5 * 1024 * 1024) {
-                      toast({ title: 'La imagen no debe exceder 5MB', variant: 'destructive' })
-                      return
-                    }
-                    setPhotoFile(file)
-                  }}
+                <ImageUploadDropzone
+                  onFileSelect={(file) => setPhotoFile(file)}
+                  onReject={(msg) => toast({ title: 'Archivo no válido', description: msg, variant: 'destructive' })}
                   disabled={isLoading}
-                  className="cursor-pointer"
+                  isUploading={isUploadingPhoto}
+                  selectionLabel={photoFile?.name ?? null}
+                  onClearSelection={() => setPhotoFile(null)}
+                  helperText="Opcional. Máx 5MB."
                 />
                 {isUploadingPhoto && (
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
                     <Loader2 className="w-4 h-4 animate-spin" />
                     Subiendo foto...
                   </div>
                 )}
-                <p className="text-xs text-muted-foreground text-center">Opcional. Máx 5MB.</p>
               </div>
             </div>
 

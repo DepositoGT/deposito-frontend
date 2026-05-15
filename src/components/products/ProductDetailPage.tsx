@@ -15,6 +15,7 @@ import { formatMoney } from '@/utils'
 import type { Product } from '@/types'
 import { adaptApiProduct, fetchProductById, type ApiProduct } from '@/services/productService'
 import { Input } from '@/components/ui/input'
+import { ImageUploadDropzone } from '@/components/ui/image-upload-dropzone'
 import { Textarea } from '@/components/ui/textarea'
 import { Separator } from '@/components/ui/separator'
 import { useSuppliers } from '@/hooks/useSuppliers'
@@ -193,6 +194,53 @@ export default function ProductDetailPage() {
     }
   }
 
+  const handleEditProductImageFile = async (file: File) => {
+    try {
+      setIsUploadingImage(true)
+      if (file.size > 5 * 1024 * 1024) {
+        toast({ title: 'Error', description: 'La imagen no debe exceder 5MB', variant: 'destructive' })
+        return
+      }
+      if (!file.type.startsWith('image/')) {
+        toast({ title: 'Error', description: 'Solo se permiten archivos de imagen', variant: 'destructive' })
+        return
+      }
+      const token = getAuthToken()
+      if (!token) {
+        toast({ title: 'Error de autenticación', description: 'No estás autenticado.', variant: 'destructive' })
+        return
+      }
+      const formData = new FormData()
+      formData.append('image', file)
+      const response = await fetch(`${getApiBaseUrl()}/products/upload-image`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body: formData,
+      })
+      const data = (await response.json()) as {
+        imageUrl?: string
+        url?: string
+        message?: string
+      }
+      if (!response.ok) {
+        const msg = typeof data.message === 'string' ? data.message : 'No se pudo subir la imagen'
+        throw new Error(msg)
+      }
+      const imageUrl = data.imageUrl ?? data.url
+      if (!imageUrl) throw new Error('La respuesta no contiene la URL de la imagen')
+      setEditImageUrl(imageUrl)
+      toast({ title: 'Imagen actualizada', description: 'La imagen se subió correctamente.' })
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: (error as Error)?.message ?? 'Error al subir la imagen',
+        variant: 'destructive',
+      })
+    } finally {
+      setIsUploadingImage(false)
+    }
+  }
+
   const resetEditState = () => {
     if (!product || !rawProduct) return
     setEditName(product.name ?? '')
@@ -328,54 +376,16 @@ export default function ProductDetailPage() {
                   <div className="flex items-center justify-center text-muted-foreground text-sm py-8">Sin imagen</div>
                 )}
                 {isEditing && canEdit && (
-                  <Input
-                    type="file"
-                    accept="image/*"
-                    disabled={isUploadingImage || isSaving}
-                    onChange={async (event) => {
-                      const file = event.target.files?.[0]
-                      if (!file) { setEditImageUrl(undefined); return }
-                      try {
-                        setIsUploadingImage(true)
-                        if (file.size > 5 * 1024 * 1024) {
-                          toast({ title: 'Error', description: 'La imagen no debe exceder 5MB', variant: 'destructive' })
-                          return
-                        }
-                        if (!file.type.startsWith('image/')) {
-                          toast({ title: 'Error', description: 'Solo se permiten archivos de imagen', variant: 'destructive' })
-                          return
-                        }
-                        const token = getAuthToken()
-                        if (!token) {
-                          toast({ title: 'Error de autenticación', description: 'No estás autenticado.', variant: 'destructive' })
-                          return
-                        }
-                        const formData = new FormData()
-                        formData.append('image', file)
-                        const response = await fetch(`${getApiBaseUrl()}/products/upload-image`, {
-                          method: 'POST',
-                          headers: { Authorization: `Bearer ${token}` },
-                          body: formData,
-                        })
-                        const data = (await response.json()) as {
-                          imageUrl?: string
-                          url?: string
-                          message?: string
-                        }
-                        if (!response.ok) {
-                          const msg = typeof data.message === 'string' ? data.message : 'No se pudo subir la imagen'
-                          throw new Error(msg)
-                        }
-                        const imageUrl = data.imageUrl ?? data.url
-                        if (!imageUrl) throw new Error('La respuesta no contiene la URL de la imagen')
-                        setEditImageUrl(imageUrl)
-                        toast({ title: 'Imagen actualizada', description: 'La imagen se subió correctamente.' })
-                      } catch (error) {
-                        toast({ title: 'Error', description: (error as Error)?.message ?? 'Error al subir la imagen', variant: 'destructive' })
-                      } finally {
-                        setIsUploadingImage(false)
-                      }
+                  <ImageUploadDropzone
+                    onFileSelect={(f) => {
+                      void handleEditProductImageFile(f)
                     }}
+                    onReject={(msg) =>
+                      toast({ title: 'Archivo no válido', description: msg, variant: 'destructive' })
+                    }
+                    disabled={isUploadingImage || isSaving}
+                    isUploading={isUploadingImage}
+                    helperText="Máx 5MB. Se guardará al pulsar «Guardar cambios»."
                   />
                 )}
               </div>
