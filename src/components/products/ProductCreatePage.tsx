@@ -17,6 +17,7 @@ import { useNavigate } from 'react-router-dom'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { ImageUploadDropzone } from '@/components/ui/image-upload-dropzone'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { ArrowLeft, Package, QrCode, Image as ImageIcon, Check, ChevronsUpDown } from 'lucide-react'
@@ -84,12 +85,7 @@ export default function ProductCreatePage() {
     return s ? (s as { name: string }).name : id
   }, [formData.supplier, suppliers])
 
-  const handleImageChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0]
-    if (!file) {
-      onFormChange('imageUrl', '')
-      return
-    }
+  const handleProductImageFile = async (file: File) => {
     try {
       setIsUploadingImage(true)
       if (file.size > 5 * 1024 * 1024) {
@@ -139,6 +135,15 @@ export default function ProductCreatePage() {
       stock: formData.stock ? Number(formData.stock) : 0,
       min_stock: formData.minStock ? Number(formData.minStock) : 0,
       price: Number(formData.price),
+      price_wholesale: formData.priceWholesale?.trim()
+        ? Number(formData.priceWholesale)
+        : undefined,
+      price_promotion: formData.pricePromotion?.trim()
+        ? Number(formData.pricePromotion)
+        : undefined,
+      promotion_valid_until: formData.promotionValidUntil?.trim()
+        ? new Date(formData.promotionValidUntil).toISOString()
+        : undefined,
       cost: formData.cost ? Number(formData.cost) : 0,
       image_url: formData.imageUrl || undefined,
       supplier_id: formData.supplier,
@@ -198,19 +203,21 @@ export default function ProductCreatePage() {
                     <span className="text-sm">Sin imagen</span>
                   </div>
                 )}
-                <Input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleImageChange}
+                <ImageUploadDropzone
+                  onFileSelect={(f) => {
+                    void handleProductImageFile(f)
+                  }}
+                  onReject={(msg) =>
+                    toast({ title: 'Archivo no válido', description: msg, variant: 'destructive' })
+                  }
                   disabled={isUploadingImage || isLoading}
-                  className="cursor-pointer"
+                  isUploading={isUploadingImage}
+                  helperText={
+                    <>
+                      Opcional. Máx 5MB. Se almacenará en el bucket <span className="font-semibold">productos</span>.
+                    </>
+                  }
                 />
-                {isUploadingImage && (
-                  <p className="text-xs text-muted-foreground">Subiendo...</p>
-                )}
-                <p className="text-xs text-muted-foreground text-center">
-                  Opcional. Máx 5MB. Se almacenará en el bucket <span className="font-semibold">productos</span>.
-                </p>
               </div>
             </div>
 
@@ -295,6 +302,43 @@ export default function ProductCreatePage() {
                         step="0.01"
                       />
                     </div>
+                  </div>
+                  <div>
+                    <Label className="text-muted-foreground">Precio mayoreo (opcional)</Label>
+                    <div className="relative mt-1">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground min-w-[3.5rem]">{currencySymbol}</span>
+                      <Input
+                        type="number"
+                        placeholder="—"
+                        value={formData.priceWholesale}
+                        onChange={(e) => onFormChange('priceWholesale', e.target.value)}
+                        className="pl-[4.5rem]"
+                        step="0.01"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <Label className="text-muted-foreground">Precio promoción (opcional)</Label>
+                    <div className="relative mt-1">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground min-w-[3.5rem]">{currencySymbol}</span>
+                      <Input
+                        type="number"
+                        placeholder="—"
+                        value={formData.pricePromotion}
+                        onChange={(e) => onFormChange('pricePromotion', e.target.value)}
+                        className="pl-[4.5rem]"
+                        step="0.01"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <Label className="text-muted-foreground">Promoción válida hasta</Label>
+                    <Input
+                      type="datetime-local"
+                      value={formData.promotionValidUntil}
+                      onChange={(e) => onFormChange('promotionValidUntil', e.target.value)}
+                      className="mt-1"
+                    />
                   </div>
                   <div>
                     <Label className="text-muted-foreground">Costo</Label>

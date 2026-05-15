@@ -14,6 +14,8 @@ import { apiFetch } from '../services/api'
 export interface PaymentTerm {
   id: number
   name: string
+  /** Días naturales hasta vencimiento sugerido (ingreso de mercancía) */
+  net_days?: number | null
   deleted: boolean
   _count?: {
     /** Relación N:M proveedor–término (schema actual) */
@@ -65,7 +67,7 @@ export function useCreatePaymentTerm() {
   const queryClient = useQueryClient()
   
   return useMutation({
-    mutationFn: async (data: { name: string }) => {
+    mutationFn: async (data: { name: string; net_days?: number | null }) => {
       return apiFetch<PaymentTerm>('/catalogs/payment-terms', {
         method: 'POST',
         body: JSON.stringify(data),
@@ -82,7 +84,13 @@ export function useUpdatePaymentTerm() {
   const queryClient = useQueryClient()
   
   return useMutation({
-    mutationFn: async ({ id, data }: { id: number; data: { name: string } }) => {
+    mutationFn: async ({
+      id,
+      data,
+    }: {
+      id: number
+      data: { name: string; net_days?: number | null }
+    }) => {
       return apiFetch<PaymentTerm>(`/catalogs/payment-terms/${id}`, {
         method: 'PUT',
         body: JSON.stringify(data),

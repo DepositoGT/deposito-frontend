@@ -1,14 +1,14 @@
 /**
  * Copyright (c) 2026 Diego Patzán. All Rights Reserved.
- * 
+ *
  * This source code is licensed under a Proprietary License.
  * Unauthorized copying, modification, distribution, or use of this file,
  * via any medium, is strictly prohibited without express written permission.
- * 
+ *
  * For licensing inquiries: GitHub @dpatzan2
  */
 
-import { useState, useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -26,14 +26,8 @@ import {
   Download,
   Plus,
   Filter,
-  X
+  X,
 } from 'lucide-react'
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
 import {
   Select,
   SelectContent,
@@ -42,7 +36,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { useToast } from '@/hooks/use-toast'
-import { useIncomingMerchandise, useIncomingMerchandiseById } from '@/hooks/useIncomingMerchandise'
+import { useIncomingMerchandise } from '@/hooks/useIncomingMerchandise'
 import { useSuppliers } from '@/hooks/useSuppliers'
 import { SUPPLIERS_DROPDOWN_PARAMS } from '@/services/supplierService'
 import { Pagination } from '@/components/shared/Pagination'
@@ -50,7 +44,18 @@ import { generateMerchandiseReport } from '@/services/incomingMerchandiseService
 import { useAuthPermissions } from '@/hooks/useAuthPermissions'
 import { usePersistedListUiState, useResetPageOnFilterChange } from '@/hooks/usePersistedListUiState'
 import { useSystemSettings } from '@/hooks/useSystemSettings'
-import type { IncomingMerchandise } from '@/services/incomingMerchandiseService'
+import type { IncomingMerchandise, MerchandisePaymentStatus } from '@/services/incomingMerchandiseService'
+
+function PaymentStatusBadge({ status }: { status?: MerchandisePaymentStatus }) {
+  const s = status ?? 'PENDING'
+  if (s === 'PAID') {
+    return <Badge className="bg-emerald-600 hover:bg-emerald-600">Pagado</Badge>
+  }
+  if (s === 'PARTIAL') {
+    return <Badge className="bg-amber-600 hover:bg-amber-600">Parcial</Badge>
+  }
+  return <Badge variant="secondary">Pendiente</Badge>
+}
 
 const IncomingMerchandiseManagement = () => {
   const navigate = useNavigate()
@@ -58,7 +63,6 @@ const IncomingMerchandiseManagement = () => {
   const { hasPermission } = useAuthPermissions()
   const { currencyCode, locale } = useSystemSettings()
 
-  // State
   const [searchTerm, setSearchTerm] = useState('')
   const {
     page: currentPage,
@@ -71,27 +75,23 @@ const IncomingMerchandiseManagement = () => {
   const [selectedSupplierId, setSelectedSupplierId] = useState<string>('all')
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
-  const [selectedRecordId, setSelectedRecordId] = useState<string | null>(null)
-  const [isDetailOpen, setIsDetailOpen] = useState(false)
   const [isFilterOpen, setIsFilterOpen] = useState(false)
+  const [paymentStatusFilter, setPaymentStatusFilter] = useState<'all' | MerchandisePaymentStatus>('all')
 
-  // Permissions (registrar ingreso usa products.register_incoming, igual que la ruta /inventario/registrar-ingreso)
   const canView = hasPermission('merchandise.view')
   const canRegister = hasPermission('products.register_incoming')
   const canDetails = hasPermission('merchandise.details')
   const canReports = hasPermission('merchandise.reports')
 
-  // Data hooks
-  const { data: recordsData, isLoading, refetch } = useIncomingMerchandise({
+  const { data: recordsData, isLoading } = useIncomingMerchandise({
     page: currentPage,
     pageSize,
     search: searchTerm || undefined,
     supplier_id: selectedSupplierId !== 'all' ? selectedSupplierId : undefined,
     start_date: startDate || undefined,
     end_date: endDate || undefined,
+    payment_status: paymentStatusFilter === 'all' ? undefined : paymentStatusFilter,
   })
-
-  const { data: detailData } = useIncomingMerchandiseById(selectedRecordId || undefined)
 
   const { data: suppliersData } = useSuppliers(SUPPLIERS_DROPDOWN_PARAMS)
   const suppliers = useMemo(() => suppliersData?.items ?? [], [suppliersData])
@@ -100,12 +100,17 @@ const IncomingMerchandiseManagement = () => {
   const totalItems = recordsData?.totalItems ?? 0
   const totalPages = recordsData?.totalPages ?? 1
 
-  useResetPageOnFilterChange(setCurrentPage, [searchTerm, selectedSupplierId, startDate, endDate, pageSize])
+  useResetPageOnFilterChange(setCurrentPage, [
+    searchTerm,
+    selectedSupplierId,
+    startDate,
+    endDate,
+    pageSize,
+    paymentStatusFilter,
+  ])
 
-  // Handlers
   const handleViewDetails = (id: string) => {
-    setSelectedRecordId(id)
-    setIsDetailOpen(true)
+    navigate(`/mercancia/${id}`)
   }
 
   const handleGenerateReport = async () => {
@@ -114,6 +119,7 @@ const IncomingMerchandiseManagement = () => {
         supplier_id: selectedSupplierId !== 'all' ? selectedSupplierId : undefined,
         start_date: startDate || undefined,
         end_date: endDate || undefined,
+        payment_status: paymentStatusFilter === 'all' ? undefined : paymentStatusFilter,
       })
 
       const url = window.URL.createObjectURL(blob)
@@ -144,6 +150,7 @@ const IncomingMerchandiseManagement = () => {
     setSelectedSupplierId('all')
     setStartDate('')
     setEndDate('')
+    setPaymentStatusFilter('all')
     setCurrentPage(1)
   }
 
@@ -183,13 +190,14 @@ const IncomingMerchandiseManagement = () => {
 
   return (
     <div className="p-3 sm:p-6 space-y-4 sm:space-y-6 animate-fade-in">
-      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:justify-between">
         <div className="min-w-0">
           <h2 className="text-lg sm:text-2xl font-bold text-foreground">Registros de Mercancía</h2>
           <p className="text-xs sm:text-sm text-muted-foreground">
             Gestiona los ingresos de mercancía.
-            {canDetails ? ' Haz clic en una fila o tarjeta para ver el detalle del registro.' : ''}
+            {canDetails
+              ? ' Haz clic en una fila o tarjeta para abrir el detalle en una nueva vista.'
+              : ''}
           </p>
         </div>
         <div className="flex gap-2 overflow-x-auto pb-1 -mx-3 px-3 sm:mx-0 sm:px-0 sm:overflow-visible">
@@ -212,23 +220,22 @@ const IncomingMerchandiseManagement = () => {
         </div>
       </div>
 
-      {/* Filters */}
       <Card>
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
             <CardTitle className="text-lg">Filtros</CardTitle>
             <div className="flex items-center gap-2">
-              {(searchTerm || selectedSupplierId !== 'all' || startDate || endDate) && (
+              {(searchTerm ||
+                selectedSupplierId !== 'all' ||
+                startDate ||
+                endDate ||
+                paymentStatusFilter !== 'all') && (
                 <Button variant="ghost" size="sm" onClick={clearFilters}>
                   <X className="w-4 h-4 mr-1" />
                   Limpiar
                 </Button>
               )}
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setIsFilterOpen(!isFilterOpen)}
-              >
+              <Button variant="outline" size="sm" onClick={() => setIsFilterOpen(!isFilterOpen)}>
                 <Filter className="w-4 h-4 mr-1" />
                 {isFilterOpen ? 'Ocultar' : 'Filtros'}
               </Button>
@@ -237,7 +244,7 @@ const IncomingMerchandiseManagement = () => {
         </CardHeader>
         {isFilterOpen && (
           <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="search">Búsqueda</Label>
                 <div className="relative">
@@ -285,17 +292,33 @@ const IncomingMerchandiseManagement = () => {
                   onChange={(e) => setEndDate(e.target.value)}
                 />
               </div>
+              <div className="space-y-2">
+                <Label htmlFor="pay-filter">Estado de pago</Label>
+                <Select
+                  value={paymentStatusFilter}
+                  onValueChange={(v) =>
+                    setPaymentStatusFilter(v as 'all' | MerchandisePaymentStatus)
+                  }
+                >
+                  <SelectTrigger id="pay-filter">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos</SelectItem>
+                    <SelectItem value="PENDING">Pendiente</SelectItem>
+                    <SelectItem value="PARTIAL">Pago parcial</SelectItem>
+                    <SelectItem value="PAID">Pagado</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           </CardContent>
         )}
       </Card>
 
-      {/* Main Content */}
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-2xl font-bold">
-            Registros ({totalItems})
-          </CardTitle>
+          <CardTitle className="text-2xl font-bold">Registros ({totalItems})</CardTitle>
           <div className="flex items-center border rounded-md bg-background/80">
             <Button
               type="button"
@@ -329,7 +352,11 @@ const IncomingMerchandiseManagement = () => {
               <Package className="w-16 h-16 mb-4 text-muted-foreground" />
               <h3 className="text-lg font-semibold mb-2">No hay registros</h3>
               <p className="text-muted-foreground mb-4">
-                {searchTerm || selectedSupplierId !== 'all' || startDate || endDate
+                {searchTerm ||
+                selectedSupplierId !== 'all' ||
+                startDate ||
+                endDate ||
+                paymentStatusFilter !== 'all'
                   ? 'No se encontraron registros con los filtros aplicados'
                   : 'Aún no hay registros de mercancía'}
               </p>
@@ -347,6 +374,8 @@ const IncomingMerchandiseManagement = () => {
                   <tr className="border-b">
                     <th className="text-left p-2 font-semibold">Fecha</th>
                     <th className="text-left p-2 font-semibold">Proveedor</th>
+                    <th className="text-left p-2 font-semibold">Término</th>
+                    <th className="text-left p-2 font-semibold">Pago</th>
                     <th className="text-left p-2 font-semibold">Registrado por</th>
                     <th className="text-left p-2 font-semibold">Productos</th>
                     <th className="text-right p-2 font-semibold">Total</th>
@@ -381,6 +410,12 @@ const IncomingMerchandiseManagement = () => {
                           <Building2 className="w-4 h-4 text-muted-foreground" />
                           <span className="font-medium">{record.supplier.name}</span>
                         </div>
+                      </td>
+                      <td className="p-2 text-sm max-w-[140px] truncate" title={record.payment_term?.name}>
+                        {record.payment_term?.name ?? '—'}
+                      </td>
+                      <td className="p-2">
+                        <PaymentStatusBadge status={record.payment_status} />
                       </td>
                       <td className="p-2">
                         <div className="flex items-center gap-2">
@@ -426,9 +461,7 @@ const IncomingMerchandiseManagement = () => {
                   <CardHeader className="pb-3">
                     <div className="flex items-start justify-between">
                       <div className="space-y-1">
-                        <CardTitle className="text-base font-semibold">
-                          {record.supplier.name}
-                        </CardTitle>
+                        <CardTitle className="text-base font-semibold">{record.supplier.name}</CardTitle>
                         <p className="text-xs text-muted-foreground flex items-center gap-1">
                           <Calendar className="w-3 h-3" />
                           {formatDate(record.date)}
@@ -441,10 +474,18 @@ const IncomingMerchandiseManagement = () => {
                       <User className="w-4 h-4" />
                       <span>{record.registeredBy.name}</span>
                     </div>
-                    <div className="flex items-center justify-between">
+                    <div className="flex flex-wrap items-center gap-2">
                       <Badge variant="secondary">
                         {record.itemsCount} {record.itemsCount === 1 ? 'producto' : 'productos'}
                       </Badge>
+                      <PaymentStatusBadge status={record.payment_status} />
+                    </div>
+                    {record.payment_term?.name && (
+                      <p className="text-xs text-muted-foreground truncate" title={record.payment_term.name}>
+                        Término: {record.payment_term.name}
+                      </p>
+                    )}
+                    <div className="flex items-center justify-between pt-1">
                       <span className="text-lg font-bold text-primary">
                         {formatCurrency(record.totalValue)}
                       </span>
@@ -455,20 +496,24 @@ const IncomingMerchandiseManagement = () => {
             </div>
           )}
 
-          {/* Pagination + page size */}
           <div className="flex flex-wrap items-center justify-between gap-4 mt-6">
             <div className="flex items-center gap-2">
               <span className="text-sm text-muted-foreground">Items por página:</span>
               <Select
                 value={String(pageSize)}
-                onValueChange={(v) => { setPageSize(Number(v)); setCurrentPage(1); }}
+                onValueChange={(v) => {
+                  setPageSize(Number(v))
+                  setCurrentPage(1)
+                }}
               >
                 <SelectTrigger className="w-[72px] h-9">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   {[18, 27, 36].map((n) => (
-                    <SelectItem key={n} value={String(n)}>{n}</SelectItem>
+                    <SelectItem key={n} value={String(n)}>
+                      {n}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -483,117 +528,6 @@ const IncomingMerchandiseManagement = () => {
           </div>
         </CardContent>
       </Card>
-
-      {/* Detail Dialog */}
-      <Dialog
-        open={isDetailOpen}
-        onOpenChange={(open) => {
-          setIsDetailOpen(open)
-          if (!open) setSelectedRecordId(null)
-        }}
-      >
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Detalle del Registro</DialogTitle>
-          </DialogHeader>
-          {detailData ? (
-            <div className="space-y-6">
-              {/* Header Info */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <Label className="text-muted-foreground">Proveedor</Label>
-                  <div className="flex items-center gap-2 mt-1">
-                    <Building2 className="w-4 h-4" />
-                    <span className="font-medium">{detailData.supplier.name}</span>
-                  </div>
-                </div>
-                <div>
-                  <Label className="text-muted-foreground">Fecha</Label>
-                  <div className="flex items-center gap-2 mt-1">
-                    <Calendar className="w-4 h-4" />
-                    <span>{formatDate(detailData.date)}</span>
-                  </div>
-                </div>
-                <div>
-                  <Label className="text-muted-foreground">Registrado por</Label>
-                  <div className="flex items-center gap-2 mt-1">
-                    <User className="w-4 h-4" />
-                    <span>{detailData.registeredBy.name}</span>
-                  </div>
-                </div>
-                <div>
-                  <Label className="text-muted-foreground">Total</Label>
-                  <div className="mt-1">
-                    <span className="text-2xl font-bold text-primary">
-                      {formatCurrency(detailData.totalValue)}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Notes */}
-              {detailData.notes && (
-                <div>
-                  <Label className="text-muted-foreground">Notas</Label>
-                  <p className="mt-1 text-sm">{detailData.notes}</p>
-                </div>
-              )}
-
-              {/* Items Table */}
-              <div>
-                <Label className="text-muted-foreground mb-2 block">Productos</Label>
-                <div className="border rounded-lg overflow-hidden">
-                  <table className="w-full">
-                    <thead className="bg-muted">
-                      <tr>
-                        <th className="text-left p-3 font-semibold">Producto</th>
-                        <th className="text-center p-3 font-semibold">Cantidad</th>
-                        <th className="text-right p-3 font-semibold">Costo Unit.</th>
-                        <th className="text-right p-3 font-semibold">Subtotal</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {detailData.items.map((item) => (
-                        <tr key={item.id} className="border-t">
-                          <td className="p-3">
-                            <div>
-                              <div className="font-medium">{item.product.name}</div>
-                              {(item.product.brand || item.product.size) && (
-                                <div className="text-xs text-muted-foreground">
-                                  {[item.product.brand, item.product.size].filter(Boolean).join(' - ')}
-                                </div>
-                              )}
-                            </div>
-                          </td>
-                          <td className="p-3 text-center">{item.quantity}</td>
-                          <td className="p-3 text-right">{formatCurrency(item.unit_cost)}</td>
-                          <td className="p-3 text-right font-semibold">
-                            {formatCurrency(item.subtotal)}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                    <tfoot className="bg-muted">
-                      <tr>
-                        <td colSpan={3} className="p-3 text-right font-semibold">
-                          Total:
-                        </td>
-                        <td className="p-3 text-right font-bold text-lg">
-                          {formatCurrency(detailData.totalValue)}
-                        </td>
-                      </tr>
-                    </tfoot>
-                  </table>
-                </div>
-              </div>
-            </div>
-          ) : (
-            <div className="flex items-center justify-center py-8">
-              <div className="text-muted-foreground">Cargando detalles...</div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
     </div>
   )
 }

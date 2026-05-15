@@ -15,6 +15,7 @@ import { formatMoney } from '@/utils'
 import type { Product } from '@/types'
 import { adaptApiProduct, fetchProductById, type ApiProduct } from '@/services/productService'
 import { Input } from '@/components/ui/input'
+import { ImageUploadDropzone } from '@/components/ui/image-upload-dropzone'
 import { Textarea } from '@/components/ui/textarea'
 import { Separator } from '@/components/ui/separator'
 import { useSuppliers } from '@/hooks/useSuppliers'
@@ -106,6 +107,9 @@ export default function ProductDetailPage() {
   const [isEditing, setIsEditing] = useState(false)
   const [editName, setEditName] = useState('')
   const [editPrice, setEditPrice] = useState('')
+  const [editPriceWholesale, setEditPriceWholesale] = useState('')
+  const [editPricePromotion, setEditPricePromotion] = useState('')
+  const [editPromotionUntil, setEditPromotionUntil] = useState('')
   const [editStock, setEditStock] = useState('')
   const [editBrand, setEditBrand] = useState('')
   const [editSize, setEditSize] = useState('')
@@ -122,6 +126,15 @@ export default function ProductDetailPage() {
     if (!product) return
     setEditName(product.name ?? '')
     setEditPrice(String(product.price ?? ''))
+    setEditPriceWholesale(
+      product.priceWholesale != null && product.priceWholesale > 0 ? String(product.priceWholesale) : ''
+    )
+    setEditPricePromotion(
+      product.pricePromotion != null && product.pricePromotion > 0 ? String(product.pricePromotion) : ''
+    )
+    setEditPromotionUntil(
+      product.promotionValidUntil ? String(product.promotionValidUntil).slice(0, 16) : ''
+    )
     setEditStock(String(product.stock ?? ''))
     setEditBrand(product.brand ?? '')
     setEditSize(product.size ?? '')
@@ -193,10 +206,66 @@ export default function ProductDetailPage() {
     }
   }
 
+  const handleEditProductImageFile = async (file: File) => {
+    try {
+      setIsUploadingImage(true)
+      if (file.size > 5 * 1024 * 1024) {
+        toast({ title: 'Error', description: 'La imagen no debe exceder 5MB', variant: 'destructive' })
+        return
+      }
+      if (!file.type.startsWith('image/')) {
+        toast({ title: 'Error', description: 'Solo se permiten archivos de imagen', variant: 'destructive' })
+        return
+      }
+      const token = getAuthToken()
+      if (!token) {
+        toast({ title: 'Error de autenticación', description: 'No estás autenticado.', variant: 'destructive' })
+        return
+      }
+      const formData = new FormData()
+      formData.append('image', file)
+      const response = await fetch(`${getApiBaseUrl()}/products/upload-image`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body: formData,
+      })
+      const data = (await response.json()) as {
+        imageUrl?: string
+        url?: string
+        message?: string
+      }
+      if (!response.ok) {
+        const msg = typeof data.message === 'string' ? data.message : 'No se pudo subir la imagen'
+        throw new Error(msg)
+      }
+      const imageUrl = data.imageUrl ?? data.url
+      if (!imageUrl) throw new Error('La respuesta no contiene la URL de la imagen')
+      setEditImageUrl(imageUrl)
+      toast({ title: 'Imagen actualizada', description: 'La imagen se subió correctamente.' })
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: (error as Error)?.message ?? 'Error al subir la imagen',
+        variant: 'destructive',
+      })
+    } finally {
+      setIsUploadingImage(false)
+    }
+  }
+
   const resetEditState = () => {
     if (!product || !rawProduct) return
     setEditName(product.name ?? '')
     setEditPrice(String(product.price ?? ''))
+    setEditPriceWholesale(
+      product.priceWholesale != null && product.priceWholesale > 0 ? String(product.priceWholesale) : ''
+    )
+    setEditPricePromotion(
+      product.pricePromotion != null && product.pricePromotion > 0 ? String(product.pricePromotion) : ''
+    )
+    setEditPromotionUntil(
+      product.promotionValidUntil ? String(product.promotionValidUntil).slice(0, 16) : ''
+    )
     setEditStock(String(product.stock ?? ''))
     setEditBrand(product.brand ?? '')
     setEditSize(product.size ?? '')
@@ -294,6 +363,11 @@ export default function ProductDetailPage() {
                         stock: numeric(editStock),
                         min_stock: numeric(editMinStock),
                         price: numeric(editPrice),
+                        price_wholesale: editPriceWholesale.trim() ? Number(editPriceWholesale) : null,
+                        price_promotion: editPricePromotion.trim() ? Number(editPricePromotion) : null,
+                        promotion_valid_until: editPromotionUntil.trim()
+                          ? new Date(editPromotionUntil).toISOString()
+                          : null,
                         cost: numeric(editCost),
                         image_url: editImageUrl ?? product.imageUrl,
                         supplier_id: editSupplierId ?? (rawSupplierId ? String(rawSupplierId) : undefined),
@@ -328,54 +402,16 @@ export default function ProductDetailPage() {
                   <div className="flex items-center justify-center text-muted-foreground text-sm py-8">Sin imagen</div>
                 )}
                 {isEditing && canEdit && (
-                  <Input
-                    type="file"
-                    accept="image/*"
-                    disabled={isUploadingImage || isSaving}
-                    onChange={async (event) => {
-                      const file = event.target.files?.[0]
-                      if (!file) { setEditImageUrl(undefined); return }
-                      try {
-                        setIsUploadingImage(true)
-                        if (file.size > 5 * 1024 * 1024) {
-                          toast({ title: 'Error', description: 'La imagen no debe exceder 5MB', variant: 'destructive' })
-                          return
-                        }
-                        if (!file.type.startsWith('image/')) {
-                          toast({ title: 'Error', description: 'Solo se permiten archivos de imagen', variant: 'destructive' })
-                          return
-                        }
-                        const token = getAuthToken()
-                        if (!token) {
-                          toast({ title: 'Error de autenticación', description: 'No estás autenticado.', variant: 'destructive' })
-                          return
-                        }
-                        const formData = new FormData()
-                        formData.append('image', file)
-                        const response = await fetch(`${getApiBaseUrl()}/products/upload-image`, {
-                          method: 'POST',
-                          headers: { Authorization: `Bearer ${token}` },
-                          body: formData,
-                        })
-                        const data = (await response.json()) as {
-                          imageUrl?: string
-                          url?: string
-                          message?: string
-                        }
-                        if (!response.ok) {
-                          const msg = typeof data.message === 'string' ? data.message : 'No se pudo subir la imagen'
-                          throw new Error(msg)
-                        }
-                        const imageUrl = data.imageUrl ?? data.url
-                        if (!imageUrl) throw new Error('La respuesta no contiene la URL de la imagen')
-                        setEditImageUrl(imageUrl)
-                        toast({ title: 'Imagen actualizada', description: 'La imagen se subió correctamente.' })
-                      } catch (error) {
-                        toast({ title: 'Error', description: (error as Error)?.message ?? 'Error al subir la imagen', variant: 'destructive' })
-                      } finally {
-                        setIsUploadingImage(false)
-                      }
+                  <ImageUploadDropzone
+                    onFileSelect={(f) => {
+                      void handleEditProductImageFile(f)
                     }}
+                    onReject={(msg) =>
+                      toast({ title: 'Archivo no válido', description: msg, variant: 'destructive' })
+                    }
+                    disabled={isUploadingImage || isSaving}
+                    isUploading={isUploadingImage}
+                    helperText="Máx 5MB. Se guardará al pulsar «Guardar cambios»."
                   />
                 )}
               </div>
@@ -401,6 +437,38 @@ export default function ProductDetailPage() {
                     <div>
                       <Label className="text-muted-foreground">Precio de venta</Label>
                       {isEditing && canEdit ? <Input type="number" value={editPrice} onChange={(e) => setEditPrice(e.target.value)} className="mt-1" /> : <p className="text-foreground font-medium">{fmt(product.price)}</p>}
+                    </div>
+                    <div>
+                      <Label className="text-muted-foreground">Precio mayoreo</Label>
+                      {isEditing && canEdit ? (
+                        <Input type="number" value={editPriceWholesale} onChange={(e) => setEditPriceWholesale(e.target.value)} className="mt-1" placeholder="Opcional" />
+                      ) : (
+                        <p className="text-foreground font-medium">
+                          {product.priceWholesale != null && product.priceWholesale > 0 ? fmt(product.priceWholesale) : '—'}
+                        </p>
+                      )}
+                    </div>
+                    <div>
+                      <Label className="text-muted-foreground">Precio promoción</Label>
+                      {isEditing && canEdit ? (
+                        <Input type="number" value={editPricePromotion} onChange={(e) => setEditPricePromotion(e.target.value)} className="mt-1" placeholder="Opcional" />
+                      ) : (
+                        <p className="text-foreground font-medium">
+                          {product.pricePromotion != null && product.pricePromotion > 0 ? fmt(product.pricePromotion) : '—'}
+                        </p>
+                      )}
+                    </div>
+                    <div>
+                      <Label className="text-muted-foreground">Promoción hasta</Label>
+                      {isEditing && canEdit ? (
+                        <Input type="datetime-local" value={editPromotionUntil} onChange={(e) => setEditPromotionUntil(e.target.value)} className="mt-1" />
+                      ) : (
+                        <p className="text-foreground font-medium">
+                          {product.promotionValidUntil
+                            ? new Date(product.promotionValidUntil).toLocaleString(locale || 'es-GT')
+                            : '—'}
+                        </p>
+                      )}
                     </div>
                     {canViewCost && (
                       <div>

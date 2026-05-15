@@ -41,19 +41,21 @@ const AppCard = ({
         <button
             onClick={onClick}
             className={cn(
-                'flex flex-col items-center justify-center p-4 rounded-xl transition-all duration-200',
-                'hover:scale-105 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-primary/50',
-                module.color,
-                isActive && 'ring-2 ring-primary shadow-lg'
+                'flex flex-col items-center justify-center gap-2 rounded-xl border border-border/70 bg-card p-3 shadow-sm transition-all duration-200',
+                'hover:-translate-y-0.5 hover:border-primary/20 hover:shadow-md',
+                'focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
+                isActive && 'border-primary/40 ring-2 ring-primary/30 shadow-md'
             )}
         >
-            <div className={cn(
-                'w-12 h-12 rounded-lg flex items-center justify-center mb-2',
-                'bg-white/60 shadow-sm'
-            )}>
-                <Icon className={cn('w-6 h-6', module.iconColor)} />
+            <div
+                className={cn(
+                    'flex h-12 w-12 items-center justify-center rounded-xl',
+                    module.color
+                )}
+            >
+                <Icon className={cn('h-7 w-7', module.iconColor)} />
             </div>
-            <span className='text-sm font-medium text-gray-700 text-center'>
+            <span className='line-clamp-2 text-center text-xs font-medium leading-tight text-foreground'>
                 {module.label}
             </span>
         </button>

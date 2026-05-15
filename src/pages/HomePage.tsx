@@ -1,16 +1,17 @@
 /**
  * Copyright (c) 2026 Diego Patzán. All Rights Reserved.
- * 
+ *
  * This source code is licensed under a Proprietary License.
  * Unauthorized copying, modification, distribution, or use of this file,
  * via any medium, is strictly prohibited without express written permission.
- * 
+ *
  * For licensing inquiries: GitHub @dpatzan2
  */
 
 /**
  * HomePage
- * Shows all available modules in a searchable grid
+ * Launcher de módulos: rejilla densa, tarjeta centrada (icono circular + título).
+ * Mismos iconos CustomIcons / Papirus.
  */
 import { useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
@@ -20,10 +21,11 @@ import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { getVisibleModules, AppModule, getUserRole } from '@/config/appModules'
 import type { AuthUser } from '@/context/AuthContext'
+import { useSystemSettings } from '@/hooks/useSystemSettings'
 
-const AppCard = ({
+const ModuleTile = ({
     module,
-    onClick
+    onClick,
 }: {
     module: AppModule
     onClick: () => void
@@ -32,20 +34,30 @@ const AppCard = ({
 
     return (
         <button
+            type="button"
             onClick={onClick}
+            aria-label={module.label}
             className={cn(
-                'group flex flex-col items-center justify-center p-3 sm:p-4 md:p-6 rounded-xl sm:rounded-2xl transition-all duration-300',
-                'hover:scale-105 hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-primary/50',
-                'bg-white shadow-md border border-gray-100'
+                'group flex h-full w-full flex-col items-center rounded-xl sm:rounded-2xl border border-border/60 bg-card p-3 text-center shadow-sm sm:p-4 md:p-5',
+                'transition-all duration-300 ease-out',
+                'hover:-translate-y-0.5 hover:border-primary/15 hover:shadow-lg',
+                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background'
             )}
         >
-            <div className={cn(
-                'w-10 h-10 sm:w-12 sm:h-12 md:w-16 md:h-16 rounded-lg md:rounded-xl flex items-center justify-center mb-2 sm:mb-3 transition-transform group-hover:scale-110',
-                module.color
-            )}>
-                <Icon className={cn('w-5 h-5 sm:w-6 sm:h-6 md:w-8 md:h-8', module.iconColor)} />
+            <div
+                className={cn(
+                    'mb-2 flex h-11 w-11 shrink-0 items-center justify-center rounded-full sm:mb-3 sm:h-14 sm:w-14 md:h-16 md:w-16',
+                    module.color
+                )}
+            >
+                <Icon
+                    className={cn(
+                        'h-7 w-7 sm:h-8 sm:w-8 md:h-10 md:w-10 transition-transform duration-300 group-hover:scale-105',
+                        module.iconColor
+                    )}
+                />
             </div>
-            <span className='text-xs sm:text-sm font-medium text-gray-700 text-center leading-tight'>
+            <span className="line-clamp-2 text-xs font-semibold leading-tight tracking-tight text-foreground sm:text-sm md:text-base">
                 {module.label}
             </span>
         </button>
@@ -57,15 +69,17 @@ export const HomePage = () => {
     const navigate = useNavigate()
     const { user: rawUser, isSeller, isAdmin } = getUserRole()
     const user = rawUser as AuthUser | null
+    const { companyName } = useSystemSettings()
 
     const modules = useMemo(() => getVisibleModules(), [])
 
     const filteredModules = useMemo(() => {
         if (!search.trim()) return modules
         const term = search.toLowerCase()
-        return modules.filter(m =>
-            m.label.toLowerCase().includes(term) ||
-            m.id.toLowerCase().includes(term)
+        return modules.filter(
+            (m) =>
+                m.label.toLowerCase().includes(term) ||
+                m.id.toLowerCase().includes(term)
         )
     }, [modules, search])
 
@@ -73,7 +87,6 @@ export const HomePage = () => {
         navigate(module.path)
     }
 
-    // Greeting based on time of day
     const getGreeting = () => {
         const hour = new Date().getHours()
         if (hour < 12) return 'Buenos días'
@@ -81,88 +94,90 @@ export const HomePage = () => {
         return 'Buenas noches'
     }
 
+    const year = new Date().getFullYear()
+
     return (
-        <div className='min-h-full bg-gradient-to-br from-slate-100 via-gray-50 to-slate-100'>
-            {/* Header area with greeting */}
-            <div className='pt-4 sm:pt-6 md:pt-8 pb-2 sm:pb-4 px-3 sm:px-4'>
-                <div className='max-w-4xl mx-auto text-center'>
-                    <h1 className='text-lg sm:text-xl md:text-2xl font-semibold text-gray-800 mb-1'>
+        <div className="min-h-full bg-gradient-to-br from-slate-100 via-gray-50 to-slate-100 dark:from-background dark:via-background dark:to-muted/30">
+            <div className="mx-auto max-w-6xl px-2 pb-8 pt-4 sm:px-4 sm:pb-10 sm:pt-6 md:pt-8">
+                <header className="mx-auto max-w-3xl text-center">
+                    <h1 className="text-lg font-semibold text-slate-800 dark:text-foreground sm:text-xl md:text-2xl">
                         {getGreeting()}, {user?.name || 'Usuario'}
                     </h1>
-                    <p className='text-xs sm:text-sm md:text-base text-gray-500'>
-                        {isSeller ? 'Accede a tus módulos' : 'Selecciona un módulo'}
+                    <p className="mt-1 text-xs text-slate-500 dark:text-muted-foreground sm:mt-1.5 sm:text-sm md:text-base">
+                        {isSeller
+                            ? 'Accede a tus módulos'
+                            : '¿Qué módulo quieres gestionar hoy?'}
                     </p>
-                </div>
-            </div>
+                </header>
 
-            {/* Search bar */}
-            <div className='px-3 sm:px-4 pb-4 sm:pb-6 md:pb-8'>
-                <div className='max-w-xl mx-auto'>
-                    <div className='relative'>
-                        <Search className='absolute left-3 sm:left-4 top-1/2 -translate-y-1/2 w-4 sm:w-5 h-4 sm:h-5 text-gray-400' />
+                <div className="mx-auto mt-4 max-w-xl sm:mt-6 md:mt-8">
+                    <div className="relative">
+                        <Search
+                            className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground sm:left-4 sm:h-5 sm:w-5"
+                            aria-hidden
+                        />
                         <Input
                             value={search}
-                            onChange={e => setSearch(e.target.value)}
-                            placeholder='Buscar...'
-                            className='pl-9 sm:pl-12 pr-9 sm:pr-12 py-4 sm:py-5 md:py-6 text-sm sm:text-base md:text-lg bg-white shadow-lg border-0 rounded-lg sm:rounded-xl focus-visible:ring-2 focus-visible:ring-primary/30'
+                            onChange={(e) => setSearch(e.target.value)}
+                            placeholder="Buscar módulos, reportes, contactos…"
+                            className="h-11 border-0 bg-white pl-9 shadow-md dark:bg-card sm:h-12 sm:pl-12 sm:pr-12 md:h-14 md:pl-14 md:text-base"
+                            autoComplete="off"
                         />
-                        {search && (
+                        {search ? (
                             <Button
-                                variant='ghost'
-                                size='sm'
-                                className='absolute right-1 sm:right-2 top-1/2 -translate-y-1/2 h-7 w-7 sm:h-8 sm:w-8 p-0 hover:bg-gray-100 rounded-full'
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className="absolute right-1 top-1/2 h-8 w-8 -translate-y-1/2 rounded-full text-muted-foreground hover:bg-muted hover:text-foreground sm:right-2 sm:h-9 sm:w-9"
                                 onClick={() => setSearch('')}
+                                aria-label="Limpiar búsqueda"
                             >
-                                <X className='w-3 h-3 sm:w-4 sm:h-4' />
+                                <X className="h-4 w-4" />
                             </Button>
-                        )}
+                        ) : null}
                     </div>
                 </div>
-            </div>
 
-            {/* App Grid */}
-            <div className='px-2 sm:px-4 pb-6 sm:pb-8 md:pb-12'>
-                <div className='max-w-5xl mx-auto'>
+                <section className="mt-6 sm:mt-8 md:mt-10" aria-label="Módulos del sistema">
                     {filteredModules.length === 0 ? (
-                        <div className='text-center py-12 sm:py-16 text-gray-500 space-y-1'>
+                        <div className="mx-auto max-w-md rounded-xl border border-dashed border-border bg-white/60 px-5 py-12 text-center text-muted-foreground dark:bg-card/50">
                             {search.trim() ? (
                                 <>
-                                    <p className='text-base sm:text-lg'>No se encontraron módulos</p>
-                                    <p className='text-xs sm:text-sm mt-1'>Intenta con otro término</p>
+                                    <p className="text-base font-medium text-foreground">No se encontraron módulos</p>
+                                    <p className="mt-1 text-sm">Intenta con otro término.</p>
                                 </>
-                            ) : Array.isArray(user?.permissions) &&
-                              !isAdmin &&
-                              user.permissions.length === 0 ? (
+                            ) : Array.isArray(user?.permissions) && !isAdmin && user.permissions.length === 0 ? (
                                 <>
-                                    <p className='text-base sm:text-lg'>
+                                    <p className="text-base font-medium text-foreground">
                                         No tienes módulos asignados todavía.
                                     </p>
-                                    <p className='text-xs sm:text-sm mt-1'>
-                                        Contacta con un administrador para que revise y asigne tus
-                                        permisos.
-                                    </p>
+                                    <p className="mt-1 text-sm">Contacta con un administrador para que revise tus permisos.</p>
                                 </>
                             ) : (
                                 <>
-                                    <p className='text-base sm:text-lg'>No hay módulos disponibles</p>
-                                    <p className='text-xs sm:text-sm mt-1'>
-                                        Si crees que esto es un error, contacta con un administrador.
-                                    </p>
+                                    <p className="text-base font-medium text-foreground">No hay módulos disponibles</p>
+                                    <p className="mt-1 text-sm">Si crees que es un error, contacta al administrador.</p>
                                 </>
                             )}
                         </div>
                     ) : (
-                        <div className='grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-2 sm:gap-3 md:gap-4'>
-                            {filteredModules.map(module => (
-                                <AppCard
-                                    key={module.id}
-                                    module={module}
-                                    onClick={() => handleNavigate(module)}
-                                />
-                            ))}
+                        <div className="mx-auto max-w-5xl">
+                            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3 md:grid-cols-4 md:gap-4 lg:grid-cols-5">
+                                {filteredModules.map((module) => (
+                                    <ModuleTile
+                                        key={module.id}
+                                        module={module}
+                                        onClick={() => handleNavigate(module)}
+                                    />
+                                ))}
+                            </div>
                         </div>
                     )}
-                </div>
+                </section>
+
+                <footer className="mt-8 text-center text-[11px] text-slate-500 dark:text-muted-foreground sm:mt-10 sm:text-xs md:mt-12">
+                    © {year} {companyName}. Todos los derechos reservados.
+                </footer>
             </div>
         </div>
     )

@@ -19,6 +19,9 @@ export interface ProductFormData {
     brand: string
     size: string
     price: string
+    priceWholesale: string
+    pricePromotion: string
+    promotionValidUntil: string
     cost: string
     stock: string
     minStock: string
@@ -47,6 +50,9 @@ export const EMPTY_PRODUCT_FORM: ProductFormData = {
     brand: '',
     size: '',
     price: '',
+    priceWholesale: '',
+    pricePromotion: '',
+    promotionValidUntil: '',
     cost: '',
     stock: '',
     minStock: '',
