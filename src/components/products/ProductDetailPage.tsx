@@ -107,6 +107,9 @@ export default function ProductDetailPage() {
   const [isEditing, setIsEditing] = useState(false)
   const [editName, setEditName] = useState('')
   const [editPrice, setEditPrice] = useState('')
+  const [editPriceWholesale, setEditPriceWholesale] = useState('')
+  const [editPricePromotion, setEditPricePromotion] = useState('')
+  const [editPromotionUntil, setEditPromotionUntil] = useState('')
   const [editStock, setEditStock] = useState('')
   const [editBrand, setEditBrand] = useState('')
   const [editSize, setEditSize] = useState('')
@@ -123,6 +126,15 @@ export default function ProductDetailPage() {
     if (!product) return
     setEditName(product.name ?? '')
     setEditPrice(String(product.price ?? ''))
+    setEditPriceWholesale(
+      product.priceWholesale != null && product.priceWholesale > 0 ? String(product.priceWholesale) : ''
+    )
+    setEditPricePromotion(
+      product.pricePromotion != null && product.pricePromotion > 0 ? String(product.pricePromotion) : ''
+    )
+    setEditPromotionUntil(
+      product.promotionValidUntil ? String(product.promotionValidUntil).slice(0, 16) : ''
+    )
     setEditStock(String(product.stock ?? ''))
     setEditBrand(product.brand ?? '')
     setEditSize(product.size ?? '')
@@ -245,6 +257,15 @@ export default function ProductDetailPage() {
     if (!product || !rawProduct) return
     setEditName(product.name ?? '')
     setEditPrice(String(product.price ?? ''))
+    setEditPriceWholesale(
+      product.priceWholesale != null && product.priceWholesale > 0 ? String(product.priceWholesale) : ''
+    )
+    setEditPricePromotion(
+      product.pricePromotion != null && product.pricePromotion > 0 ? String(product.pricePromotion) : ''
+    )
+    setEditPromotionUntil(
+      product.promotionValidUntil ? String(product.promotionValidUntil).slice(0, 16) : ''
+    )
     setEditStock(String(product.stock ?? ''))
     setEditBrand(product.brand ?? '')
     setEditSize(product.size ?? '')
@@ -342,6 +363,11 @@ export default function ProductDetailPage() {
                         stock: numeric(editStock),
                         min_stock: numeric(editMinStock),
                         price: numeric(editPrice),
+                        price_wholesale: editPriceWholesale.trim() ? Number(editPriceWholesale) : null,
+                        price_promotion: editPricePromotion.trim() ? Number(editPricePromotion) : null,
+                        promotion_valid_until: editPromotionUntil.trim()
+                          ? new Date(editPromotionUntil).toISOString()
+                          : null,
                         cost: numeric(editCost),
                         image_url: editImageUrl ?? product.imageUrl,
                         supplier_id: editSupplierId ?? (rawSupplierId ? String(rawSupplierId) : undefined),
@@ -411,6 +437,38 @@ export default function ProductDetailPage() {
                     <div>
                       <Label className="text-muted-foreground">Precio de venta</Label>
                       {isEditing && canEdit ? <Input type="number" value={editPrice} onChange={(e) => setEditPrice(e.target.value)} className="mt-1" /> : <p className="text-foreground font-medium">{fmt(product.price)}</p>}
+                    </div>
+                    <div>
+                      <Label className="text-muted-foreground">Precio mayoreo</Label>
+                      {isEditing && canEdit ? (
+                        <Input type="number" value={editPriceWholesale} onChange={(e) => setEditPriceWholesale(e.target.value)} className="mt-1" placeholder="Opcional" />
+                      ) : (
+                        <p className="text-foreground font-medium">
+                          {product.priceWholesale != null && product.priceWholesale > 0 ? fmt(product.priceWholesale) : '—'}
+                        </p>
+                      )}
+                    </div>
+                    <div>
+                      <Label className="text-muted-foreground">Precio promoción</Label>
+                      {isEditing && canEdit ? (
+                        <Input type="number" value={editPricePromotion} onChange={(e) => setEditPricePromotion(e.target.value)} className="mt-1" placeholder="Opcional" />
+                      ) : (
+                        <p className="text-foreground font-medium">
+                          {product.pricePromotion != null && product.pricePromotion > 0 ? fmt(product.pricePromotion) : '—'}
+                        </p>
+                      )}
+                    </div>
+                    <div>
+                      <Label className="text-muted-foreground">Promoción hasta</Label>
+                      {isEditing && canEdit ? (
+                        <Input type="datetime-local" value={editPromotionUntil} onChange={(e) => setEditPromotionUntil(e.target.value)} className="mt-1" />
+                      ) : (
+                        <p className="text-foreground font-medium">
+                          {product.promotionValidUntil
+                            ? new Date(product.promotionValidUntil).toLocaleString(locale || 'es-GT')
+                            : '—'}
+                        </p>
+                      )}
                     </div>
                     {canViewCost && (
                       <div>

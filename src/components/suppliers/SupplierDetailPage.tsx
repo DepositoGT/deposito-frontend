@@ -66,6 +66,7 @@ import { Input } from '@/components/ui/input'
 import { useUpdateSupplier } from '@/hooks/useUpdateSupplier'
 import { useDeleteSupplier } from '@/hooks/useDeleteSupplier'
 import type { IncomingMerchandise } from '@/services/incomingMerchandiseService'
+import { replaceSupplierPriceRules } from '@/services/supplierService'
 import { useCategories } from '@/hooks/useCategories'
 import { usePaymentTerms } from '@/hooks/usePaymentTerms'
 import {
@@ -198,6 +199,28 @@ export default function SupplierDetailPage() {
     partyType === 'CUSTOMER'
       ? hasPermission('contacts.clients.delete')
       : hasPermission('contacts.suppliers.delete')
+
+  const [defaultPriceTier, setDefaultPriceTier] = useState<'LIST' | 'WHOLESALE' | 'PROMOTION'>('LIST')
+  const [priceRuleDraft, setPriceRuleDraft] = useState<
+    Array<{ channel: string; price_tier: string; priority: string }>
+  >([{ channel: '', price_tier: 'LIST', priority: '0' }])
+  const [savingPriceRules, setSavingPriceRules] = useState(false)
+
+  useEffect(() => {
+    if (!supplier || partyType !== 'CUSTOMER') return
+    const d = supplier.defaultPriceTier
+    setDefaultPriceTier(d === 'WHOLESALE' || d === 'PROMOTION' || d === 'LIST' ? d : 'LIST')
+    const rules = supplier.customerPriceRules ?? []
+    setPriceRuleDraft(
+      rules.length > 0
+        ? rules.map((r) => ({
+            channel: r.channel ?? '',
+            price_tier: r.price_tier,
+            priority: String(r.priority ?? 0),
+          }))
+        : [{ channel: '', price_tier: 'LIST', priority: '0' }]
+    )
+  }, [supplier, partyType])
 
   const updateSupplierMutation = useUpdateSupplier()
   const { mutateAsync: updateSupplierAsync, isPending: isUpdating } = updateSupplierMutation
@@ -357,6 +380,39 @@ export default function SupplierDetailPage() {
         description: (e as Error)?.message ?? 'No se pudo actualizar el contacto',
         variant: 'destructive',
       })
+    }
+  }
+
+  const handleSavePriceRules = async () => {
+    if (!id || partyType !== 'CUSTOMER' || !canEditSupplier) return
+    setSavingPriceRules(true)
+    try {
+      await updateSupplierAsync({
+        id,
+        payload: { default_price_tier: defaultPriceTier },
+      })
+      await replaceSupplierPriceRules(
+        id,
+        priceRuleDraft.map((r) => ({
+          channel: (r.channel || '') as '' | 'POS' | 'WHOLESALE' | 'ONLINE',
+          price_tier: r.price_tier as 'LIST' | 'WHOLESALE' | 'PROMOTION',
+          priority: Number(r.priority) || 0,
+          active: true,
+        }))
+      )
+      await refetchSupplier()
+      toast({
+        title: 'Precios guardados',
+        description: 'Tarifa por defecto y reglas por canal actualizadas.',
+      })
+    } catch (e) {
+      toast({
+        title: 'Error al guardar precios',
+        description: (e as Error)?.message ?? 'Intenta de nuevo.',
+        variant: 'destructive',
+      })
+    } finally {
+      setSavingPriceRules(false)
     }
   }
 
@@ -1090,6 +1146,130 @@ export default function SupplierDetailPage() {
               </div>
             </CardContent>
           </Card>
+
+          {partyType === 'CUSTOMER' && canEditSupplier && (
+            <Card className="mt-6">
+              <CardHeader>
+                <CardTitle>Precios por canal</CardTitle>
+                <p className="text-sm text-muted-foreground">
+                  La regla con mayor prioridad aplica primero. «Todos los canales» coincide con cualquier venta.
+                </p>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div>
+                  <Label>Tarifa por defecto</Label>
+                  <Select
+                    value={defaultPriceTier}
+                    onValueChange={(v) => {
+                      if (v === 'LIST' || v === 'WHOLESALE' || v === 'PROMOTION') setDefaultPriceTier(v)
+                    }}
+                  >
+                    <SelectTrigger className="mt-1 w-full max-w-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="LIST">Lista (precio base)</SelectItem>
+                      <SelectItem value="WHOLESALE">Mayoreo</SelectItem>
+                      <SelectItem value="PROMOTION">Promoción</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                {priceRuleDraft.map((row, idx) => (
+                  <div key={idx} className="flex flex-wrap items-end gap-2 border border-border rounded-lg p-3">
+                    <div className="min-w-[140px] flex-1">
+                      <Label className="text-xs">Canal</Label>
+                      <Select
+                        value={row.channel === '' ? '__all__' : row.channel}
+                        onValueChange={(v) => {
+                          const ch = v === '__all__' ? '' : v
+                          setPriceRuleDraft((prev) =>
+                            prev.map((x, i) => (i === idx ? { ...x, channel: ch } : x))
+                          )
+                        }}
+                      >
+                        <SelectTrigger className="mt-1">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="__all__">Todos</SelectItem>
+                          <SelectItem value="POS">Mostrador</SelectItem>
+                          <SelectItem value="WHOLESALE">Mayoreo</SelectItem>
+                          <SelectItem value="ONLINE">En línea</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="min-w-[140px] flex-1">
+                      <Label className="text-xs">Tarifa</Label>
+                      <Select
+                        value={row.price_tier}
+                        onValueChange={(v) => {
+                          if (v !== 'LIST' && v !== 'WHOLESALE' && v !== 'PROMOTION') return
+                          setPriceRuleDraft((prev) =>
+                            prev.map((x, i) => (i === idx ? { ...x, price_tier: v } : x))
+                          )
+                        }}
+                      >
+                        <SelectTrigger className="mt-1">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="LIST">Lista</SelectItem>
+                          <SelectItem value="WHOLESALE">Mayoreo</SelectItem>
+                          <SelectItem value="PROMOTION">Promoción</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="w-24">
+                      <Label className="text-xs">Prioridad</Label>
+                      <Input
+                        type="number"
+                        className="mt-1"
+                        value={row.priority}
+                        onChange={(e) =>
+                          setPriceRuleDraft((prev) =>
+                            prev.map((x, i) => (i === idx ? { ...x, priority: e.target.value } : x))
+                          )
+                        }
+                      />
+                    </div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setPriceRuleDraft((prev) => prev.filter((_, i) => i !== idx))}
+                      disabled={priceRuleDraft.length <= 1}
+                    >
+                      Quitar
+                    </Button>
+                  </div>
+                ))}
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() =>
+                      setPriceRuleDraft((p) => [
+                        ...p,
+                        { channel: 'POS', price_tier: 'WHOLESALE', priority: '10' },
+                      ])
+                    }
+                  >
+                    Añadir regla
+                  </Button>
+                  <Button
+                    type="button"
+                    className="bg-liquor-amber hover:bg-liquor-amber/90 text-white"
+                    size="sm"
+                    disabled={savingPriceRules}
+                    onClick={() => void handleSavePriceRules()}
+                  >
+                    {savingPriceRules ? 'Guardando…' : 'Guardar precios'}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
 
         {showMerchTab && (

@@ -146,6 +146,21 @@ export const adaptApiSupplier = (s: ApiSupplier): Supplier => {
     ? s.productsList.map(adaptApiProduct)
     : undefined;
 
+  const rawRules = (s as { customer_price_rules?: unknown }).customer_price_rules;
+  const customerPriceRules = Array.isArray(rawRules)
+    ? rawRules.map((r: Record<string, unknown>) => ({
+        id: String(r.id ?? ""),
+        channel: (r.channel as string | null) ?? null,
+        price_tier: String(r.price_tier ?? "LIST"),
+        priority: Number(r.priority ?? 0),
+        active: Boolean(r.active !== false),
+      }))
+    : undefined;
+
+  const dpt = (s as { default_price_tier?: string }).default_price_tier;
+  const defaultPriceTier =
+    dpt === "WHOLESALE" || dpt === "PROMOTION" || dpt === "LIST" ? dpt : "LIST";
+
   const pt = s.party_type === "CUSTOMER" ? "CUSTOMER" : "SUPPLIER";
   const entityKind = s.entity_kind === "PERSON" ? "PERSON" : "ORGANIZATION";
   const taxId =
@@ -173,6 +188,8 @@ export const adaptApiSupplier = (s: ApiSupplier): Supplier => {
     categories: categoriesFromApi,
     categoriesLabel: categoryLabel || undefined,
     productsList,
+    defaultPriceTier: pt === "CUSTOMER" ? defaultPriceTier : undefined,
+    customerPriceRules: pt === "CUSTOMER" ? customerPriceRules : undefined,
   };
 };
 
@@ -262,6 +279,8 @@ export interface CreateSupplierPayload {
   tax_id?: string | null;
   /** Persona individual vs empresa */
   entity_kind?: "PERSON" | "ORGANIZATION";
+  /** Solo clientes: tarifa por defecto si no hay regla de canal */
+  default_price_tier?: "LIST" | "WHOLESALE" | "PROMOTION";
 }
 
 export const createSupplier = async (payload: CreateSupplierPayload): Promise<ApiSupplier> => {
@@ -284,7 +303,24 @@ export const updateSupplier = async (id: string, payload: Partial<CreateSupplier
   });
   return data;
 };
- 
+
+export type CustomerPriceRuleInput = {
+  channel?: "" | "POS" | "WHOLESALE" | "ONLINE" | null;
+  price_tier: "LIST" | "WHOLESALE" | "PROMOTION";
+  priority?: number;
+  active?: boolean;
+};
+
+export const replaceSupplierPriceRules = async (
+  supplierId: string,
+  rules: CustomerPriceRuleInput[]
+): Promise<{ rules: Array<Record<string, unknown>> }> => {
+  return apiFetch<{ rules: Array<Record<string, unknown>> }>(`/api/suppliers/${supplierId}/price-rules`, {
+    method: "PUT",
+    body: JSON.stringify({ rules }),
+  });
+};
+
 export const deleteSupplier = async (id: string): Promise<{ ok?: boolean } | null> => {
   const data = await apiFetch<{ ok?: boolean }>(`/api/suppliers/${id}`, { method: "DELETE" });
   return data ?? null;

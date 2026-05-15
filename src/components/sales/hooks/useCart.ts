@@ -19,6 +19,8 @@ import type { CartProduct, AvailabilityDialogState, AdminAuthDialogState } from 
 
 interface UseCartOptions {
     availableProducts: Product[]
+    /** Precio unitario según cliente/canal (POS); si no se envía, se usa `product.price`. */
+    getUnitPrice?: (product: Product) => number
 }
 
 interface UseCartReturn {
@@ -41,6 +43,8 @@ interface UseCartReturn {
         lines: { productId: string; qty: number }[],
         adminAuthorizedIds: string[]
     ) => { missingProductIds: string[]; qtyAdjustedIds: string[] }
+    /** Recalcula precios en carrito (p. ej. tras cambiar canal o cliente). */
+    repriceCartLines: () => void
     setAdditionalQty: (qty: string) => void
     setAdminUsername: (username: string) => void
     setAdminPassword: (password: string) => void
@@ -51,7 +55,7 @@ interface UseCartReturn {
     closeAdminAuthDialog: () => void
 }
 
-export const useCart = ({ availableProducts }: UseCartOptions): UseCartReturn => {
+export const useCart = ({ availableProducts, getUnitPrice }: UseCartOptions): UseCartReturn => {
     const { toast } = useToast()
 
     // Cart state
@@ -82,6 +86,7 @@ export const useCart = ({ availableProducts }: UseCartOptions): UseCartReturn =>
 
     // Actions
     const addToCart = useCallback((product: Product) => {
+        const unit = getUnitPrice ? getUnitPrice(product) : Number(product.price ?? 0)
         const available = Number(product.stock ?? 0)
         const existing = cartItems.find(i => i.id === product.id)
         const currentQty = existing?.qty ?? 0
@@ -90,7 +95,7 @@ export const useCart = ({ availableProducts }: UseCartOptions): UseCartReturn =>
         if (requestedQty <= available) {
             setCartItems(prev => {
                 if (existing) return prev.map(i => i.id === product.id ? { ...i, qty: i.qty + 1 } : i)
-                return [...prev, { ...product, qty: 1 }]
+                return [...prev, { ...product, price: unit, qty: 1 }]
             })
             return
         }
@@ -98,7 +103,7 @@ export const useCart = ({ availableProducts }: UseCartOptions): UseCartReturn =>
         // Insufficient stock: ask for additional quantity
         setAvailabilityDialog({ open: true, product, requestedQty, availableStock: available })
         setAdditionalQty('')
-    }, [cartItems])
+    }, [cartItems, getUnitPrice])
 
     const removeFromCart = useCallback((productId: string) => {
         setCartItems(prev => prev.filter(i => i.id !== productId))
@@ -156,14 +161,15 @@ export const useCart = ({ availableProducts }: UseCartOptions): UseCartReturn =>
                     }
                     qtyAdjustedIds.push(line.productId)
                 }
-                built.push({ ...p, qty })
+                const unit = getUnitPrice ? getUnitPrice(p) : Number(p.price ?? 0)
+                built.push({ ...p, price: unit, qty })
             }
 
             setCartItems(built)
             setAdminAuthorizedProducts(adminSet)
             return { missingProductIds, qtyAdjustedIds }
         },
-        [availableProducts]
+        [availableProducts, getUnitPrice]
     )
 
     // Dialog handlers
@@ -237,7 +243,8 @@ export const useCart = ({ availableProducts }: UseCartOptions): UseCartReturn =>
                         i.id === product.id ? { ...i, qty: requestedQty } : i
                     ))
                 } else {
-                    setCartItems(prev => [...prev, { ...product, qty: requestedQty }])
+                    const unit = getUnitPrice ? getUnitPrice(product) : Number(product.price ?? 0)
+                    setCartItems(prev => [...prev, { ...product, price: unit, qty: requestedQty }])
                 }
 
                 setAdminAuthorizedProducts(prev => new Set(prev).add(product.id))
@@ -262,13 +269,24 @@ export const useCart = ({ availableProducts }: UseCartOptions): UseCartReturn =>
         } finally {
             setIsAuthenticating(false)
         }
-    }, [adminUsername, adminPassword, adminAuthDialog, cartItems, toast])
+    }, [adminUsername, adminPassword, adminAuthDialog, cartItems, toast, getUnitPrice])
 
     const closeAdminAuthDialog = useCallback(() => {
         setAdminAuthDialog({ open: false, product: null, requestedQty: 0 })
         setAdminUsername('')
         setAdminPassword('')
     }, [])
+
+    const repriceCartLines = useCallback(() => {
+        if (!getUnitPrice) return
+        setCartItems((prev) =>
+            prev.map((i) => {
+                const p = availableProducts.find((x) => x.id === i.id)
+                if (!p) return i
+                return { ...i, price: getUnitPrice(p) }
+            })
+        )
+    }, [availableProducts, getUnitPrice])
 
     return {
         cartItems,
@@ -285,6 +303,7 @@ export const useCart = ({ availableProducts }: UseCartOptions): UseCartReturn =>
         updateQuantity,
         clearCart,
         hydrateFromLines,
+        repriceCartLines,
         setAdditionalQty,
         setAdminUsername,
         setAdminPassword,

@@ -47,6 +47,7 @@ import { useAuthPermissions } from '@/hooks/useAuthPermissions'
 import { useSystemSettings } from '@/hooks/useSystemSettings'
 import { formatMoney } from '@/utils'
 import { createSale } from '@/services/saleService'
+import { postPricingPreview } from '@/services/productService'
 import {
   saveNewSaleDraft,
   loadNewSaleDraft,
@@ -77,11 +78,13 @@ const ProductCard = ({
   onAdd,
   disabled,
   formatPrice,
+  displayUnitPrice,
 }: {
   product: Product
   onAdd: () => void
   disabled?: boolean
   formatPrice: (n: number) => string
+  displayUnitPrice: number
 }) => (
   <Card className="overflow-hidden transition-shadow hover:shadow-md">
     <div className="aspect-square bg-muted relative">
@@ -102,7 +105,7 @@ const ProductCard = ({
         {product.name}
       </p>
       <p className="text-xs text-muted-foreground">
-        {formatPrice(Number(product.price))} · Stock: {product.stock ?? 0}
+        {formatPrice(displayUnitPrice)} · Stock: {product.stock ?? 0}
       </p>
       <Button
         size="sm"
@@ -140,6 +143,8 @@ export default function NewSalePage() {
   const [customer, setCustomer] = useState('')
   const [customerNit, setCustomerNit] = useState('')
   const [pickedCustomerId, setPickedCustomerId] = useState<string>('__none__')
+  const [salesChannel, setSalesChannel] = useState<'POS' | 'WHOLESALE' | 'ONLINE'>('POS')
+  const [unitPricesById, setUnitPricesById] = useState<Record<string, number>>({})
   const [isFinalConsumer, setIsFinalConsumer] = useState(false)
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethodType | null>(null)
   const [amountReceived, setAmountReceived] = useState('')
@@ -148,7 +153,20 @@ export default function NewSalePage() {
   /** Fuerza recomputar si hay borrador en localStorage (React no observa el storage). */
   const [storedDraftRevision, setStoredDraftRevision] = useState(0)
 
-  const cart = useCart({ availableProducts })
+  const customerContactIdForPricing =
+    pickedCustomerId !== '__none__' && pickedCustomerId.trim() ? pickedCustomerId : undefined
+
+  const getUnitPrice = useCallback(
+    (p: Product) => {
+      const u = unitPricesById[p.id]
+      return u != null && Number.isFinite(u) ? u : Number(p.price ?? 0)
+    },
+    [unitPricesById]
+  )
+
+  const cart = useCart({ availableProducts, getUnitPrice })
+  const repriceCartRef = useRef(cart.repriceCartLines)
+  repriceCartRef.current = cart.repriceCartLines
   const promotionCartItems = useMemo(
     () =>
       cart.cartItems.map((item) => ({
@@ -167,6 +185,34 @@ export default function NewSalePage() {
     locale,
     currencyCode,
   })
+
+  useEffect(() => {
+    let cancelled = false
+    const ids = availableProducts.map((p) => p.id)
+    if (ids.length === 0) {
+      setUnitPricesById({})
+      return
+    }
+    void (async () => {
+      try {
+        const r = await postPricingPreview({
+          product_ids: ids,
+          sales_channel: salesChannel,
+          customer_contact_id: customerContactIdForPricing ?? null,
+        })
+        if (!cancelled) setUnitPricesById(r.unit_prices ?? {})
+      } catch {
+        if (!cancelled) setUnitPricesById({})
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [availableProducts, salesChannel, customerContactIdForPricing])
+
+  useEffect(() => {
+    repriceCartRef.current()
+  }, [unitPricesById])
 
   const filteredProducts = useMemo(
     () =>
@@ -299,6 +345,12 @@ export default function NewSalePage() {
           : '__none__'
       )
       setIsFinalConsumer(Boolean(draft.isFinalConsumer))
+      const ch = draft.salesChannel
+      if (ch === 'WHOLESALE' || ch === 'ONLINE' || ch === 'POS') {
+        setSalesChannel(ch)
+      } else {
+        setSalesChannel('POS')
+      }
       setAmountReceived(draft.amountReceived ?? '')
       if (draft.productPageSize && [9, 18, 36, 54].includes(draft.productPageSize)) {
         setProductPageSize(draft.productPageSize)
@@ -490,6 +542,7 @@ export default function NewSalePage() {
       customerNit,
       pickedCustomerId: pickedCustomerId === '__none__' ? undefined : pickedCustomerId,
       isFinalConsumer,
+      salesChannel,
       paymentMethodId: paymentMethod?.id ?? null,
       amountReceived,
       lines: cart.cartItems.map((item) => ({ productId: item.id, qty: item.qty })),
@@ -502,6 +555,7 @@ export default function NewSalePage() {
     setCustomer('')
     setCustomerNit('')
     setPickedCustomerId('__none__')
+    setSalesChannel('POS')
     setIsFinalConsumer(false)
     setPaymentMethod(null)
     setAmountReceived('')
@@ -555,6 +609,8 @@ export default function NewSalePage() {
       is_final_consumer: isFinalConsumer,
       payment_method_id: paymentMethod.id,
       status_id: 0,
+      customer_contact_id: pickedCustomerId !== '__none__' ? pickedCustomerId : undefined,
+      sales_channel: salesChannel,
       items: cart.cartItems.map((item: CartProduct) => ({
         product_id: item.id,
         price: item.price,
@@ -593,6 +649,7 @@ export default function NewSalePage() {
       setCustomer('')
       setCustomerNit('')
       setPickedCustomerId('__none__')
+      setSalesChannel('POS')
       setPaymentMethod(null)
       setAmountReceived('')
     } catch (e) {
@@ -827,6 +884,27 @@ export default function NewSalePage() {
                 <Label htmlFor="cf">Consumidor final (CF)</Label>
               </div>
               <div>
+                <Label>Canal de venta</Label>
+                <Select
+                  value={salesChannel}
+                  onValueChange={(v) => {
+                    if (v === 'WHOLESALE' || v === 'ONLINE' || v === 'POS') setSalesChannel(v)
+                  }}
+                >
+                  <SelectTrigger className="mt-1">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="POS">Mostrador (POS)</SelectItem>
+                    <SelectItem value="WHOLESALE">Mayoreo / ruta</SelectItem>
+                    <SelectItem value="ONLINE">En línea</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Define lista, mayoreo o promoción según precios del producto y reglas del cliente.
+                </p>
+              </div>
+              <div>
                 <Label>Método de pago *</Label>
                 <Select
                   value={paymentMethod ? String(paymentMethod.id) : ''}
@@ -1037,6 +1115,7 @@ export default function NewSalePage() {
                         onAdd={() => cart.addToCart(product)}
                         disabled={isProcessing}
                         formatPrice={fmt}
+                        displayUnitPrice={getUnitPrice(product)}
                       />
                     ))}
                   </div>
