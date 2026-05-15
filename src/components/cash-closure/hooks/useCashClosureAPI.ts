@@ -34,6 +34,8 @@ interface SaveClosurePayload {
     cashierName: string
     /** ID del usuario cajero (trazabilidad) */
     cashierId?: string
+    /** Sesión de caja ya cerrada en POS (pendiente de arqueo); al guardar solo se enlaza al cierre */
+    cashRegisterSessionId?: string
     theoreticalData: TheoreticalData
     actualTotal: number
     notes: string
@@ -91,7 +93,7 @@ interface UseCashClosureAPIReturn {
     setPageSize: (size: number) => void
     // Operations
     getLastClosureDate: (scope: 'day' | 'mine') => Promise<{ suggestedStart: string; suggestedEnd: string } | null>
-    calculateTheoretical: (startDate: string, endDate: string, cashierId?: string) => Promise<TheoreticalData | null>
+    calculateTheoretical: (startDate: string, endDate: string, cashierId?: string, cashRegisterSessionId?: string) => Promise<TheoreticalData | null>
     saveClosure: (payload: SaveClosurePayload) => Promise<boolean>
     fetchClosures: (page: number, isSeller: boolean, pageSizeOverride?: number, filters?: { status?: string; startDate?: string; endDate?: string }) => Promise<void>
     fetchClosureDetail: (closureId: string) => Promise<CashClosure | null>
@@ -143,7 +145,7 @@ export const useCashClosureAPI = (): UseCashClosureAPIReturn => {
         }
     }, [timezone])
 
-    const calculateTheoretical = useCallback(async (startDate: string, endDate: string, cashierId?: string): Promise<TheoreticalData | null> => {
+    const calculateTheoretical = useCallback(async (startDate: string, endDate: string, cashierId?: string, cashRegisterSessionId?: string): Promise<TheoreticalData | null> => {
         setIsCalculating(true)
         try {
             // Validate stocks first
@@ -169,12 +171,27 @@ export const useCashClosureAPI = (): UseCashClosureAPIReturn => {
                 end_date: endDate
             })
             if (cashierId) params.set('cashier_id', cashierId)
+            if (cashRegisterSessionId) params.set('cash_register_session_id', cashRegisterSessionId)
             const response = await fetch(
                 `${API_URL}/cash-closures/calculate-theoretical?${params.toString()}`,
                 { headers: getAuthHeaders() }
             )
 
-            if (!response.ok) throw new Error('Error calculating theoretical data')
+            if (!response.ok) {
+                let msg = 'No se pudo calcular el cierre teórico'
+                try {
+                    const err = await response.json() as { message?: string }
+                    if (err?.message) msg = err.message
+                } catch {
+                    /* ignore */
+                }
+                toast({
+                    title: 'Error',
+                    description: msg,
+                    variant: 'destructive'
+                })
+                return null
+            }
 
             const data: TheoreticalData = await response.json()
             setTheoreticalData(data)
@@ -228,6 +245,9 @@ export const useCashClosureAPI = (): UseCashClosureAPIReturn => {
                 denominations: payload.denominations.filter(d => d.quantity > 0)
             }
             if (payload.cashierId) closureData.cashierId = payload.cashierId
+            if (payload.cashRegisterSessionId) {
+                closureData.cash_register_session_id = payload.cashRegisterSessionId
+            }
 
             const response = await fetch(`${API_URL}/cash-closures`, {
                 method: 'POST',
@@ -235,13 +255,17 @@ export const useCashClosureAPI = (): UseCashClosureAPIReturn => {
                 body: JSON.stringify(closureData)
             })
 
-            if (!response.ok) throw new Error(`Error saving closure: ${response.status}`)
+            const savedOrErr = await response.json().catch(() => ({})) as { message?: string; closure_number?: number }
 
-            const savedClosure = await response.json()
+            if (!response.ok) {
+                const msg = savedOrErr.message || `Error al guardar (${response.status})`
+                toast({ title: 'Error', description: msg, variant: 'destructive' })
+                return false
+            }
 
             toast({
                 title: 'Cierre guardado',
-                description: `Cierre #${savedClosure.closure_number} guardado exitosamente`,
+                description: `Cierre #${savedOrErr.closure_number} guardado exitosamente`,
             })
 
             setTheoreticalData(null)
@@ -250,7 +274,7 @@ export const useCashClosureAPI = (): UseCashClosureAPIReturn => {
             console.error('Error saving closure:', error)
             toast({
                 title: 'Error',
-                description: 'No se pudo guardar el cierre de caja',
+                description: error instanceof Error ? error.message : 'No se pudo guardar el cierre de caja',
                 variant: 'destructive'
             })
             return false

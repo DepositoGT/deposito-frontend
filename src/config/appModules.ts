@@ -39,8 +39,10 @@ export interface AppModule {
     label: string
     path: string
     icon: IconComponent
-    color: string       // Background color for the card
-    iconColor: string   // Icon color
+    /** Fondo suave del halo circular del icono (home / launcher) */
+    color: string
+    /** Clase Tailwind sobre el wrapper del icono (SVG / PNG) */
+    iconColor: string
     adminOnly?: boolean
     sellerAllowed?: boolean
     // Permisos (códigos) necesarios para ver este módulo.
@@ -54,8 +56,8 @@ export const appModules: AppModule[] = [
         label: 'Dashboard',
         path: '/dashboard',
         icon: DashboardIcon,
-        color: 'bg-orange-100',
-        iconColor: 'text-orange-600',
+        color: 'bg-sky-100/90',
+        iconColor: 'text-sky-800',
         // Solo visible si el usuario tiene permisos de analíticas
         permissions: ['analytics.view']
     },
@@ -64,8 +66,8 @@ export const appModules: AppModule[] = [
         label: 'Ventas',
         path: '/ventas',
         icon: VentasIcon,
-        color: 'bg-orange-100',
-        iconColor: 'text-orange-600',
+        color: 'bg-emerald-100/90',
+        iconColor: 'text-emerald-800',
         sellerAllowed: true,
         permissions: ['sales.view', 'sales.create']
     },
@@ -74,8 +76,8 @@ export const appModules: AppModule[] = [
         label: 'Inventario',
         path: '/inventario',
         icon: InventarioIcon,
-        color: 'bg-orange-100',
-        iconColor: 'text-orange-600',
+        color: 'bg-violet-100/90',
+        iconColor: 'text-violet-800',
         permissions: ['products.view']
     },
     {
@@ -83,8 +85,8 @@ export const appModules: AppModule[] = [
         label: 'Inventariado',
         path: '/inventario/inventariado',
         icon: InventariadoIcon,
-        color: 'bg-orange-100',
-        iconColor: 'text-orange-600',
+        color: 'bg-cyan-100/90',
+        iconColor: 'text-cyan-800',
         sellerAllowed: true,
         permissions: [
             'inventory_count.view',
@@ -97,8 +99,8 @@ export const appModules: AppModule[] = [
         label: 'Devoluciones',
         path: '/devoluciones',
         icon: DevolucionesIcon,
-        color: 'bg-orange-100',
-        iconColor: 'text-orange-600',
+        color: 'bg-orange-100/90',
+        iconColor: 'text-orange-800',
         permissions: ['returns.view']
     },
     {
@@ -106,8 +108,8 @@ export const appModules: AppModule[] = [
         label: 'Cierre de Caja',
         path: '/cierre-caja',
         icon: CierreCajaIcon,
-        color: 'bg-orange-100',
-        iconColor: 'text-orange-600',
+        color: 'bg-lime-100/90',
+        iconColor: 'text-lime-900',
         sellerAllowed: true,
         permissions: ['cashclosure.view']
     },
@@ -116,8 +118,8 @@ export const appModules: AppModule[] = [
         label: 'Contactos',
         path: '/contactos',
         icon: ProveedoresIcon,
-        color: 'bg-orange-100',
-        iconColor: 'text-orange-600',
+        color: 'bg-indigo-100/90',
+        iconColor: 'text-indigo-800',
         permissions: ['contacts.suppliers.view', 'contacts.clients.view']
     },
     {
@@ -125,8 +127,8 @@ export const appModules: AppModule[] = [
         label: 'Mercancía',
         path: '/mercancia',
         icon: MercanciaIcon,
-        color: 'bg-orange-100',
-        iconColor: 'text-orange-600',
+        color: 'bg-amber-100/90',
+        iconColor: 'text-amber-900',
         permissions: ['merchandise.view']
     },
     {
@@ -134,8 +136,8 @@ export const appModules: AppModule[] = [
         label: 'Análisis',
         path: '/analisis',
         icon: AnalyticsIcon,
-        color: 'bg-orange-100',
-        iconColor: 'text-orange-600',
+        color: 'bg-teal-100/90',
+        iconColor: 'text-teal-800',
         permissions: ['analytics.view']
     },
     {
@@ -143,8 +145,8 @@ export const appModules: AppModule[] = [
         label: 'Reportes',
         path: '/reportes',
         icon: ReportesIcon,
-        color: 'bg-orange-100',
-        iconColor: 'text-orange-600',
+        color: 'bg-green-100/90',
+        iconColor: 'text-green-900',
         permissions: ['reports.view']
     },
     {
@@ -152,8 +154,8 @@ export const appModules: AppModule[] = [
         label: 'Alertas',
         path: '/alertas',
         icon: AlertasIcon,
-        color: 'bg-orange-100',
-        iconColor: 'text-orange-600',
+        color: 'bg-red-100/90',
+        iconColor: 'text-red-800',
         permissions: ['alerts.view']
     },
     {
@@ -161,8 +163,8 @@ export const appModules: AppModule[] = [
         label: 'Promociones',
         path: '/promociones',
         icon: PromocionesIcon,
-        color: 'bg-orange-100',
-        iconColor: 'text-orange-600',
+        color: 'bg-fuchsia-100/90',
+        iconColor: 'text-fuchsia-800',
         adminOnly: true,
         permissions: ['promotions.view', 'promotions.manage']
     },
@@ -171,8 +173,8 @@ export const appModules: AppModule[] = [
         label: 'Catálogos',
         path: '/catalogos',
         icon: CatalogosIcon,
-        color: 'bg-orange-100',
-        iconColor: 'text-orange-600',
+        color: 'bg-blue-100/90',
+        iconColor: 'text-blue-800',
         adminOnly: true,
         permissions: ['catalogs.view']
     },
@@ -181,8 +183,8 @@ export const appModules: AppModule[] = [
         label: 'Usuarios',
         path: '/usuarios',
         icon: UsuariosIcon,
-        color: 'bg-orange-100',
-        iconColor: 'text-orange-600',
+        color: 'bg-rose-100/90',
+        iconColor: 'text-rose-900',
         adminOnly: true,
         permissions: ['users.view', 'roles.manage']
     },
@@ -191,8 +193,8 @@ export const appModules: AppModule[] = [
         label: 'Configuración',
         path: '/configuracion',
         icon: ConfiguracionIcon,
-        color: 'bg-orange-100',
-        iconColor: 'text-orange-600',
+        color: 'bg-slate-200/80',
+        iconColor: 'text-slate-800',
         adminOnly: true,
         permissions: ['settings.view', 'settings.manage']
     }

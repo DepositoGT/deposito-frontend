@@ -59,6 +59,7 @@ import PromotionsManagement from "@/components/PromotionsManagement";
 import PromotionCreatePage from "@/components/promotions/PromotionCreatePage";
 import PromotionEditPage from "@/components/promotions/PromotionEditPage";
 import IncomingMerchandiseManagement from "@/components/IncomingMerchandiseManagement";
+import IncomingMerchandiseDetailPage from "@/pages/IncomingMerchandiseDetailPage";
 import ConfigManagement from "@/components/config/ConfigManagement";
 import InventoryCountListPage from "@/components/inventoryCounts/InventoryCountListPage";
 import InventoryCountNewPage from "@/components/inventoryCounts/InventoryCountNewPage";
@@ -287,6 +288,14 @@ const App = () => (
                 />
 
                 {/* Incoming Merchandise */}
+                <Route
+                  path="/mercancia/:id"
+                  element={
+                    <PermissionRoute any={["merchandise.view"]}>
+                      <IncomingMerchandiseDetailPage />
+                    </PermissionRoute>
+                  }
+                />
                 <Route
                   path="/mercancia"
                   element={

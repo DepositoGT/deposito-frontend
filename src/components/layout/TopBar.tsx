@@ -12,17 +12,15 @@
  * TopBar - Top navigation bar with app launcher trigger
  * Replaces the traditional sidebar with a clean top bar
  */
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { Menu, Bell, LogOut, User } from 'lucide-react'
+import { Menu, Bell, LogOut, ChevronDown } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import {
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
-    DropdownMenuLabel,
-    DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { AppLauncher } from './AppLauncher'
@@ -35,6 +33,21 @@ import type { User as UserType } from '@/services/userService'
 import type { AuthUser } from '@/context/AuthContext'
 
 type CurrentUser = AuthUser | UserType | null
+
+function initialsFromName(name: string | undefined | null) {
+    if (!name?.trim()) return '??'
+    const parts = name.trim().split(/\s+/).filter(Boolean)
+    if (parts.length >= 2) {
+        return `${parts[0][0] ?? ''}${parts[parts.length - 1][0] ?? ''}`.toUpperCase()
+    }
+    return name.slice(0, 2).toUpperCase()
+}
+
+function userPhotoUrl(user: CurrentUser) {
+    if (!user) return null
+    const url = (user as UserType).photo_url ?? (user as AuthUser).photo_url
+    return url && String(url).trim() ? String(url).trim() : null
+}
 
 export const TopBar = () => {
     const [launcherOpen, setLauncherOpen] = useState(false)
@@ -50,6 +63,12 @@ export const TopBar = () => {
     // Obtener el usuario completo del contexto de autenticación
     const currentUser: CurrentUser = authUser || (roleUser as AuthUser | UserType | null)
     const roleName = currentUser?.role?.name ?? null
+    const displayName = currentUser?.name?.trim() || 'Usuario'
+    const photoUrl = userPhotoUrl(currentUser)
+
+    useEffect(() => {
+        setImageError(false)
+    }, [currentUser?.id, photoUrl])
 
     // Get critical products for notification badge
     const { data: criticalProducts = [] } = useCriticalProducts()
@@ -66,7 +85,7 @@ export const TopBar = () => {
 
     return (
         <>
-            <header className='h-12 sm:h-14 bg-card border-b border-border flex items-center px-2 sm:px-4 gap-2 sm:gap-4 shadow-sm'>
+            <header className='h-14 bg-card border-b border-border flex items-center px-2 sm:px-4 gap-2 sm:gap-3 shadow-sm'>
                 {/* App Launcher Button */}
                 <Button
                     variant='ghost'
@@ -103,65 +122,110 @@ export const TopBar = () => {
                 {/* Spacer */}
                 <div className='flex-1' />
 
-                {/* Alerts Button - solo si tiene acceso al módulo de alertas */}
-                {canViewAlerts && (
-                    <Button
-                        variant='ghost'
-                        size='icon'
-                        className='relative'
-                        onClick={() => navigate('/alertas')}
-                    >
-                        <Bell className='w-5 h-5' />
-                        {criticalProducts.length > 0 && (
-                            <Badge
-                                variant='destructive'
-                                className='absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-xs'
-                            >
-                                {criticalProducts.length > 9 ? '9+' : criticalProducts.length}
-                            </Badge>
-                        )}
-                    </Button>
-                )}
-
-                {/* User Menu */}
-                <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                        <Button variant='ghost' size='icon' className='rounded-full'>
-                            {currentUser && (currentUser as UserType)?.photo_url && !imageError ? (
-                                <div className='w-8 h-8 rounded-full overflow-hidden bg-secondary flex items-center justify-center border border-border'>
-                                    <img 
-                                        src={(currentUser as UserType).photo_url!} 
-                                        alt={currentUser?.name || 'Usuario'}
-                                        className='w-full h-full object-cover'
-                                        onError={() => setImageError(true)}
-                                    />
-                                </div>
-                            ) : (
-                                <div className='w-8 h-8 bg-secondary rounded-full flex items-center justify-center'>
-                                    <User className='w-4 h-4' />
-                                </div>
+                {/* Zona derecha: alertas + cuenta */}
+                <div className='flex items-center gap-1 sm:gap-2 shrink-0'>
+                    {/* Alertas */}
+                    {canViewAlerts && (
+                        <Button
+                            type='button'
+                            variant='ghost'
+                            size='icon'
+                            className='relative h-10 w-10 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/80'
+                            onClick={() => navigate('/alertas')}
+                            aria-label={
+                                criticalProducts.length > 0
+                                    ? `Alertas: ${criticalProducts.length} productos críticos`
+                                    : 'Ver alertas'
+                            }
+                        >
+                            <Bell className='h-5 w-5' strokeWidth={2} />
+                            {criticalProducts.length > 0 && (
+                                <span className='absolute -top-0.5 -right-0.5 flex h-[1.125rem] min-w-[1.125rem] items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold leading-none text-primary-foreground shadow-sm ring-2 ring-card'>
+                                    {criticalProducts.length > 9 ? '9+' : criticalProducts.length}
+                                </span>
                             )}
                         </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align='end' className='w-56'>
-                        <DropdownMenuLabel>
-                            <div className='flex flex-col'>
-                                <span>{currentUser?.name || 'Usuario'}</span>
-                                <span className='text-xs font-normal text-muted-foreground'>
-                                    {currentUser?.email || 'Sin correo'}
+                    )}
+
+                    {canViewAlerts && (
+                        <div
+                            className='hidden sm:block h-8 w-px bg-border shrink-0'
+                            aria-hidden
+                        />
+                    )}
+
+                    {/* Menú de usuario: tarjeta compacta estilo ERP */}
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button
+                                type='button'
+                                variant='ghost'
+                                className='group h-10 gap-0 rounded-lg border border-transparent px-1.5 text-foreground hover:bg-muted/70 hover:text-foreground hover:border-border/60 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background sm:pl-2 sm:pr-2.5'
+                            >
+                                <span className='flex items-center gap-2 sm:gap-2.5'>
+                                    <Avatar className='h-8 w-8 border border-border/80 shadow-sm sm:h-9 sm:w-9'>
+                                        {photoUrl && !imageError ? (
+                                            <AvatarImage
+                                                src={photoUrl}
+                                                alt=''
+                                                onError={() => setImageError(true)}
+                                            />
+                                        ) : null}
+                                        <AvatarFallback className='bg-primary/10 text-xs font-semibold text-primary group-hover:text-primary'>
+                                            {initialsFromName(displayName)}
+                                        </AvatarFallback>
+                                    </Avatar>
+                                    <span className='hidden min-w-0 sm:flex flex-col items-start text-left leading-tight'>
+                                        <span className='max-w-[10rem] truncate text-sm font-semibold tracking-tight text-foreground group-hover:text-foreground'>
+                                            {displayName}
+                                        </span>
+                                        <span className='max-w-[10rem] truncate text-xs font-normal text-muted-foreground group-hover:text-muted-foreground'>
+                                            {roleName || 'Sin rol asignado'}
+                                        </span>
+                                    </span>
+                                    <ChevronDown
+                                        className='hidden h-4 w-4 shrink-0 text-muted-foreground opacity-80 group-hover:text-muted-foreground sm:block'
+                                        aria-hidden
+                                    />
                                 </span>
-                                <span className='text-xs font-normal text-muted-foreground'>
-                                    Cargo: {roleName || 'Sin rol'}
-                                </span>
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align='end' className='w-64 p-0 overflow-hidden' sideOffset={8}>
+                            <div className='bg-muted/40 px-3 py-3 border-b border-border/60'>
+                                <div className='flex gap-3'>
+                                    <Avatar className='h-11 w-11 border border-border shadow-sm'>
+                                        {photoUrl && !imageError ? (
+                                            <AvatarImage
+                                                src={photoUrl}
+                                                alt=''
+                                                onError={() => setImageError(true)}
+                                            />
+                                        ) : null}
+                                        <AvatarFallback className='bg-primary/10 text-sm font-semibold text-primary'>
+                                            {initialsFromName(displayName)}
+                                        </AvatarFallback>
+                                    </Avatar>
+                                    <div className='min-w-0 flex-1 py-0.5'>
+                                        <p className='truncate font-semibold text-sm'>{displayName}</p>
+                                        <p className='truncate text-xs text-muted-foreground'>{roleName || 'Sin rol'}</p>
+                                        <p className='mt-1 truncate text-xs text-muted-foreground'>
+                                            {currentUser?.email || '—'}
+                                        </p>
+                                    </div>
+                                </div>
                             </div>
-                        </DropdownMenuLabel>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem onClick={handleLogout} className='text-destructive'>
-                            <LogOut className='w-4 h-4 mr-2' />
-                            Cerrar Sesión
-                        </DropdownMenuItem>
-                    </DropdownMenuContent>
-                </DropdownMenu>
+                            <div className='p-1'>
+                                <DropdownMenuItem
+                                    onClick={handleLogout}
+                                    className='text-destructive focus:text-destructive cursor-pointer rounded-md'
+                                >
+                                    <LogOut className='mr-2 h-4 w-4' />
+                                    Cerrar sesión
+                                </DropdownMenuItem>
+                            </div>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
+                </div>
             </header>
 
             {/* App Launcher Modal */}
