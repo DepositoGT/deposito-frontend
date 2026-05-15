@@ -19,6 +19,11 @@ export interface Product extends BaseEntity {
   stock: number;
   minStock: number;
   price: number;
+  /** Mayoreo (opcional). */
+  priceWholesale?: number | null;
+  /** Promoción vigente hasta `promotionValidUntil` (opcional). */
+  pricePromotion?: number | null;
+  promotionValidUntil?: string | null;
   cost: number;
   supplier: string;
   supplierId?: string; // ID del proveedor (para uso interno)
@@ -89,6 +94,9 @@ export interface ApiProduct {
   stock?: number | string;
   min_stock?: number | string;
   price?: number | string;
+  price_wholesale?: number | string | null;
+  price_promotion?: number | string | null;
+  promotion_valid_until?: string | null;
   cost?: number | string;
    image_url?: string | null;
   supplier?: string | { id: string | number; name: string };
@@ -110,6 +118,9 @@ export interface CreateProductPayload {
   stock?: number;
   min_stock?: number;
   price?: number;
+  price_wholesale?: number | null;
+  price_promotion?: number | null;
+  promotion_valid_until?: string | null;
   cost?: number;
   image_url?: string;
   supplier_id?: string;

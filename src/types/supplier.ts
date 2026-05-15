@@ -39,10 +39,20 @@ export interface Supplier extends BaseEntity {
   status: Status | string; // derivado de estado para UI (active/inactive)
   paymentTerms: string;
   /** Términos de pago asociados (API: payment_terms) */
-  paymentTermsList?: { id: number; name: string; isDefault: boolean }[];
+  paymentTermsList?: { id: number; name: string; isDefault: boolean; netDays?: number }[];
   /** ID del término predeterminado (compatibilidad) */
   payment_terms_id?: number;
   productsList?: Product[]; // productos asociados desde API
+  /** Cliente: tarifa por defecto (lista / mayoreo / promoción) */
+  defaultPriceTier?: "LIST" | "WHOLESALE" | "PROMOTION";
+  /** Cliente: reglas por canal (mayor prioridad primero) */
+  customerPriceRules?: Array<{
+    id: string;
+    channel: string | null;
+    price_tier: string;
+    priority: number;
+    active: boolean;
+  }>;
 }
 
 // Interfaz para nuevo proveedor (form)

@@ -81,7 +81,9 @@ const ProductManagement = () => {
         { id: 'brand', label: 'Marca' },
         { id: 'size', label: 'Tamaño' },
         { id: 'barcode', label: 'Código de barras' },
-        { id: 'price', label: 'Precio' },
+        { id: 'price', label: 'Precio lista' },
+        { id: 'price_wholesale', label: 'Precio mayoreo' },
+        { id: 'price_promotion', label: 'Promoción (y vigencia)' },
         { id: 'cost', label: 'Costo' },
         { id: 'stock', label: 'Stock' },
         { id: 'min_stock', label: 'Stock mínimo' },
@@ -89,7 +91,9 @@ const ProductManagement = () => {
         { id: 'status', label: 'Estado' },
         { id: 'description', label: 'Descripción' },
     ]
-    const [exportSelectedFields, setExportSelectedFields] = useState<string[]>(['name', 'category', 'brand', 'size', 'price', 'stock'])
+    const [exportSelectedFields, setExportSelectedFields] = useState<string[]>([
+        'name', 'category', 'brand', 'size', 'price', 'price_wholesale', 'price_promotion', 'stock',
+    ])
     const [exportIncludeSummary, setExportIncludeSummary] = useState(true)
 
     // Selección para exportar (IDs de productos)
@@ -648,7 +652,11 @@ const ProductManagement = () => {
                                 type="button"
                                 variant="outline"
                                 size="sm"
-                                onClick={() => setExportSelectedFields(['name', 'category', 'brand', 'size', 'price', 'stock'])}
+                                onClick={() =>
+                                    setExportSelectedFields([
+                                        'name', 'category', 'brand', 'size', 'price', 'price_wholesale', 'price_promotion', 'stock',
+                                    ])
+                                }
                             >
                                 Solo cotización
                             </Button>

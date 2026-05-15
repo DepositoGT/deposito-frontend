@@ -50,12 +50,26 @@ import {
 import { generateClosurePDF } from './generatePDF'
 import type { CashClosure } from './types'
 import { readListUiPersisted } from '@/hooks/usePersistedListUiState'
+import { fetchCashSessionCurrent, sessionOpenedAtToLocalInput } from '@/services/cashSessionsService'
+import type { CashRegisterDto, CashRegisterSessionDto } from '@/services/cashSessionsService'
+
+function endOfTodayLocalDateTime(timeZone: string): string {
+    const now = new Date()
+    const parts = new Intl.DateTimeFormat('en-CA', {
+        timeZone,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+    }).formatToParts(now)
+    const get = (type: string) => parts.find((p) => p.type === type)?.value ?? ''
+    return `${get('year')}-${get('month')}-${get('day')}T23:59:59`
+}
 
 const CashClosureManagement = () => {
     const { toast } = useToast()
     const { user } = useAuth()
     const { hasPermission } = useAuthPermissions()
-    const { companyName, currencyCode, locale, cashClosureMaxDiffPct } = useSystemSettings()
+    const { companyName, currencyCode, locale, cashClosureMaxDiffPct, timezone } = useSystemSettings()
 
     const form = useCashClosureForm()
     const api = useCashClosureAPI()
@@ -66,10 +80,12 @@ const CashClosureManagement = () => {
     const canCreateClosure = canCreateDay || canCreateOwn
     const showClosureTypeSelector = canCreateDay && canCreateOwn
 
-    // Alcance: si solo puede uno, fijarlo; si puede ambos, elegir
+    // Alcance: por defecto «mi cierre» (turno en caja); cierre del día solo si el rol lo permite
     const [closureScope, setClosureScope] = useState<'day' | 'mine'>(() =>
-        canCreateOwn && !canCreateDay ? 'mine' : 'day'
+        canCreateDay && !canCreateOwn ? 'day' : 'mine'
     )
+
+    const effectiveScope = showClosureTypeSelector ? closureScope : (canCreateDay ? 'day' : 'mine')
 
     // Filtros del historial (solo para no sellers)
     const [historyStatus, setHistoryStatus] = useState<string>('')
@@ -86,6 +102,164 @@ const CashClosureManagement = () => {
 
     const historyFilterSigRef = useRef<string | null>(null)
     const historyFirstLoadRef = useRef(true)
+    const mineClosureReqRef = useRef(0)
+
+    type MineClosureReason =
+        | 'ok'
+        | 'loading'
+        | 'register-open-own'
+        | 'register-open-other'
+        | 'no-pending'
+        | 'error'
+
+    /** «Mi cierre»: no calcular con caja abierta; solo turno ya cerrado en POS y pendiente de arqueo. */
+    const [mineClosureGate, setMineClosureGate] = useState<{
+        loading: boolean
+        canCalculate: boolean
+        reason: MineClosureReason
+        errorMessage: string | null
+        closableSessionId: string | null
+        register: CashRegisterDto | null
+        openSession: CashRegisterSessionDto | null
+        closableSession: CashRegisterSessionDto | null
+    }>({
+        loading: true,
+        canCalculate: false,
+        reason: 'loading',
+        errorMessage: null,
+        closableSessionId: null,
+        register: null,
+        openSession: null,
+        closableSession: null,
+    })
+
+    const refreshMineClosureGate = () => {
+        const reqId = ++mineClosureReqRef.current
+        if (effectiveScope !== 'mine' || !user?.id) {
+            setMineClosureGate({
+                loading: false,
+                canCalculate: true,
+                reason: 'ok',
+                errorMessage: null,
+                closableSessionId: null,
+                register: null,
+                openSession: null,
+                closableSession: null,
+            })
+            return
+        }
+        setMineClosureGate((prev) => ({
+            ...prev,
+            loading: true,
+            canCalculate: false,
+            reason: 'loading',
+            errorMessage: null,
+        }))
+        void fetchCashSessionCurrent().then((r) => {
+            if (reqId !== mineClosureReqRef.current) return
+            if (!r.ok) {
+                setMineClosureGate({
+                    loading: false,
+                    canCalculate: false,
+                    reason: 'error',
+                    errorMessage: r.message || 'No se pudo verificar el turno',
+                    closableSessionId: null,
+                    register: null,
+                    openSession: null,
+                    closableSession: null,
+                })
+                return
+            }
+
+            const register = r.register
+            const open = r.session?.status === 'OPEN' ? r.session : null
+            const closableRaw = r.closableSession
+            const closable =
+                closableRaw &&
+                closableRaw.status === 'CLOSED' &&
+                (closableRaw.cash_closure_id == null || closableRaw.cash_closure_id === '')
+                    ? closableRaw
+                    : null
+
+            if (open) {
+                const own = String(open.opened_by_id) === String(user.id)
+                setMineClosureGate({
+                    loading: false,
+                    canCalculate: false,
+                    reason: own ? 'register-open-own' : 'register-open-other',
+                    errorMessage: null,
+                    closableSessionId: null,
+                    register,
+                    openSession: open,
+                    closableSession: closable,
+                })
+                if (own) {
+                    form.setStartDate(sessionOpenedAtToLocalInput(open.opened_at, timezone))
+                    form.setEndDate(endOfTodayLocalDateTime(timezone))
+                } else {
+                    void api.getLastClosureDate('mine').then((result) => {
+                        if (reqId !== mineClosureReqRef.current) return
+                        if (result?.suggestedStart && result?.suggestedEnd) {
+                            form.setStartDate(result.suggestedStart)
+                            form.setEndDate(result.suggestedEnd)
+                        }
+                    })
+                }
+                return
+            }
+
+            if (closable) {
+                setMineClosureGate({
+                    loading: false,
+                    canCalculate: true,
+                    reason: 'ok',
+                    errorMessage: null,
+                    closableSessionId: closable.id,
+                    register,
+                    openSession: null,
+                    closableSession: closable,
+                })
+                form.setStartDate(sessionOpenedAtToLocalInput(closable.opened_at, timezone))
+                if (closable.closed_at) {
+                    form.setEndDate(sessionOpenedAtToLocalInput(closable.closed_at, timezone))
+                }
+                return
+            }
+
+            setMineClosureGate({
+                loading: false,
+                canCalculate: false,
+                reason: 'no-pending',
+                errorMessage: null,
+                closableSessionId: null,
+                register,
+                openSession: null,
+                closableSession: null,
+            })
+            void api.getLastClosureDate('mine').then((result) => {
+                if (reqId !== mineClosureReqRef.current) return
+                if (result?.suggestedStart && result?.suggestedEnd) {
+                    form.setStartDate(result.suggestedStart)
+                    form.setEndDate(result.suggestedEnd)
+                }
+            })
+        })
+    }
+
+    useEffect(() => {
+        refreshMineClosureGate()
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [effectiveScope, user?.id, timezone])
+
+    useEffect(() => {
+        if (effectiveScope !== 'mine') return
+        const onFocus = () => {
+            refreshMineClosureGate()
+        }
+        window.addEventListener('focus', onFocus)
+        return () => window.removeEventListener('focus', onFocus)
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [effectiveScope, user?.id, timezone])
 
     // Load closures on mount and when filters change (restaura página al volver; pág. 1 si cambian filtros)
     useEffect(() => {
@@ -112,11 +286,10 @@ const CashClosureManagement = () => {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [historyStatus, historyStartDate, historyEndDate])
 
-    const effectiveScope = showClosureTypeSelector ? closureScope : (canCreateDay ? 'day' : 'mine')
-
-    // Sugerir período desde último cierre (según alcance) hasta fin del día
+    // Sugerir período solo para cierre del día (el «mi cierre» toma horario del turno en caja)
     useEffect(() => {
-        api.getLastClosureDate(effectiveScope).then((result) => {
+        if (effectiveScope !== 'day') return
+        void api.getLastClosureDate('day').then((result) => {
             if (result?.suggestedStart && result?.suggestedEnd) {
                 form.setStartDate(result.suggestedStart)
                 form.setEndDate(result.suggestedEnd)
@@ -125,10 +298,70 @@ const CashClosureManagement = () => {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [effectiveScope])
 
+    const mineClosureBlockedHint = (): string => {
+        switch (mineClosureGate.reason) {
+            case 'register-open-own':
+                return 'Cierre el turno en «Nueva venta» (fin de turno); mientras la caja siga abierta no puede arquear.'
+            case 'register-open-other':
+                return 'Hay turno abierto de otro cajero en esta caja.'
+            case 'no-pending':
+                return 'No hay turno cerrado pendiente de arqueo. Abra y cierre turno en «Nueva venta» primero.'
+            default:
+                return 'Actualice la página o revise su conexión.'
+        }
+    }
+
     // Handlers
     const handleCalculateTheoretical = async () => {
         const cashierId = effectiveScope === 'mine' ? (user?.id ?? undefined) : undefined
-        const data = await api.calculateTheoretical(form.startDate, form.endDate, cashierId)
+        let cashRegisterSessionId: string | undefined
+        if (effectiveScope === 'mine') {
+            if (!mineClosureGate.canCalculate || mineClosureGate.loading || !mineClosureGate.closableSessionId) {
+                toast({
+                    title: 'No puede calcular ahora',
+                    description: mineClosureBlockedHint(),
+                    variant: 'destructive',
+                })
+                return
+            }
+            const r = await fetchCashSessionCurrent()
+            if (!r.ok) {
+                toast({ title: 'No se pudo verificar el turno', description: r.message, variant: 'destructive' })
+                void refreshMineClosureGate()
+                return
+            }
+            if (r.session?.status === 'OPEN') {
+                toast({
+                    title: 'Caja con turno abierto',
+                    description:
+                        'Mientras haya turno abierto en esta caja no se calcula el cierre. Use «Fin de turno» en «Nueva venta».',
+                    variant: 'destructive',
+                })
+                void refreshMineClosureGate()
+                return
+            }
+            const cs = r.closableSession
+            if (!cs?.id || cs.status !== 'CLOSED' || cs.cash_closure_id) {
+                toast({
+                    title: 'Sin turno listo para arqueo',
+                    description: 'No hay turno cerrado pendiente de cierre contable, o ya fue arqueado.',
+                    variant: 'destructive',
+                })
+                void refreshMineClosureGate()
+                return
+            }
+            if (String(cs.opened_by_id) !== String(user?.id)) {
+                toast({
+                    title: 'Sesión no válida',
+                    description: 'Solo puede arquear su propio turno en esta caja.',
+                    variant: 'destructive',
+                })
+                void refreshMineClosureGate()
+                return
+            }
+            cashRegisterSessionId = cs.id
+        }
+        const data = await api.calculateTheoretical(form.startDate, form.endDate, cashierId, cashRegisterSessionId)
         if (data) {
             form.initializeFromTheoretical(data)
         }
@@ -136,11 +369,44 @@ const CashClosureManagement = () => {
 
     const performSaveClosure = async () => {
         if (!api.theoreticalData) return false
+        let cashRegisterSessionId: string | undefined
+        if (effectiveScope === 'mine') {
+            const r = await fetchCashSessionCurrent()
+            if (!r.ok) {
+                toast({ title: 'No se pudo verificar el turno', description: r.message, variant: 'destructive' })
+                return false
+            }
+            if (r.session?.status === 'OPEN') {
+                toast({
+                    title: 'Caja con turno abierto',
+                    description: 'Cierre el turno en «Nueva venta» antes de guardar el arqueo.',
+                    variant: 'destructive',
+                })
+                void refreshMineClosureGate()
+                return false
+            }
+            const cs = r.closableSession
+            if (!cs?.id || cs.status !== 'CLOSED' || cs.cash_closure_id) {
+                toast({
+                    title: 'No hay turno para vincular',
+                    description: 'El turno ya no está disponible para este cierre. Recalcule o actualice.',
+                    variant: 'destructive',
+                })
+                void refreshMineClosureGate()
+                return false
+            }
+            if (String(cs.opened_by_id) !== String(user?.id)) {
+                toast({ title: 'Sesión no válida', description: 'Solo puede guardar el cierre de su turno.', variant: 'destructive' })
+                return false
+            }
+            cashRegisterSessionId = cs.id
+        }
         const success = await api.saveClosure({
             startDate: form.startDate,
             endDate: form.endDate,
             cashierName: form.cashierName,
-            cashierId: user?.id,
+            cashierId: effectiveScope === 'mine' ? (user?.id ?? undefined) : undefined,
+            cashRegisterSessionId: effectiveScope === 'mine' ? cashRegisterSessionId : undefined,
             theoreticalData: api.theoreticalData,
             actualTotal: form.getActualTotal(),
             notes: form.notes,
@@ -149,6 +415,7 @@ const CashClosureManagement = () => {
         })
         if (success) {
             form.resetForm()
+            void refreshMineClosureGate()
             const f = historyStatus || historyStartDate || historyEndDate ? { status: historyStatus || undefined, startDate: historyStartDate || undefined, endDate: historyEndDate || undefined } : undefined
             api.fetchClosures(1, form.isSeller, undefined, f)
         }
@@ -225,12 +492,20 @@ const CashClosureManagement = () => {
 
     const canViewHistory = hasPermission('cashclosure.view')
 
+    const fmtSessionDt = (iso: string | null | undefined) =>
+        iso
+            ? new Date(iso).toLocaleString(locale || 'es-GT', { dateStyle: 'short', timeStyle: 'short' })
+            : '—'
+
     return (
         <div className="p-6 space-y-6">
             <div className="flex items-center justify-between">
                 <div>
                     <h2 className="text-2xl font-bold text-foreground">Cierre de Caja</h2>
-                    <p className="text-muted-foreground">Registra y aprueba cierres por período y cajero.</p>
+                    <p className="text-muted-foreground">
+                        Mi cierre: arqueo del turno ya cerrado en «Nueva venta» (no mientras la caja siga abierta). Si aplica,
+                        también cierre del día para todos los cajeros.
+                    </p>
                 </div>
             </div>
 
@@ -250,27 +525,109 @@ const CashClosureManagement = () => {
                     <div className="space-y-3">
                         <h4 className="text-sm font-medium text-foreground">Paso 1 — Período</h4>
                         <div className="bg-muted/50 border rounded-lg p-4">
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                <div>
-                                    <p className="text-xs text-muted-foreground mb-0.5">Fecha</p>
-                                    <p className="text-sm font-medium">
-                                        {new Date().toLocaleDateString(locale || 'es-GT', {
-                                            weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
-                                        })}
+                            {effectiveScope === 'mine' ? (
+                                mineClosureGate.loading ? (
+                                    <p className="text-sm text-muted-foreground">Cargando datos de la caja…</p>
+                                ) : (
+                                    <>
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                            <div>
+                                                <p className="text-xs text-muted-foreground mb-0.5">Caja</p>
+                                                <p className="text-sm font-medium">
+                                                    {mineClosureGate.register?.name ?? '—'}
+                                                    {mineClosureGate.register?.code ? (
+                                                        <span className="text-muted-foreground font-normal">
+                                                            {' '}
+                                                            · {mineClosureGate.register.code}
+                                                        </span>
+                                                    ) : null}
+                                                </p>
+                                            </div>
+                                            <div>
+                                                <p className="text-xs text-muted-foreground mb-0.5">Turno en caja</p>
+                                                <p className="text-sm font-medium">
+                                                    {mineClosureGate.openSession
+                                                        ? `Abierto · desde ${fmtSessionDt(mineClosureGate.openSession.opened_at)}`
+                                                        : mineClosureGate.closableSession
+                                                          ? `Cerrado · ${fmtSessionDt(mineClosureGate.closableSession.opened_at)} → ${fmtSessionDt(mineClosureGate.closableSession.closed_at)}`
+                                                          : 'Sin turno cerrado pendiente de arqueo'}
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4 pt-4 border-t">
+                                            <div>
+                                                <p className="text-xs text-muted-foreground mb-0.5">
+                                                    Horario del período (arqueo)
+                                                </p>
+                                                <p className="text-sm font-medium tabular-nums">
+                                                    {form.startDate && form.endDate ? (
+                                                        <>
+                                                            {form.startDate.split('T')[1]?.substring(0, 8) || '00:00:00'} —{' '}
+                                                            {form.endDate.split('T')[1]?.substring(0, 8) || '23:59:59'}
+                                                        </>
+                                                    ) : (
+                                                        '—'
+                                                    )}
+                                                </p>
+                                            </div>
+                                            <div>
+                                                <p className="text-xs text-muted-foreground mb-0.5">Fondo inicial del turno</p>
+                                                <p className="text-sm font-medium tabular-nums">
+                                                    {mineClosureGate.openSession
+                                                        ? new Intl.NumberFormat(locale || 'es-GT', {
+                                                              style: 'currency',
+                                                              currency: currencyCode || 'GTQ',
+                                                          }).format(Number(mineClosureGate.openSession.opening_float))
+                                                        : mineClosureGate.closableSession
+                                                          ? new Intl.NumberFormat(locale || 'es-GT', {
+                                                                style: 'currency',
+                                                                currency: currencyCode || 'GTQ',
+                                                            }).format(Number(mineClosureGate.closableSession.opening_float))
+                                                          : '—'}
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <p className="text-xs text-muted-foreground mt-3 pt-3 border-t">
+                                            Solo se cuentan sus ventas ligadas a ese turno en esta caja. Mientras haya turno
+                                            abierto en la caja no se puede calcular el cierre: cierre el turno en «Nueva
+                                            venta» y vuelva aquí.
+                                        </p>
+                                    </>
+                                )
+                            ) : (
+                                <>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                        <div>
+                                            <p className="text-xs text-muted-foreground mb-0.5">Fecha</p>
+                                            <p className="text-sm font-medium">
+                                                {new Date().toLocaleDateString(locale || 'es-GT', {
+                                                    weekday: 'long',
+                                                    year: 'numeric',
+                                                    month: 'long',
+                                                    day: 'numeric',
+                                                })}
+                                            </p>
+                                        </div>
+                                        <div>
+                                            <p className="text-xs text-muted-foreground mb-0.5">Horario del período</p>
+                                            <p className="text-sm font-medium tabular-nums">
+                                                {form.startDate && form.endDate ? (
+                                                    <>
+                                                        {form.startDate.split('T')[1]?.substring(0, 8) || '00:00:00'} —{' '}
+                                                        {form.endDate.split('T')[1]?.substring(0, 8) || '23:59:59'}
+                                                    </>
+                                                ) : (
+                                                    'Cargando...'
+                                                )}
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <p className="text-xs text-muted-foreground mt-3 pt-3 border-t">
+                                        Desde el fin del último cierre del día hasta las 23:59:59 de hoy (todas las
+                                        ventas).
                                     </p>
-                                </div>
-                                <div>
-                                    <p className="text-xs text-muted-foreground mb-0.5">Horario del período</p>
-                                    <p className="text-sm font-medium tabular-nums">
-                                        {form.startDate && form.endDate ? (
-                                            <>{form.startDate.split('T')[1]?.substring(0, 8) || '00:00:00'} — {form.endDate.split('T')[1]?.substring(0, 8) || '23:59:59'}</>
-                                        ) : 'Cargando...'}
-                                    </p>
-                                </div>
-                            </div>
-                            <p className="text-xs text-muted-foreground mt-3 pt-3 border-t">
-                                Desde el fin del último cierre hasta las 23:59:59 de hoy.
-                            </p>
+                                </>
+                            )}
                         </div>
                         {showClosureTypeSelector && (
                             <div className="space-y-2">
@@ -284,7 +641,7 @@ const CashClosureManagement = () => {
                                             <SelectItem value="day">Cierre del día (todos los cajeros)</SelectItem>
                                         )}
                                         {canCreateOwn && (
-                                            <SelectItem value="mine">Mi cierre (solo mis ventas)</SelectItem>
+                                            <SelectItem value="mine">Mi cierre (mis ventas del turno en caja)</SelectItem>
                                         )}
                                     </SelectContent>
                                 </Select>
@@ -292,12 +649,63 @@ const CashClosureManagement = () => {
                         )}
                         {!showClosureTypeSelector && (
                             <p className="text-sm text-muted-foreground">
-                                {effectiveScope === 'day' ? 'Generando: Cierre del día (todos los cajeros).' : 'Generando: Mi cierre (solo mis ventas).'}
+                                {effectiveScope === 'day'
+                                    ? 'Generando: cierre del día (todos los cajeros).'
+                                    : 'Generando: mi cierre (ventas de mi turno en caja).'}
                             </p>
                         )}
+
+                        {effectiveScope === 'mine' && (
+                            <p
+                                className={`text-sm rounded-md border px-3 py-2 ${
+                                    mineClosureGate.loading || !mineClosureGate.canCalculate
+                                        ? 'border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-100'
+                                        : 'border-emerald-200 bg-emerald-50 text-emerald-900 dark:border-emerald-900/50 dark:bg-emerald-950/40 dark:text-emerald-100'
+                                }`}
+                            >
+                                {mineClosureGate.loading && 'Comprobando la caja y los turnos…'}
+                                {!mineClosureGate.loading && mineClosureGate.reason === 'ok' && (
+                                    <>
+                                        Turno cerrado listo para arqueo. Puede pulsar «Calcular mi cierre» (ventas de
+                                        ese turno en la caja).
+                                    </>
+                                )}
+                                {!mineClosureGate.loading && mineClosureGate.reason === 'register-open-own' && (
+                                    <>
+                                        <span className="font-medium">Calcular bloqueado:</span> tiene la caja abierta.
+                                        Use «Fin de turno» en «Nueva venta»; después podrá arquear ese turno aquí.
+                                    </>
+                                )}
+                                {!mineClosureGate.loading && mineClosureGate.reason === 'register-open-other' && (
+                                    <>
+                                        <span className="font-medium">Calcular bloqueado:</span> hay turno abierto de
+                                        otro cajero en esta caja.
+                                    </>
+                                )}
+                                {!mineClosureGate.loading && mineClosureGate.reason === 'no-pending' && (
+                                    <>
+                                        <span className="font-medium">Calcular bloqueado:</span> no hay turno cerrado
+                                        pendiente de arqueo. Abra caja, venda, cierre turno en «Nueva venta» y vuelva.
+                                    </>
+                                )}
+                                {!mineClosureGate.loading && mineClosureGate.reason === 'error' && (
+                                    <>
+                                        <span className="font-medium">No se pudo comprobar la caja.</span>{' '}
+                                        {mineClosureGate.errorMessage || 'Intente de nuevo o revise su conexión.'}
+                                    </>
+                                )}
+                            </p>
+                        )}
+
                         <Button
                             onClick={handleCalculateTheoretical}
-                            disabled={api.isCalculating}
+                            disabled={
+                                api.isCalculating ||
+                                (effectiveScope === 'mine' &&
+                                    (mineClosureGate.loading ||
+                                        !mineClosureGate.canCalculate ||
+                                        !mineClosureGate.closableSessionId))
+                            }
                             className="w-full bg-liquor-amber hover:bg-liquor-amber/90 text-white"
                         >
                             <Calculator className="h-4 w-4 mr-2" />
@@ -362,7 +770,13 @@ const CashClosureManagement = () => {
 
                             <Button
                                 onClick={handleSaveClosure}
-                                disabled={api.isSaving}
+                                disabled={
+                                    api.isSaving ||
+                                    (effectiveScope === 'mine' &&
+                                        (mineClosureGate.loading ||
+                                            mineClosureGate.reason !== 'ok' ||
+                                            !mineClosureGate.closableSessionId))
+                                }
                                 className="w-full bg-liquor-amber hover:bg-liquor-amber/90 text-white"
                                 size="lg"
                             >
