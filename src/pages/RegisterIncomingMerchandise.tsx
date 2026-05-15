@@ -8,7 +8,7 @@
  * For licensing inquiries: GitHub @dpatzan2
  */
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -33,6 +33,15 @@ import { SUPPLIERS_DROPDOWN_PARAMS } from '@/services/supplierService'
 import { useProducts } from '@/hooks/useProducts'
 import { apiFetch } from '@/services/api'
 import { adaptApiProduct } from '@/services/productService'
+import { adaptApiSupplier } from '@/services/supplierService'
+import { useSupplier } from '@/hooks/useSupplier'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 
 interface IncomingItem {
   product_id: string
@@ -50,6 +59,11 @@ export const RegisterIncomingMerchandise = () => {
   const [notes, setNotes] = useState('')
   const [items, setItems] = useState<IncomingItem[]>([])
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [paymentTermId, setPaymentTermId] = useState('')
+  const [paymentStatus, setPaymentStatus] = useState<'PENDING' | 'PAID'>('PENDING')
+  const [paidAtLocal, setPaidAtLocal] = useState('')
+  const [paymentReference, setPaymentReference] = useState('')
+  const [dueDate, setDueDate] = useState('')
 
   const { data: suppliersData } = useSuppliers(SUPPLIERS_DROPDOWN_PARAMS)
   const suppliers = useMemo(() => suppliersData?.items ?? [], [suppliersData])
@@ -67,6 +81,69 @@ export const RegisterIncomingMerchandise = () => {
   const selectedSupplier = useMemo(() => {
     return suppliers.find(s => s.id === selectedSupplierId)
   }, [suppliers, selectedSupplierId])
+
+  const { data: supplierRaw, isLoading: supplierDetailLoading } = useSupplier(
+    selectedSupplierId || undefined
+  )
+  const supplierDetail = useMemo(
+    () => (supplierRaw ? adaptApiSupplier(supplierRaw) : null),
+    [supplierRaw]
+  )
+  const paymentTermsOptions = supplierDetail?.paymentTermsList ?? []
+
+  useEffect(() => {
+    if (!selectedSupplierId) {
+      setPaymentTermId('')
+      return
+    }
+    if (!paymentTermsOptions.length) {
+      setPaymentTermId('')
+      return
+    }
+    const def = paymentTermsOptions.find((x) => x.isDefault) || paymentTermsOptions[0]
+    setPaymentTermId(String(def.id))
+  }, [selectedSupplierId, supplierDetail])
+
+  useEffect(() => {
+    if (paymentStatus === 'PAID' && !paidAtLocal) {
+      const d = new Date()
+      const pad = (n: number) => String(n).padStart(2, '0')
+      setPaidAtLocal(
+        `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+      )
+    }
+  }, [paymentStatus, paidAtLocal])
+
+  /** Misma lógica que el servidor: reloj local → componentes UTC + días en calendario UTC */
+  useEffect(() => {
+    if (!paymentTermId || !paymentTermsOptions.length) {
+      if (!paymentTermId) setDueDate('')
+      return
+    }
+    const term = paymentTermsOptions.find((t) => String(t.id) === paymentTermId)
+    const nd = term?.netDays
+    if (nd == null || !Number.isFinite(nd) || nd < 0) {
+      setDueDate('')
+      return
+    }
+    const now = new Date()
+    const d = new Date(
+      Date.UTC(
+        now.getFullYear(),
+        now.getMonth(),
+        now.getDate(),
+        now.getHours(),
+        now.getMinutes(),
+        now.getSeconds(),
+        now.getMilliseconds()
+      )
+    )
+    d.setUTCDate(d.getUTCDate() + Math.floor(nd))
+    const pad = (n: number) => String(n).padStart(2, '0')
+    setDueDate(
+      `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}`
+    )
+  }, [paymentTermId, paymentTermsOptions])
 
   const handleAddProduct = () => {
     if (!selectedSupplierId) {
@@ -161,6 +238,25 @@ export const RegisterIncomingMerchandise = () => {
       return
     }
 
+    if (paymentTermsOptions.length > 0 && !paymentTermId) {
+      toast({
+        title: 'Término de pago',
+        description: 'Seleccione el término de pago acordado con el proveedor',
+        variant: 'destructive',
+      })
+      return
+    }
+
+    if (paymentTermsOptions.length === 0) {
+      toast({
+        title: 'Proveedor sin términos de pago',
+        description:
+          'Configura al menos un término de pago en el contacto del proveedor antes de registrar mercancía',
+        variant: 'destructive',
+      })
+      return
+    }
+
     // Validate all items
     for (const item of items) {
       if (!item.product_id) {
@@ -193,7 +289,12 @@ export const RegisterIncomingMerchandise = () => {
 
     setIsSubmitting(true)
     try {
-      const payload = {
+      const paidAtIso =
+        paymentStatus === 'PAID' && paidAtLocal
+          ? new Date(paidAtLocal).toISOString()
+          : undefined
+
+      const payload: Record<string, unknown> = {
         supplier_id: selectedSupplierId,
         items: items.map(item => ({
           product_id: item.product_id,
@@ -201,6 +302,13 @@ export const RegisterIncomingMerchandise = () => {
           unit_cost: Number(item.unit_cost),
         })),
         notes: notes.trim() || undefined,
+        payment_term_id: Number(paymentTermId),
+        payment_status: paymentStatus,
+        payment_reference: paymentReference.trim() || undefined,
+        due_date: dueDate ? new Date(dueDate + 'T12:00:00').toISOString() : undefined,
+      }
+      if (paymentStatus === 'PAID' && paidAtIso) {
+        payload.paid_at = paidAtIso
       }
 
       await apiFetch('/api/products/register-incoming', {
@@ -217,6 +325,11 @@ export const RegisterIncomingMerchandise = () => {
       setSelectedSupplierId('')
       setNotes('')
       setItems([])
+      setPaymentTermId('')
+      setPaymentStatus('PENDING')
+      setPaidAtLocal('')
+      setPaymentReference('')
+      setDueDate('')
       
       // Navigate back to inventory
       navigate('/inventario')
@@ -322,6 +435,91 @@ export const RegisterIncomingMerchandise = () => {
               </p>
             )}
           </div>
+
+          {/* Condiciones de pago (cuenta por pagar) */}
+          {selectedSupplierId && (
+            <div className="space-y-4 rounded-lg border border-border p-4 bg-muted/30">
+              <p className="text-sm font-medium text-foreground">Condiciones de pago</p>
+              {supplierDetailLoading ? (
+                <p className="text-sm text-muted-foreground">Cargando términos del proveedor…</p>
+              ) : paymentTermsOptions.length === 0 ? (
+                <p className="text-sm text-destructive">
+                  Este proveedor no tiene términos de pago asignados. Configúralos en Contactos antes de
+                  registrar.
+                </p>
+              ) : (
+                <>
+                  <div>
+                    <Label htmlFor="payment-term">Término de pago *</Label>
+                    <Select value={paymentTermId} onValueChange={setPaymentTermId}>
+                      <SelectTrigger id="payment-term" className="mt-1">
+                        <SelectValue placeholder="Seleccionar" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {paymentTermsOptions.map((t) => (
+                          <SelectItem key={t.id} value={String(t.id)}>
+                            {t.name}
+                            {t.isDefault ? ' (predeterminado)' : ''}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="payment-status">Estado del pago</Label>
+                      <Select
+                        value={paymentStatus}
+                        onValueChange={(v) => setPaymentStatus(v as 'PENDING' | 'PAID')}
+                      >
+                        <SelectTrigger id="payment-status" className="mt-1">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="PENDING">Pendiente de pago</SelectItem>
+                          <SelectItem value="PAID">Ya pagado</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    {paymentStatus === 'PAID' && (
+                      <div>
+                        <Label htmlFor="paid-at">Fecha / hora del pago</Label>
+                        <Input
+                          id="paid-at"
+                          type="datetime-local"
+                          className="mt-1"
+                          value={paidAtLocal}
+                          onChange={(e) => setPaidAtLocal(e.target.value)}
+                        />
+                      </div>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="due-date">Vencimiento (opcional)</Label>
+                      <Input
+                        id="due-date"
+                        type="date"
+                        className="mt-1"
+                        value={dueDate}
+                        onChange={(e) => setDueDate(e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="payment-ref">Referencia (factura, transferencia…)</Label>
+                      <Input
+                        id="payment-ref"
+                        placeholder="Opcional"
+                        className="mt-1"
+                        value={paymentReference}
+                        onChange={(e) => setPaymentReference(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
 
           {/* Products List */}
           <div>
@@ -488,7 +686,13 @@ export const RegisterIncomingMerchandise = () => {
             </Button>
             <Button
               onClick={handleSubmit}
-              disabled={isSubmitting || items.length === 0 || !selectedSupplierId}
+              disabled={
+                isSubmitting ||
+                items.length === 0 ||
+                !selectedSupplierId ||
+                supplierDetailLoading ||
+                (paymentTermsOptions.length === 0 && !!selectedSupplierId)
+              }
               className="bg-liquor-amber hover:bg-liquor-amber/90 text-white"
             >
               {isSubmitting ? (

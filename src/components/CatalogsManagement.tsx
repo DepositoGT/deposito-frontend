@@ -8,7 +8,7 @@
  * For licensing inquiries: GitHub @dpatzan2
  */
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs'
 import { Button } from './ui/button'
@@ -295,6 +295,7 @@ function PaymentTermsTab({
               <TableRow>
                 <TableHead>ID</TableHead>
                 <TableHead>Nombre</TableHead>
+                <TableHead className="whitespace-nowrap">Días neto</TableHead>
                 <TableHead>Proveedores</TableHead>
                 <TableHead>Estado</TableHead>
                 <TableHead className="text-right">Acciones</TableHead>
@@ -303,7 +304,7 @@ function PaymentTermsTab({
             <TableBody>
               {paymentTerms?.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center text-muted-foreground">
+                    <TableCell colSpan={6} className="text-center text-muted-foreground">
                     No hay términos de pago registrados
                   </TableCell>
                 </TableRow>
@@ -312,6 +313,9 @@ function PaymentTermsTab({
                   <TableRow key={term.id}>
                     <TableCell className="font-medium">{term.id}</TableCell>
                     <TableCell>{term.name}</TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {term.net_days != null ? `${term.net_days} d` : '—'}
+                    </TableCell>
                     <TableCell>{paymentTermSupplierUsageCount(term)}</TableCell>
                     <TableCell>
                       {term.deleted ? (
@@ -733,17 +737,26 @@ function PaymentTermDialog({
 }) {
   const { toast } = useToast()
   const [name, setName] = useState('')
+  const [netDays, setNetDays] = useState('')
   const createMutation = useCreatePaymentTerm()
   const updateMutation = useUpdatePaymentTerm()
+
+  useEffect(() => {
+    if (!dialog.open) return
+    if (dialog.mode === 'create' || !dialog.item) {
+      setName('')
+      setNetDays('')
+    } else {
+      setName(dialog.item.name)
+      setNetDays(dialog.item.net_days != null ? String(dialog.item.net_days) : '')
+    }
+  }, [dialog.open, dialog.mode, dialog.item])
 
   const handleOpenChange = (open: boolean) => {
     if (!open) {
       setName('')
+      setNetDays('')
       setDialog({ open: false, mode: 'create' })
-    } else {
-      if (dialog.item) {
-        setName(dialog.item.name)
-      }
     }
   }
 
@@ -759,15 +772,40 @@ function PaymentTermDialog({
       return
     }
 
+    let netDaysPayload: number | null | undefined
+    if (netDays.trim() !== '') {
+      const n = Number(netDays.trim())
+      if (!Number.isFinite(n) || n < 0 || n > 3650) {
+        toast({
+          variant: 'destructive',
+          title: 'Días neto',
+          description: 'Indica un número entre 0 y 3650 o déjalo vacío',
+        })
+        return
+      }
+      netDaysPayload = Math.floor(n)
+    } else {
+      netDaysPayload = dialog.mode === 'edit' ? null : undefined
+    }
+
     try {
       if (dialog.mode === 'create') {
-        await createMutation.mutateAsync({ name: name.trim() })
+        await createMutation.mutateAsync({
+          name: name.trim(),
+          net_days: netDaysPayload,
+        })
         toast({
           title: 'Término creado',
           description: 'El término de pago ha sido creado correctamente',
         })
       } else if (dialog.item) {
-        await updateMutation.mutateAsync({ id: dialog.item.id, data: { name: name.trim() } })
+        await updateMutation.mutateAsync({
+          id: dialog.item.id,
+          data: {
+            name: name.trim(),
+            net_days: netDaysPayload,
+          },
+        })
         toast({
           title: 'Término actualizado',
           description: 'El término de pago ha sido actualizado correctamente',
@@ -808,6 +846,22 @@ function PaymentTermDialog({
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 autoFocus
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="net-days">Días neto (opcional)</Label>
+              <p className="text-xs text-muted-foreground">
+                Días naturales desde la fecha de ingreso hasta el vencimiento sugerido al registrar mercancía;
+                si no envías vencimiento manual, el servidor usa esta fecha.
+              </p>
+              <Input
+                id="net-days"
+                type="number"
+                min={0}
+                max={3650}
+                placeholder="Ej: 30"
+                value={netDays}
+                onChange={(e) => setNetDays(e.target.value)}
               />
             </div>
           </div>

@@ -38,6 +38,7 @@ export interface ApiSupplier {
     is_default?: boolean;
     sort_order?: number;
     name?: string;
+    net_days?: number | null;
   }>;
   productsList?: ApiProduct[] | null;
   party_type?: string | null;
@@ -134,6 +135,10 @@ export const adaptApiSupplier = (s: ApiSupplier): Supplier => {
           id: Number(x.payment_term_id),
           name: String(x.name ?? ""),
           isDefault: Boolean(x.is_default),
+          netDays:
+            x.net_days != null && x.net_days !== ""
+              ? Number(x.net_days)
+              : undefined,
         }))
       : undefined;
 

@@ -21,8 +21,24 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { ArrowLeft, Plus, Receipt, Search, ChevronLeft, ChevronRight, PauseCircle, RotateCcw } from 'lucide-react'
+import { ArrowLeft, Plus, Receipt, Search, ChevronLeft, ChevronRight, PauseCircle, RotateCcw, Loader2, Landmark, Settings } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { useQueryClient } from '@tanstack/react-query'
 import { useAllProducts, PRODUCTS_QUERY_KEY } from '@/hooks/useProducts'
@@ -51,6 +67,9 @@ import {
   PromotionCodeInput,
   SavedCustomerMany2One,
 } from './components'
+import { OpenCashRegisterPrompt } from './OpenCashRegisterPrompt'
+import { closeCashSession, fetchCashSessionCurrent } from '@/services/cashSessionsService'
+import type { CashRegisterSessionDto } from '@/services/cashSessionsService'
 import type { CartProduct } from './types'
 
 const ProductCard = ({
@@ -174,6 +193,95 @@ export default function NewSalePage() {
       : 0
 
   const canCreate = hasPermission('sales.create')
+
+  const [cashCheckDone, setCashCheckDone] = useState(false)
+  const [cashCheckError, setCashCheckError] = useState<string | null>(null)
+  const [cashSessionOpen, setCashSessionOpen] = useState(false)
+  const [cashRegisterMeta, setCashRegisterMeta] = useState<{ id: string; name: string } | null>(null)
+  const [activeCashSession, setActiveCashSession] = useState<CashRegisterSessionDto | null>(null)
+  const [showCloseCashDialog, setShowCloseCashDialog] = useState(false)
+  const [isClosingCashSession, setIsClosingCashSession] = useState(false)
+
+  const runCashCheck = useCallback(async () => {
+    setCashCheckError(null)
+    setCashCheckDone(false)
+    const r = await fetchCashSessionCurrent()
+    setCashCheckDone(true)
+    if (!r.ok) {
+      setCashCheckError(r.message)
+      setCashSessionOpen(false)
+      setCashRegisterMeta(null)
+      setActiveCashSession(null)
+      return
+    }
+    setCashRegisterMeta(
+      r.register?.id ? { id: r.register.id, name: r.register.name } : null
+    )
+    setCashSessionOpen(Boolean(r.session))
+    setActiveCashSession(r.session ?? null)
+  }, [])
+
+  useEffect(() => {
+    void runCashCheck()
+  }, [runCashCheck])
+
+  const handleCashSessionOpened = useCallback(async () => {
+    const r = await fetchCashSessionCurrent()
+    setCashCheckDone(true)
+    setCashCheckError(null)
+    if (!r.ok) {
+      setCashCheckError(r.message)
+      setCashSessionOpen(false)
+      setCashRegisterMeta(null)
+      setActiveCashSession(null)
+      return
+    }
+    setCashRegisterMeta(
+      r.register?.id ? { id: r.register.id, name: r.register.name } : null
+    )
+    setCashSessionOpen(Boolean(r.session))
+    setActiveCashSession(r.session ?? null)
+    if (r.ok && !r.session) {
+      toast({
+        title: 'Sesión no detectada',
+        description: 'Abra de nuevo o contacte a un supervisor.',
+        variant: 'destructive',
+      })
+    }
+  }, [toast])
+
+  const canUserCloseCashTurn = useMemo(() => {
+    if (!activeCashSession || !user) return false
+    const roleName = String(user.role?.name ?? '').toLowerCase()
+    if (roleName === 'admin') return true
+    if (String(activeCashSession.opened_by_id) === String(user.id)) return true
+    return hasPermission('cashclosure.create') || hasPermission('cashclosure.create_day')
+  }, [activeCashSession, user, hasPermission])
+
+  const confirmCloseCashSession = useCallback(async () => {
+    setIsClosingCashSession(true)
+    try {
+      await closeCashSession(
+        cashRegisterMeta?.id ? { cash_register_id: cashRegisterMeta.id } : {}
+      )
+      setShowCloseCashDialog(false)
+      setCashSessionOpen(false)
+      setActiveCashSession(null)
+      toast({
+        title: 'Turno cerrado',
+        description:
+          'Ya puede abrir otro turno si lo necesita. El arqueo y cierre contable siguen en «Cierre de caja».',
+      })
+    } catch (e) {
+      toast({
+        title: 'No se pudo cerrar el turno',
+        description: e instanceof Error ? e.message : 'Error desconocido',
+        variant: 'destructive',
+      })
+    } finally {
+      setIsClosingCashSession(false)
+    }
+  }, [cashRegisterMeta?.id, toast])
 
   const [hasStoredDraft, setHasStoredDraft] = useState(false)
   useEffect(() => {
@@ -413,6 +521,14 @@ export default function NewSalePage() {
       toast({ title: 'Sin permiso para crear ventas', variant: 'destructive' })
       return
     }
+    if (!cashSessionOpen) {
+      toast({
+        title: 'Caja cerrada',
+        description: 'Abra la caja antes de registrar la venta.',
+        variant: 'destructive',
+      })
+      return
+    }
     if (!paymentMethod) {
       toast({ title: 'Selecciona un método de pago', variant: 'destructive' })
       return
@@ -490,18 +606,137 @@ export default function NewSalePage() {
     }
   }
 
+  if (!cashCheckDone) {
+    return (
+      <div className="px-4 sm:px-8 lg:px-14 py-16 w-full flex flex-col items-center justify-center gap-4 min-h-[50vh]">
+        <Loader2 className="h-10 w-10 animate-spin text-muted-foreground" aria-hidden />
+        <p className="text-sm text-muted-foreground">Comprobando turno de caja…</p>
+        <Button variant="outline" size="sm" onClick={() => navigate('/ventas')}>
+          <ArrowLeft className="w-4 h-4 mr-2" />
+          Volver a ventas
+        </Button>
+      </div>
+    )
+  }
+
+  if (cashCheckError) {
+    return (
+      <div className="px-4 sm:px-8 lg:px-14 py-8 w-full max-w-lg mx-auto space-y-4">
+        <div className="flex items-center gap-3">
+          <Button variant="ghost" size="icon" onClick={() => navigate('/ventas')}>
+            <ArrowLeft className="w-5 h-5" />
+          </Button>
+          <h1 className="text-xl font-bold">Nueva venta</h1>
+        </div>
+        <Alert variant="destructive">
+          <AlertTitle>No se pudo verificar la caja</AlertTitle>
+          <AlertDescription className="mt-2">{cashCheckError}</AlertDescription>
+        </Alert>
+        <div className="flex flex-wrap gap-2">
+          <Button type="button" onClick={() => void runCashCheck()}>
+            Reintentar
+          </Button>
+          <Button type="button" variant="outline" onClick={() => navigate('/ventas')}>
+            Volver a ventas
+          </Button>
+        </div>
+      </div>
+    )
+  }
+
+  if (!cashSessionOpen) {
+    return (
+      <>
+        <div className="px-4 sm:px-8 lg:px-14 py-4 w-full">
+          <div className="flex items-center gap-3 mb-2">
+            <Button variant="ghost" size="icon" onClick={() => navigate('/ventas')}>
+              <ArrowLeft className="w-5 h-5" />
+            </Button>
+            <h1 className="text-xl font-bold text-muted-foreground">Nueva venta</h1>
+          </div>
+        </div>
+        <OpenCashRegisterPrompt
+          registerName={cashRegisterMeta?.name}
+          registerId={cashRegisterMeta?.id}
+          onOpened={handleCashSessionOpened}
+          onBack={() => navigate('/ventas')}
+        />
+      </>
+    )
+  }
+
   return (
     <div className="px-4 sm:px-8 lg:px-14 py-4 sm:py-6 w-full animate-fade-in">
-      <div className="flex items-center gap-3 mb-6">
-        <Button variant="ghost" size="icon" onClick={() => navigate('/ventas')}>
-          <ArrowLeft className="w-5 h-5" />
-        </Button>
-        <div>
-          <h1 className="text-xl sm:text-2xl font-bold">Nueva Venta</h1>
-          <p className="text-sm text-muted-foreground">
-            Completa la información y agrega productos
-          </p>
+      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
+        <div className="flex items-start gap-3 min-w-0">
+          <Button variant="ghost" size="icon" className="shrink-0 mt-0.5" onClick={() => navigate('/ventas')}>
+            <ArrowLeft className="w-5 h-5" />
+          </Button>
+          <div className="min-w-0">
+            <h1 className="text-xl sm:text-2xl font-bold">Nueva Venta</h1>
+            <p className="text-sm text-muted-foreground">
+              Completa la información y agrega productos
+            </p>
+          </div>
         </div>
+
+        {activeCashSession && (
+          <div className="flex flex-wrap items-center gap-2 pl-11 sm:pl-0 sm:justify-end sm:max-w-[min(100%,28rem)] lg:max-w-[32rem]">
+            <div
+              className="inline-flex min-w-0 max-w-full items-center gap-2 rounded-md border border-border/60 bg-muted/20 px-2.5 py-1.5 text-xs text-muted-foreground sm:text-sm"
+              title={`${cashRegisterMeta?.name ?? 'Caja principal'} · Fondo Q${Number(activeCashSession.opening_float).toFixed(2)} · ${new Date(activeCashSession.opened_at).toLocaleString(locale || 'es-GT')}${activeCashSession.openedBy?.name ? ` · ${activeCashSession.openedBy.name}` : ''}`}
+            >
+              <Landmark className="h-3.5 w-3.5 shrink-0 opacity-60" aria-hidden />
+              <span className="truncate">
+                <span className="text-foreground/80 font-medium">Turno abierto</span>
+                <span className="mx-1.5 text-border">·</span>
+                {cashRegisterMeta?.name ?? 'Caja principal'}
+                <span className="mx-1.5">·</span>
+                Q{Number(activeCashSession.opening_float).toFixed(2)}
+                <span className="mx-1.5">·</span>
+                {new Date(activeCashSession.opened_at).toLocaleString(locale || 'es-GT', {
+                  dateStyle: 'short',
+                  timeStyle: 'short',
+                })}
+                {activeCashSession.openedBy?.name ? (
+                  <>
+                    <span className="mx-1.5">·</span>
+                    {activeCashSession.openedBy.name}
+                  </>
+                ) : null}
+              </span>
+            </div>
+            {canUserCloseCashTurn ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    className="h-8 w-8 shrink-0 border-border/80 bg-background"
+                    disabled={isProcessing || isClosingCashSession}
+                    aria-label="Acciones del turno de caja"
+                  >
+                    <Settings className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" sideOffset={6} className="w-56">
+                  <DropdownMenuItem
+                    className="text-destructive focus:text-destructive focus:bg-destructive/10 cursor-pointer"
+                    disabled={isProcessing || isClosingCashSession}
+                    onSelect={() => setShowCloseCashDialog(true)}
+                  >
+                    Cerrar caja (fin de turno)
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : (
+              <span className="text-[11px] leading-tight text-muted-foreground sm:text-xs sm:max-w-[12rem] sm:text-right">
+                Solo quien abrió el turno o un supervisor puede cerrarlo.
+              </span>
+            )}
+          </div>
+        )}
       </div>
 
       {hasStoredDraft && (
@@ -866,6 +1101,39 @@ export default function NewSalePage() {
         onConfirm={cart.handleAdminAuth}
         onCancel={cart.closeAdminAuthDialog}
       />
+
+      <AlertDialog open={showCloseCashDialog} onOpenChange={setShowCloseCashDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Cerrar el turno de caja?</AlertDialogTitle>
+            <AlertDialogDescription className="space-y-2">
+              <span>
+                Cierra el turno en el sistema <strong>sin</strong> generar un cierre contable ni arqueo. Para cuadrar
+                efectivo y dejar constancia oficial use la pantalla <strong>Cierre de caja</strong>.
+              </span>
+              {cart.cartItems.length > 0 ? (
+                <span className="block text-amber-800 dark:text-amber-200">
+                  Hay {cart.cartItems.length} línea(s) en el carrito: puede vaciarlas antes o cerrar igual; no se
+                  registrará ninguna venta hasta abrir un turno nuevo.
+                </span>
+              ) : null}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isClosingCashSession}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={isClosingCashSession}
+              onClick={(e) => {
+                e.preventDefault()
+                void confirmCloseCashSession()
+              }}
+            >
+              {isClosingCashSession ? 'Cerrando…' : 'Sí, cerrar turno'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

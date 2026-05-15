@@ -8,11 +8,16 @@
  * For licensing inquiries: GitHub @dpatzan2
  */
 
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   fetchIncomingMerchandise,
   getIncomingMerchandiseById,
+  patchIncomingMerchandisePayment,
+  postIncomingMerchandisePayment,
+  deleteIncomingMerchandisePayment,
   type IncomingMerchandiseQueryParams,
+  type PatchIncomingMerchandisePaymentPayload,
+  type PostIncomingMerchandisePaymentBody,
 } from '@/services/incomingMerchandiseService'
 
 export const useIncomingMerchandise = (params?: IncomingMerchandiseQueryParams) => {
@@ -31,5 +36,38 @@ export const useIncomingMerchandiseById = (id?: string) => {
     queryFn: () => getIncomingMerchandiseById(id!),
     enabled: !!id,
     staleTime: 60 * 1000,
+  })
+}
+
+export const usePatchIncomingMerchandisePayment = () => {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, payload }: { id: string; payload: PatchIncomingMerchandisePaymentPayload }) =>
+      patchIncomingMerchandisePayment(id, payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['incoming-merchandise'] })
+    },
+  })
+}
+
+export const usePostIncomingMerchandisePayment = () => {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, body }: { id: string; body: PostIncomingMerchandisePaymentBody }) =>
+      postIncomingMerchandisePayment(id, body),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['incoming-merchandise'] })
+    },
+  })
+}
+
+export const useDeleteIncomingMerchandisePayment = () => {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, entryId }: { id: string; entryId: string }) =>
+      deleteIncomingMerchandisePayment(id, entryId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['incoming-merchandise'] })
+    },
   })
 }
