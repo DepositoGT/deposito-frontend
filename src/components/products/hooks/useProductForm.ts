@@ -138,6 +138,17 @@ export const useProductForm = (): UseProductFormReturn => {
             brand: product.brand,
             size: product.size,
             price: product.price.toString(),
+            priceWholesale:
+                product.priceWholesale != null && product.priceWholesale > 0
+                    ? String(product.priceWholesale)
+                    : '',
+            pricePromotion:
+                product.pricePromotion != null && product.pricePromotion > 0
+                    ? String(product.pricePromotion)
+                    : '',
+            promotionValidUntil: product.promotionValidUntil
+                ? String(product.promotionValidUntil).slice(0, 16)
+                : '',
             cost: product.cost.toString(),
             stock: product.stock.toString(),
             minStock: product.minStock.toString(),

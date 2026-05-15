@@ -135,6 +135,15 @@ export default function ProductCreatePage() {
       stock: formData.stock ? Number(formData.stock) : 0,
       min_stock: formData.minStock ? Number(formData.minStock) : 0,
       price: Number(formData.price),
+      price_wholesale: formData.priceWholesale?.trim()
+        ? Number(formData.priceWholesale)
+        : undefined,
+      price_promotion: formData.pricePromotion?.trim()
+        ? Number(formData.pricePromotion)
+        : undefined,
+      promotion_valid_until: formData.promotionValidUntil?.trim()
+        ? new Date(formData.promotionValidUntil).toISOString()
+        : undefined,
       cost: formData.cost ? Number(formData.cost) : 0,
       image_url: formData.imageUrl || undefined,
       supplier_id: formData.supplier,
@@ -293,6 +302,43 @@ export default function ProductCreatePage() {
                         step="0.01"
                       />
                     </div>
+                  </div>
+                  <div>
+                    <Label className="text-muted-foreground">Precio mayoreo (opcional)</Label>
+                    <div className="relative mt-1">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground min-w-[3.5rem]">{currencySymbol}</span>
+                      <Input
+                        type="number"
+                        placeholder="—"
+                        value={formData.priceWholesale}
+                        onChange={(e) => onFormChange('priceWholesale', e.target.value)}
+                        className="pl-[4.5rem]"
+                        step="0.01"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <Label className="text-muted-foreground">Precio promoción (opcional)</Label>
+                    <div className="relative mt-1">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground min-w-[3.5rem]">{currencySymbol}</span>
+                      <Input
+                        type="number"
+                        placeholder="—"
+                        value={formData.pricePromotion}
+                        onChange={(e) => onFormChange('pricePromotion', e.target.value)}
+                        className="pl-[4.5rem]"
+                        step="0.01"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <Label className="text-muted-foreground">Promoción válida hasta</Label>
+                    <Input
+                      type="datetime-local"
+                      value={formData.promotionValidUntil}
+                      onChange={(e) => onFormChange('promotionValidUntil', e.target.value)}
+                      className="mt-1"
+                    />
                   </div>
                   <div>
                     <Label className="text-muted-foreground">Costo</Label>

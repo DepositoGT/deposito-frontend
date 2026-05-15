@@ -19,6 +19,8 @@ export interface NewSaleDraft {
   /** UUID del contacto cliente si se eligió desde el listado guardado */
   pickedCustomerId?: string
   isFinalConsumer: boolean
+  /** Canal de venta para precios (lista / mayoreo según reglas). */
+  salesChannel?: 'POS' | 'WHOLESALE' | 'ONLINE'
   paymentMethodId: number | null
   amountReceived: string
   lines: NewSaleDraftLine[]

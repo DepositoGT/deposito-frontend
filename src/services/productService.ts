@@ -88,6 +88,19 @@ export const adaptApiProduct = (p: ApiProduct): Product => {
     stock: toNumber(p.stock, 0),
     minStock: toNumber(p.min_stock, 0),
     price: toNumber(p.price, 0),
+    priceWholesale:
+      p.price_wholesale != null && p.price_wholesale !== ''
+        ? toNumber(p.price_wholesale, 0)
+        : null,
+    pricePromotion:
+      p.price_promotion != null && p.price_promotion !== ''
+        ? toNumber(p.price_promotion, 0)
+        : null,
+    promotionValidUntil:
+      (p.promotion_valid_until as string | null | undefined) != null &&
+      String(p.promotion_valid_until).trim() !== ''
+        ? String(p.promotion_valid_until)
+        : null,
     cost: toNumber(p.cost, 0),
     supplier: supplier || "",
     supplierId: supplierId, // Agregar supplierId para uso interno
@@ -150,6 +163,27 @@ export const fetchCriticalProducts = async (): Promise<Product[]> => {
   const data = await apiFetch<ApiProduct[]>("/api/products/critical", { method: "GET" });
   if (!Array.isArray(data)) return [];
   return data.map(adaptApiProduct);
+};
+
+export interface PricingPreviewRequest {
+  customer_contact_id?: string | null;
+  sales_channel?: string;
+  product_ids: string[];
+}
+
+export interface PricingPreviewResponse {
+  price_tier_used: string;
+  sales_channel: string;
+  unit_prices: Record<string, number>;
+}
+
+export const postPricingPreview = async (
+  body: PricingPreviewRequest
+): Promise<PricingPreviewResponse> => {
+  return apiFetch<PricingPreviewResponse>("/api/products/pricing-preview", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
 };
 
 export type CreateProductPayload = CreateProductPayloadType;

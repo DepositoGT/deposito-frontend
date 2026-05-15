@@ -22,6 +22,10 @@ export interface CreateSalePayload {
   is_final_consumer: boolean;
   payment_method_id: number;
   status_id: number;
+  /** Cliente del maestro (UUID) si se eligió en POS */
+  customer_contact_id?: string;
+  /** Canal para resolución de precios y auditoría */
+  sales_channel?: string;
   items: SaleItemPayload[];
 }
 
