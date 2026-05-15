@@ -17,6 +17,7 @@ import { useNavigate } from 'react-router-dom'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { ImageUploadDropzone } from '@/components/ui/image-upload-dropzone'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { ArrowLeft, Package, QrCode, Image as ImageIcon, Check, ChevronsUpDown } from 'lucide-react'
@@ -84,12 +85,7 @@ export default function ProductCreatePage() {
     return s ? (s as { name: string }).name : id
   }, [formData.supplier, suppliers])
 
-  const handleImageChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0]
-    if (!file) {
-      onFormChange('imageUrl', '')
-      return
-    }
+  const handleProductImageFile = async (file: File) => {
     try {
       setIsUploadingImage(true)
       if (file.size > 5 * 1024 * 1024) {
@@ -198,19 +194,21 @@ export default function ProductCreatePage() {
                     <span className="text-sm">Sin imagen</span>
                   </div>
                 )}
-                <Input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleImageChange}
+                <ImageUploadDropzone
+                  onFileSelect={(f) => {
+                    void handleProductImageFile(f)
+                  }}
+                  onReject={(msg) =>
+                    toast({ title: 'Archivo no válido', description: msg, variant: 'destructive' })
+                  }
                   disabled={isUploadingImage || isLoading}
-                  className="cursor-pointer"
+                  isUploading={isUploadingImage}
+                  helperText={
+                    <>
+                      Opcional. Máx 5MB. Se almacenará en el bucket <span className="font-semibold">productos</span>.
+                    </>
+                  }
                 />
-                {isUploadingImage && (
-                  <p className="text-xs text-muted-foreground">Subiendo...</p>
-                )}
-                <p className="text-xs text-muted-foreground text-center">
-                  Opcional. Máx 5MB. Se almacenará en el bucket <span className="font-semibold">productos</span>.
-                </p>
               </div>
             </div>
 

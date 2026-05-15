@@ -17,6 +17,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
+import { ImageUploadDropzone } from '@/components/ui/image-upload-dropzone'
 import { Textarea } from '@/components/ui/textarea'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -218,17 +219,8 @@ export default function UserDetailPage() {
     }
   }
 
-  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file || !user) return
-    if (!file.type.startsWith('image/')) {
-      toast({ title: 'Solo se permiten imágenes', variant: 'destructive' })
-      return
-    }
-    if (file.size > 5 * 1024 * 1024) {
-      toast({ title: 'La imagen no debe exceder 5MB', variant: 'destructive' })
-      return
-    }
+  const handlePhotoFile = async (file: File) => {
+    if (!user) return
     setIsUploading(true)
     try {
       const updated = await uploadUserPhoto(user.id, file)
@@ -373,19 +365,17 @@ export default function UserDetailPage() {
                 </div>
                 {canEdit && (
                   <div className="mt-4 w-full">
-                    <Input
-                      type="file"
-                      accept="image/*"
+                    <ImageUploadDropzone
+                      onFileSelect={(f) => {
+                        void handlePhotoFile(f)
+                      }}
+                      onReject={(msg) =>
+                        toast({ title: 'Archivo no válido', description: msg, variant: 'destructive' })
+                      }
                       disabled={isUploading}
-                      onChange={handlePhotoUpload}
-                      className="cursor-pointer"
+                      isUploading={isUploading}
+                      helperText="Opcional. Máx 5MB."
                     />
-                    {isUploading && (
-                      <div className="flex items-center gap-2 mt-2 text-sm text-muted-foreground">
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        Subiendo...
-                      </div>
-                    )}
                   </div>
                 )}
               </div>
