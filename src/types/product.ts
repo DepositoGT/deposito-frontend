@@ -33,6 +33,8 @@ export interface Product extends BaseEntity {
   status: StockStatus | string; // Permitir string para flexibilidad
   deleted?: boolean; // Campo para soft delete
   deleted_at?: string | null; // Fecha de eliminación
+  /** Si es false, no aparece en ventas (POS) y la API rechaza incluirlo en una venta. */
+  availableForSale?: boolean;
 }
 
 // Interfaz para nuevo producto (form)
@@ -106,6 +108,7 @@ export interface ApiProduct {
   description?: string | null;
   status?: string | { id: string | number; name: string };
   status_id?: number | string;
+  available_for_sale?: boolean;
   [key: string]: unknown;
 }
 
@@ -127,6 +130,7 @@ export interface CreateProductPayload {
   barcode?: string;
   description?: string;
   status_id?: number;
+  available_for_sale?: boolean;
 }
 
 export interface UpdateProductPayload extends CreateProductPayload {

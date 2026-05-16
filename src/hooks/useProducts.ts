@@ -25,14 +25,12 @@ export const useProducts = (params?: ProductsQueryParams) => {
   });
 };
 
-// Legacy hook for backward compatibility (returns all products as array)
-export const useAllProducts = () => {
+/** Catálogo completo en memoria (p. ej. POS). Con `forSaleOnly`, excluye productos marcados solo para inventario. */
+export const useAllProducts = (options?: { forSaleOnly?: boolean }) => {
+  const forSaleOnly = options?.forSaleOnly === true;
   return useQuery<Product[], Error>({
-    queryKey: [...PRODUCTS_QUERY_KEY, "all"],
-    queryFn: async () => {
-      const data = await fetchAllProducts();
-      return data;
-    },
+    queryKey: [...PRODUCTS_QUERY_KEY, "all", forSaleOnly],
+    queryFn: async () => fetchAllProducts({ forSaleOnly }),
     staleTime: 60 * 1000, // 1 min
   });
 };
