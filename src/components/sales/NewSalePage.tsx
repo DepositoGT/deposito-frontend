@@ -134,7 +134,7 @@ export default function NewSalePage() {
 
   const paymentMethodsQuery = usePaymentMethods()
   const paymentMethods = useMemo(() => paymentMethodsQuery.data ?? [], [paymentMethodsQuery.data])
-  const productsQuery = useAllProducts()
+  const productsQuery = useAllProducts({ forSaleOnly: true })
   const availableProducts = useMemo(() => productsQuery.data ?? [], [productsQuery.data])
 
   const [productSearch, setProductSearch] = useState('')
@@ -1097,6 +1097,10 @@ export default function NewSalePage() {
               </div>
             </CardHeader>
             <CardContent>
+              <p className="text-xs text-muted-foreground mb-3">
+                Solo se muestran productos marcados como disponibles para la venta. Puedes cambiarlo en el detalle del
+                producto en Inventario.
+              </p>
               {productsQuery.isLoading ? (
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 py-8 text-center text-muted-foreground">
                   Cargando productos...

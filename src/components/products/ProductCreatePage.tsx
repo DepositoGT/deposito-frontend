@@ -31,6 +31,7 @@ import { SUPPLIERS_DROPDOWN_PARAMS } from '@/services/supplierService'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { Switch } from '@/components/ui/switch'
 import { getApiBaseUrl, getAuthToken } from '@/services/api'
 import type { ApiProduct } from '@/services/productService'
 import type { ProductFormData } from './types'
@@ -60,7 +61,7 @@ export default function ProductCreatePage() {
 
   const formData = productForm.formData
   const setFormData = productForm.setFormData
-  const onFormChange = (field: keyof ProductFormData, value: string) => {
+  const onFormChange = <K extends keyof ProductFormData>(field: K, value: ProductFormData[K]) => {
     setFormData(prev => ({ ...prev, [field]: value }))
   }
 
@@ -150,6 +151,7 @@ export default function ProductCreatePage() {
       barcode: formData.barcode?.trim() || undefined,
       description: formData.description?.trim() || undefined,
       status_id: 1,
+      available_for_sale: formData.availableForSale,
     }
     createProductMutation.mutate(payload, {
       onSuccess: (data: ApiProduct) => {
@@ -445,6 +447,20 @@ export default function ProductCreatePage() {
                     className="mt-1 resize-none"
                   />
                 </div>
+                <div className="mt-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-lg border border-border p-4">
+                  <div className="space-y-0.5">
+                    <Label htmlFor="create-available-sale">Disponible para la venta</Label>
+                    <p className="text-xs text-muted-foreground max-w-xl">
+                      Si se desactiva esta opción, el producto no aparece al registrar ventas ni puede venderse.
+                    </p>
+                  </div>
+                  <Switch
+                    id="create-available-sale"
+                    checked={formData.availableForSale}
+                    onCheckedChange={(v) => onFormChange('availableForSale', v)}
+                  />
+                </div>
+
               </div>
 
               <div className="flex flex-wrap items-center justify-end gap-2 pt-4 border-t">

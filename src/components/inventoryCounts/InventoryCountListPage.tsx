@@ -54,6 +54,7 @@ export default function InventoryCountListPage() {
     if (s === "APPROVED") return "default" as const;
     if (s === "CANCELLED") return "secondary" as const;
     if (s === "IN_REVIEW") return "outline" as const;
+    if (s === "PENDING_SECOND_APPROVAL") return "outline" as const;
     return "secondary" as const;
   };
 
@@ -65,7 +66,7 @@ export default function InventoryCountListPage() {
           <div>
             <h1 className="text-lg sm:text-2xl font-bold">Inventariado</h1>
             <p className="text-xs sm:text-sm text-muted-foreground">
-              Conteos físicos y ajuste de stock tras aprobación
+              Revisar lo que hay en tienda frente a lo que dice el sistema
             </p>
           </div>
         </div>
@@ -82,7 +83,7 @@ export default function InventoryCountListPage() {
           <div className="space-y-1">
             <CardTitle className="text-base">Sesiones</CardTitle>
             <p className="text-xs sm:text-sm text-muted-foreground font-normal">
-              Haz clic en una fila para abrir la sesión. En borrador, use «Iniciar conteo» en el detalle.
+              Toca una fila para abrirla. Si dice «Pendiente de empezar», entra y pulsa «Armar lista y contar».
             </p>
           </div>
           <Select value={statusFilter || "all"} onValueChange={(v) => setStatusFilter(v === "all" ? "" : v)}>
@@ -91,11 +92,12 @@ export default function InventoryCountListPage() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todos los estados</SelectItem>
-              <SelectItem value="DRAFT">Borrador</SelectItem>
-              <SelectItem value="IN_PROGRESS">En conteo</SelectItem>
+              <SelectItem value="DRAFT">Pendiente de empezar</SelectItem>
+              <SelectItem value="IN_PROGRESS">Contando</SelectItem>
               <SelectItem value="IN_REVIEW">En revisión</SelectItem>
-              <SelectItem value="APPROVED">Aprobado</SelectItem>
+              <SelectItem value="PENDING_SECOND_APPROVAL">Falta segunda firma</SelectItem>
               <SelectItem value="CANCELLED">Cancelado</SelectItem>
+              <SelectItem value="APPROVED">Cerrado y guardado</SelectItem>
             </SelectContent>
           </Select>
         </CardHeader>
@@ -106,7 +108,7 @@ export default function InventoryCountListPage() {
           )}
           {!isLoading && !sessions.length && (
             <p className="text-sm text-muted-foreground py-6 text-center">
-              No hay sesiones. Cree una nueva para comenzar un conteo.
+              No hay inventarios todavía. Pulsa «Nuevo inventariado» para crear uno.
             </p>
           )}
           {sessions.length > 0 && (
@@ -146,10 +148,23 @@ export default function InventoryCountListPage() {
                             {statusLabel(row.status)}
                           </Badge>
                         </TableCell>
-                        <TableCell className="text-right text-sm text-muted-foreground">
-                          {prog
-                            ? `${prog.countedLines}/${prog.totalLines} (${prog.pct}%)`
-                            : "—"}
+                        <TableCell className="text-right text-sm">
+                          {prog ? (
+                            <div className="text-muted-foreground">
+                              <span>
+                                {prog.countedLines}/{prog.totalLines} ({prog.pct}%)
+                              </span>
+                              {row.status === "IN_PROGRESS" &&
+                                row.scope_json?.doubleCount === true &&
+                                prog.countedLines < prog.totalLines && (
+                                  <span className="block text-[11px] text-amber-700 dark:text-amber-400 mt-0.5 max-w-[220px] ml-auto leading-snug">
+                                    Cuenta Contado + Comprobación
+                                  </span>
+                                )}
+                            </div>
+                          ) : (
+                            "—"
+                          )}
                         </TableCell>
                       </TableRow>
                     );
