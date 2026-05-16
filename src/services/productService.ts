@@ -110,6 +110,7 @@ export const adaptApiProduct = (p: ApiProduct): Product => {
     status,
     deleted: p.deleted === true || p.deleted === 1 || (p as { deleted?: boolean }).deleted === true,
     deleted_at: (p as { deleted_at?: string | null }).deleted_at || null,
+    availableForSale: (p as { available_for_sale?: boolean }).available_for_sale !== false,
   };
 };
 
@@ -120,6 +121,8 @@ export interface ProductsQueryParams {
   category?: string;
   supplier?: string;
   includeDeleted?: boolean;
+  /** Solo productos disponibles para venta (POS). */
+  forSaleOnly?: boolean;
 }
 
 export interface ProductsResponse {
@@ -140,6 +143,7 @@ export const fetchProducts = async (params?: ProductsQueryParams): Promise<Produ
   if (params?.category && params.category !== 'all') search.set("category", params.category);
   if (params?.supplier) search.set("supplier", params.supplier);
   if (params?.includeDeleted) search.set("includeDeleted", "true");
+  if (params?.forSaleOnly) search.set("forSale", "true");
 
   const url = `/api/products${search.toString() ? `?${search.toString()}` : ""}`;
   const data = await apiFetch<ProductsResponse>(url, { method: "GET" });
@@ -147,9 +151,11 @@ export const fetchProducts = async (params?: ProductsQueryParams): Promise<Produ
 };
 
 // Legacy function for backward compatibility (returns all products)
-export const fetchAllProducts = async (): Promise<Product[]> => {
-  // Fetch all products with a large page size to get everything in one request
-  const data = await apiFetch<ProductsResponse>("/api/products?pageSize=10000", { method: "GET" });
+export const fetchAllProducts = async (options?: { forSaleOnly?: boolean }): Promise<Product[]> => {
+  const search = new URLSearchParams();
+  search.set("pageSize", "10000");
+  if (options?.forSaleOnly) search.set("forSale", "true");
+  const data = await apiFetch<ProductsResponse>(`/api/products?${search.toString()}`, { method: "GET" });
   if (!data || !data.items || !Array.isArray(data.items)) return [];
   return data.items.map(adaptApiProduct);
 };

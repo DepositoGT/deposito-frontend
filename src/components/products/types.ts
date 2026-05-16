@@ -29,6 +29,8 @@ export interface ProductFormData {
     barcode: string
     description: string
     imageUrl: string
+    /** Si es false, no se muestra en el punto de venta. */
+    availableForSale: boolean
 }
 
 export interface ProductFilters {
@@ -59,7 +61,8 @@ export const EMPTY_PRODUCT_FORM: ProductFormData = {
     supplier: '',
     barcode: '',
     description: '',
-    imageUrl: ''
+    imageUrl: '',
+    availableForSale: true,
 }
 
 export const getProductStatusBadge = (product: Product) => {

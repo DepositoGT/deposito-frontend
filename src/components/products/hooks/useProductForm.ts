@@ -155,7 +155,8 @@ export const useProductForm = (): UseProductFormReturn => {
             supplier: supplierValue,
             barcode: product.barcode,
             description: product.description || '',
-            imageUrl: product.imageUrl || ''
+            imageUrl: product.imageUrl || '',
+            availableForSale: product.availableForSale !== false,
         })
     }, [])
 

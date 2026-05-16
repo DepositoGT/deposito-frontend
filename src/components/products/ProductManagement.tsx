@@ -477,7 +477,14 @@ const ProductManagement = () => {
                                                         />
                                                     </td>
                                                     <td className="p-3">
-                                                        <div className="font-medium text-foreground">{product.name}</div>
+                                                        <div className="font-medium text-foreground flex flex-wrap items-center gap-2">
+                                                            {product.name}
+                                                            {product.availableForSale === false && (
+                                                                <Badge variant="secondary" className="text-[10px] font-normal">
+                                                                    Solo inventario
+                                                                </Badge>
+                                                            )}
+                                                        </div>
                                                         <div className="text-sm text-muted-foreground">{product.brand} • {product.size}</div>
                                                         <div className="text-xs text-muted-foreground">Código: {product.id}</div>
                                                     </td>
@@ -530,8 +537,13 @@ const ProductManagement = () => {
                                                     )}
                                                 </div>
                                                 <div className="flex-1 min-w-0 flex flex-col gap-0.5 py-0.5">
-                                                    <h3 className="font-bold text-foreground leading-tight line-clamp-2">
+                                                    <h3 className="font-bold text-foreground leading-tight line-clamp-2 flex flex-wrap items-center gap-2">
                                                         {product.name}
+                                                        {product.availableForSale === false && (
+                                                            <Badge variant="secondary" className="text-[9px] font-normal shrink-0">
+                                                                Sin venta
+                                                            </Badge>
+                                                        )}
                                                     </h3>
                                                     <p className="text-sm text-muted-foreground truncate">
                                                         {product.brand} • {product.size}

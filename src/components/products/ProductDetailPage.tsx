@@ -18,6 +18,7 @@ import { Input } from '@/components/ui/input'
 import { ImageUploadDropzone } from '@/components/ui/image-upload-dropzone'
 import { Textarea } from '@/components/ui/textarea'
 import { Separator } from '@/components/ui/separator'
+import { Switch } from '@/components/ui/switch'
 import { useSuppliers } from '@/hooks/useSuppliers'
 import { SUPPLIERS_DROPDOWN_PARAMS } from '@/services/supplierService'
 import { useCategories } from '@/hooks/useCategories'
@@ -120,6 +121,7 @@ export default function ProductDetailPage() {
   const [editCategoryId, setEditCategoryId] = useState<string | undefined>(undefined)
   const [editSupplierId, setEditSupplierId] = useState<string | undefined>(undefined)
   const [editImageUrl, setEditImageUrl] = useState<string | undefined>(undefined)
+  const [editAvailableForSale, setEditAvailableForSale] = useState(true)
   const [isUploadingImage, setIsUploadingImage] = useState(false)
 
   useEffect(() => {
@@ -147,6 +149,7 @@ export default function ProductDetailPage() {
     setEditCategoryId(rawCategoryId ? String(rawCategoryId) : undefined)
     const rawSupplierId = (rawProduct as { supplier_id?: string | number } | null)?.supplier_id
     setEditSupplierId(rawSupplierId ? String(rawSupplierId) : undefined)
+    setEditAvailableForSale(product.availableForSale !== false)
   }, [product, rawProduct])
 
   const categoryLabel = useMemo(() => {
@@ -278,6 +281,7 @@ export default function ProductDetailPage() {
     setEditCategoryId(rawCategoryId ? String(rawCategoryId) : undefined)
     const rawSupplierId = (rawProduct as { supplier_id?: string | number } | null)?.supplier_id
     setEditSupplierId(rawSupplierId ? String(rawSupplierId) : undefined)
+    setEditAvailableForSale(product.availableForSale !== false)
   }
 
   return (
@@ -373,6 +377,7 @@ export default function ProductDetailPage() {
                         supplier_id: editSupplierId ?? (rawSupplierId ? String(rawSupplierId) : undefined),
                         barcode: editBarcode || undefined,
                         description: editDescription || undefined,
+                        available_for_sale: editAvailableForSale,
                       },
                     })
                     setRawProduct(updated)
@@ -522,6 +527,27 @@ export default function ProductDetailPage() {
                     <div>
                       <Label className="text-muted-foreground">Estado</Label>
                       <div className="mt-1">{getStatusBadge(product)}</div>
+                    </div>
+                    <div className="md:col-span-2">
+                      <Label htmlFor="edit-available-sale" className="text-muted-foreground">
+                        Disponible para la venta (POS)
+                      </Label>
+                      {isEditing && canEdit ? (
+                        <div className="mt-2 flex items-center gap-3">
+                          <Switch
+                            id="edit-available-sale"
+                            checked={editAvailableForSale}
+                            onCheckedChange={setEditAvailableForSale}
+                          />
+                          <span className="text-sm text-muted-foreground">
+                            Si lo desactivas, el producto no aparece al registrar ventas.
+                          </span>
+                        </div>
+                      ) : (
+                        <p className="text-foreground font-medium mt-1">
+                          {product.availableForSale !== false ? 'Sí, aparece en ventas' : 'No (solo inventario)'}
+                        </p>
+                      )}
                     </div>
                     <div>
                       <Label className="text-muted-foreground">Proveedor</Label>
