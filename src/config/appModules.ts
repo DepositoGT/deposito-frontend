@@ -34,6 +34,11 @@ import { ForwardRefExoticComponent, RefAttributes } from 'react'
 
 type IconComponent = ForwardRefExoticComponent<ModuleIconProps & RefAttributes<HTMLSpanElement>>
 
+/** Etiqueta y rutas del módulo de listas compartidas (categorías, términos de pago, etc.). */
+export const MASTER_DATA_MODULE_LABEL = 'Datos maestros'
+export const MASTER_DATA_MODULE_PATH = '/datos-maestros'
+export const MASTER_DATA_IMPORT_PATH = `${MASTER_DATA_MODULE_PATH}/importar`
+
 export interface AppModule {
     id: string
     label: string
@@ -170,8 +175,8 @@ export const appModules: AppModule[] = [
     },
     {
         id: 'catalogs',
-        label: 'Catálogos',
-        path: '/catalogos',
+        label: MASTER_DATA_MODULE_LABEL,
+        path: MASTER_DATA_MODULE_PATH,
         icon: CatalogosIcon,
         color: 'bg-blue-100/90',
         iconColor: 'text-blue-800',

@@ -60,6 +60,7 @@ import {
 } from '../hooks/useProductCategories'
 import { Pencil, Trash2, Plus, RotateCcw, Loader2, FileUp } from 'lucide-react'
 import { CatalogImportDialog } from './catalogs/CatalogImportDialog'
+import { PaymentMethodsTab } from './catalogs/PaymentMethodsTab'
 import { Pagination } from './shared/Pagination'
 import { useAuthPermissions } from '../hooks/useAuthPermissions'
 import { usePersistedListUiState, useResetPageOnFilterChange } from '../hooks/usePersistedListUiState'
@@ -86,7 +87,7 @@ type ProductCategoryDialogState = {
 }
 
 export function CatalogsManagement() {
-  const [activeTab, setActiveTab] = useState('payment-terms')
+  const [activeTab, setActiveTab] = useState('payment-methods')
   const [showDeleted, setShowDeleted] = useState(false)
 
   // Payment Terms Dialog State
@@ -110,19 +111,32 @@ export function CatalogsManagement() {
   return (
     <div className="p-3 sm:p-6 space-y-4 sm:space-y-6">
       <div>
-        <h1 className="text-xl sm:text-2xl md:text-3xl font-bold tracking-tight">Catálogos</h1>
-        <p className="text-xs sm:text-sm text-muted-foreground">Gestiona pagos y categorías</p>
+        <h1 className="text-xl sm:text-2xl md:text-3xl font-bold tracking-tight">Datos maestros</h1>
+        <p className="text-xs sm:text-sm text-muted-foreground">
+          Listas compartidas: métodos de cobro (ventas), términos con proveedores y categorías de producto
+        </p>
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <div className="overflow-x-auto -mx-3 px-3 sm:mx-0 sm:px-0">
-          <TabsList className="inline-flex w-auto min-w-full sm:grid sm:grid-cols-2">
-            <TabsTrigger value="payment-terms" className="text-xs sm:text-sm whitespace-nowrap">Términos de Pago</TabsTrigger>
-            <TabsTrigger value="categories" className="text-xs sm:text-sm whitespace-nowrap">Categorías</TabsTrigger>
+          <TabsList className="inline-flex w-auto min-w-full sm:grid sm:grid-cols-3 h-auto">
+            <TabsTrigger value="payment-methods" className="text-xs sm:text-sm whitespace-nowrap">
+              Métodos de pago
+            </TabsTrigger>
+            <TabsTrigger value="payment-terms" className="text-xs sm:text-sm whitespace-nowrap">
+              Términos de pago
+            </TabsTrigger>
+            <TabsTrigger value="categories" className="text-xs sm:text-sm whitespace-nowrap">
+              Categorías
+            </TabsTrigger>
           </TabsList>
         </div>
 
-        <TabsContent value="payment-terms" className="space-y-4">
+        <TabsContent value="payment-methods" className="space-y-4 mt-4">
+          <PaymentMethodsTab />
+        </TabsContent>
+
+        <TabsContent value="payment-terms" className="space-y-4 mt-4">
           <PaymentTermsTab
             showDeleted={showDeleted}
             setShowDeleted={setShowDeleted}
@@ -135,7 +149,7 @@ export function CatalogsManagement() {
           />
         </TabsContent>
 
-        <TabsContent value="categories" className="space-y-4">
+        <TabsContent value="categories" className="space-y-4 mt-4">
           <ProductCategoriesTab
             showDeleted={showDeleted}
             setShowDeleted={setShowDeleted}
