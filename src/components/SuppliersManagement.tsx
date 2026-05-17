@@ -650,7 +650,7 @@ const SuppliersManagement = () => {
                               })}
                               {categories.length === 0 && (
                                 <div className="px-2 py-3 text-xs text-muted-foreground">
-                                  Configura categorías en catálogos primero.
+                                  Configura categorías en Datos maestros primero.
                                 </div>
                               )}
                             </ScrollArea>

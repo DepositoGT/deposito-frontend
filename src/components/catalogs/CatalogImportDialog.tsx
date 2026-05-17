@@ -19,6 +19,7 @@
 import { useState, useCallback, useRef } from 'react'
 import { getApiBaseUrl } from '@/services/api'
 import { useNavigate } from 'react-router-dom'
+import { MASTER_DATA_IMPORT_PATH } from '@/config/appModules'
 import {
     Dialog,
     DialogContent,
@@ -127,7 +128,7 @@ export function CatalogImportDialog({ open, onOpenChange, type }: CatalogImportD
 
             // Close dialog and navigate to import page
             onOpenChange(false)
-            navigate('/catalogos/importar')
+            navigate(MASTER_DATA_IMPORT_PATH)
         } catch (err) {
             setErrorMessage(err instanceof Error ? err.message : 'Error al procesar el archivo')
             setStep('error')

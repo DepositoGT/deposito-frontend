@@ -110,8 +110,10 @@ export function CatalogsManagement() {
   return (
     <div className="p-3 sm:p-6 space-y-4 sm:space-y-6">
       <div>
-        <h1 className="text-xl sm:text-2xl md:text-3xl font-bold tracking-tight">Catálogos</h1>
-        <p className="text-xs sm:text-sm text-muted-foreground">Gestiona pagos y categorías</p>
+        <h1 className="text-xl sm:text-2xl md:text-3xl font-bold tracking-tight">Datos maestros</h1>
+        <p className="text-xs sm:text-sm text-muted-foreground">
+          Listas compartidas en todo el sistema: categorías de producto y términos de pago
+        </p>
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
