@@ -10,6 +10,67 @@
 
 import type { Permission } from "@/services/userService";
 
+/** Orden sugerido en la UI de roles (alineado al menú principal). */
+const GROUP_ORDER: string[] = [
+  "sales",
+  "returns",
+  "cashclosure",
+  "products",
+  "inventory_count",
+  "merchandise",
+  "contactos — proveedores",
+  "contactos — clientes",
+  "promotions",
+  "catalogs",
+  "alerts",
+  "analytics",
+  "reports",
+  "settings",
+  "users",
+  "roles",
+];
+
+/** Títulos en español para el primer segmento del código de permiso (o claves especiales). */
+const GROUP_LABELS: Record<string, string> = {
+  sales: "Ventas",
+  returns: "Devoluciones",
+  cashclosure: "Cierre de caja",
+  products: "Inventario",
+  inventory_count: "Inventariado",
+  merchandise: "Mercancía",
+  promotions: "Promociones",
+  catalogs: "Datos maestros",
+  alerts: "Alertas",
+  analytics: "Análisis",
+  reports: "Reportes",
+  settings: "Configuración",
+  users: "Usuarios",
+  roles: "Roles y permisos",
+  "contactos — proveedores": "Contactos — proveedores",
+  "contactos — clientes": "Contactos — clientes",
+};
+
+/**
+ * Etiqueta legible para el encabezado de cada tarjeta de permisos.
+ */
+export function formatPermissionGroupLabel(moduleKey: string): string {
+  if (GROUP_LABELS[moduleKey]) return GROUP_LABELS[moduleKey];
+  return moduleKey
+    .replace(/_/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/^\w/, (c) => c.toUpperCase());
+}
+
+function compareGroupKeys(a: string, b: string): number {
+  const ia = GROUP_ORDER.indexOf(a);
+  const ib = GROUP_ORDER.indexOf(b);
+  if (ia === -1 && ib === -1) return a.localeCompare(b, "es");
+  if (ia === -1) return 1;
+  if (ib === -1) return -1;
+  return ia - ib;
+}
+
 /**
  * Agrupa permisos por módulo para la UI de roles.
  * Los códigos contacts.suppliers.* y contacts.clients.* se muestran en bloques separados.
@@ -30,4 +91,11 @@ export function groupPermissionsByModule(permissions: Permission[]): Record<stri
     groups[key].push(perm);
   }
   return groups;
+}
+
+/** Entradas [clave, permisos] ordenadas para la grilla de roles. */
+export function sortPermissionGroupEntries(
+  groups: Record<string, Permission[]>
+): [string, Permission[]][] {
+  return Object.entries(groups).sort(([a], [b]) => compareGroupKeys(a, b));
 }

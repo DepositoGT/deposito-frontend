@@ -577,7 +577,7 @@ export default function IncomingMerchandiseDetailPage() {
                   <p className="text-sm text-muted-foreground">Cargando términos del proveedor…</p>
                 ) : paymentTermsForEdit.length === 0 ? (
                   <p className="text-sm text-muted-foreground">
-                    Sin términos en catálogo para este proveedor. Solo puedes editar notas de referencia si
+                    Sin términos de pago en Datos maestros para este proveedor. Solo puedes editar notas de referencia si
                     aplica.
                   </p>
                 ) : null}

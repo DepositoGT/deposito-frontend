@@ -20,6 +20,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { getApiBaseUrl } from '@/services/api'
 import { useNavigate } from 'react-router-dom'
+import { MASTER_DATA_MODULE_PATH } from '@/config/appModules'
 import * as XLSX from 'xlsx'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -125,10 +126,10 @@ export default function CatalogImportPage() {
                 sessionStorage.removeItem('import:fileData')
             } catch (err) {
                 console.error('Error loading file from sessionStorage:', err)
-                navigate('/catalogos')
+                navigate(MASTER_DATA_MODULE_PATH)
             }
         } else {
-            navigate('/catalogos')
+            navigate(MASTER_DATA_MODULE_PATH)
         }
     }, [navigate, catalogType])
 
@@ -388,7 +389,7 @@ export default function CatalogImportPage() {
                             {importResult.skipped && importResult.skipped > 0 && ` ${importResult.skipped} fueron omitidos.`}
                         </p>
                         <div className="flex gap-3 justify-center">
-                            <Button variant="outline" onClick={() => navigate('/catalogos')}>Ir a Catálogos</Button>
+                            <Button variant="outline" onClick={() => navigate(MASTER_DATA_MODULE_PATH)}>Ir a Datos maestros</Button>
                             <Button onClick={() => { setStep('mapping'); setImportResult(null) }}>Importar Más</Button>
                         </div>
                     </CardContent>
@@ -407,7 +408,7 @@ export default function CatalogImportPage() {
                         <h3 className="text-xl font-semibold mb-2">Error</h3>
                         <p className="text-muted-foreground mb-4">{errorMessage}</p>
                         <div className="flex gap-3 justify-center">
-                            <Button variant="outline" onClick={() => navigate('/catalogos')}>Cancelar</Button>
+                            <Button variant="outline" onClick={() => navigate(MASTER_DATA_MODULE_PATH)}>Cancelar</Button>
                             <Button onClick={() => setStep('mapping')}>Intentar de nuevo</Button>
                         </div>
                     </CardContent>
@@ -440,7 +441,7 @@ export default function CatalogImportPage() {
                 <div className="container mx-auto px-4 py-3">
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-4">
-                            <Button variant="ghost" size="icon" onClick={() => navigate('/catalogos')}>
+                            <Button variant="ghost" size="icon" onClick={() => navigate(MASTER_DATA_MODULE_PATH)}>
                                 <ArrowLeft className="h-5 w-5" />
                             </Button>
                             <div className="flex items-center gap-2">
@@ -477,7 +478,7 @@ export default function CatalogImportPage() {
                                         <input type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={handleFileChange} />
                                     </label>
                                 </Button>
-                                <Button variant="ghost" size="sm" onClick={() => navigate('/catalogos')}>
+                                <Button variant="ghost" size="sm" onClick={() => navigate(MASTER_DATA_MODULE_PATH)}>
                                     Cancelar
                                 </Button>
                             </div>

@@ -11,7 +11,7 @@
 /**
  * SupplierImportPage - Importación de contactos (proveedores y clientes)
  *
- * - Categoría / términos desconocidos: validación falla hasta Crear en catálogo u Omitir filas
+ * - Categoría / términos desconocidos: validación falla hasta Crear en Datos maestros u Omitir filas
  * - importOptions: createCategories, createPaymentTerms, skipRowIndexes
  */
 import { useState, useEffect, useMemo } from 'react'
@@ -586,7 +586,7 @@ export default function SupplierImportPage() {
             case 'category':
                 return [
                     'Solo proveedores: una o varias separadas por ; , o /.',
-                    'Si el nombre no está en el catálogo, «Probar» fallará hasta que elija «Crear» u «Omitir filas».',
+                    'Si el nombre no está en Datos maestros, «Probar» fallará hasta que elija «Crear» u «Omitir filas».',
                     'Clientes: puede omitir el mapeo.',
                 ]
             case 'payment_terms':
@@ -785,7 +785,7 @@ export default function SupplierImportPage() {
                                         </SelectContent>
                                     </Select>
                                     <p className="text-[11px] text-muted-foreground leading-snug">
-                                        Si «Probar» marca categoría o término inexistente, elija crear el valor en catálogo u omitir las filas del Excel .
+                                        Si «Probar» marca categoría o término inexistente, elija crear el valor en Datos maestros u omitir las filas del Excel .
                                     </p>
                                 </div>
 
@@ -840,7 +840,7 @@ export default function SupplierImportPage() {
                                 {hasTestedOnce && resolutionHints.length > 0 && (
                                     <div className="mb-4 space-y-2 rounded-md border border-orange-200 bg-orange-50/90 p-3">
                                         <p className="text-sm font-medium text-orange-950">
-                                            ¿Qué hacer con datos que no existen en el catálogo?
+                                            ¿Qué hacer con datos que no existen en Datos maestros?
                                         </p>
                                         <p className="text-xs text-muted-foreground">
                                             Aplique a todos los valores detectados, o use los botones por columna en «Comentarios».

@@ -9,7 +9,9 @@
  */
 
 import { useQuery } from "@tanstack/react-query";
-import { getApiBaseUrl } from "@/services/api";
+import { apiFetch } from "@/services/api";
+
+export const PAYMENT_METHODS_QUERY_KEY = ["payment-methods"] as const;
 
 export interface PaymentMethod {
   id: number;
@@ -17,14 +19,12 @@ export interface PaymentMethod {
 }
 
 const fetchPaymentMethods = async (): Promise<PaymentMethod[]> => {
-  const res = await fetch(`${getApiBaseUrl()}/catalogs/payment-methods`);
-  if (!res.ok) throw new Error("Failed to fetch payment methods");
-  return res.json();
+  return apiFetch<PaymentMethod[]>("/catalogs/payment-methods");
 };
 
 export const usePaymentMethods = () => {
   return useQuery({
-    queryKey: ["payment-methods"],
+    queryKey: PAYMENT_METHODS_QUERY_KEY,
     queryFn: fetchPaymentMethods,
     staleTime: 60 * 1000,
   });

@@ -531,8 +531,8 @@ export default function ImportPage() {
                 ]
             case 'category':
                 return [
-                    'Si el nombre no está en el catálogo, «Probar» fallará hasta «Crear categoría» u «Omitir filas».',
-                    'Puede crear el valor en catálogo desde esta pantalla sin salir del import.',
+                    'Si el nombre no está en Datos maestros, «Probar» fallará hasta «Crear categoría» u «Omitir filas».',
+                    'Puede crear el valor en Datos maestros desde esta pantalla sin salir del import.',
                 ]
             case 'supplier':
                 return [
@@ -694,7 +694,7 @@ export default function ImportPage() {
                                     <HR />
 
                                     <div className="space-y-2">
-                                        <p className="text-xs font-medium text-muted-foreground">Catálogo</p>
+                                        <p className="text-xs font-medium text-muted-foreground">Datos maestros</p>
                                         <p className="text-[11px] text-muted-foreground leading-snug">
                                             Si «Probar» detecta categoría o proveedor inexistente, elija crear el valor o omitir las filas del Excel (mismo criterio que en importación de contactos).
                                         </p>

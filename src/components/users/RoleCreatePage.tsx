@@ -11,7 +11,11 @@ import { useToast } from "@/hooks/use-toast";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useAuth } from "@/context/useAuth";
 import { createRole } from "@/services/userService";
-import { groupPermissionsByModule } from "@/lib/permissionGroups";
+import {
+  groupPermissionsByModule,
+  formatPermissionGroupLabel,
+  sortPermissionGroupEntries,
+} from "@/lib/permissionGroups";
 import { ArrowLeft, CheckSquare } from "lucide-react";
 
 const RoleCreatePage = () => {
@@ -47,7 +51,9 @@ const RoleCreatePage = () => {
   const [selectedPerms, setSelectedPerms] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
 
-  const permissionGroups = groupPermissionsByModule(allPermissions);
+  const permissionGroupEntries = sortPermissionGroupEntries(
+    groupPermissionsByModule(allPermissions)
+  );
 
   const togglePerm = (code: string) => {
     setSelectedPerms((prev) =>
@@ -153,14 +159,14 @@ const RoleCreatePage = () => {
             <div className="text-sm text-muted-foreground">Cargando permisos...</div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {Object.entries(permissionGroups).map(([moduleKey, perms]) => (
+              {permissionGroupEntries.map(([moduleKey, perms]) => (
                 <div
                   key={moduleKey}
                   className="space-y-2 border rounded-lg p-3 bg-muted/40"
                 >
-                  <div className="text-xs font-semibold uppercase text-muted-foreground flex items-center gap-1">
+                  <div className="text-xs font-semibold text-muted-foreground flex items-center gap-1">
                     <CheckSquare className="w-3 h-3" />
-                    {moduleKey}
+                    {formatPermissionGroupLabel(moduleKey)}
                   </div>
                   <div className="space-y-1">
                     {perms.map((perm) => (
