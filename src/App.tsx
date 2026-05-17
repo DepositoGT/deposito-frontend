@@ -371,9 +371,9 @@ const App = () => (
                   }
                 />
 
-                {/* Catalogs (Admin) */}
+                {/* Datos maestros (Admin) */}
                 <Route
-                  path="/catalogos"
+                  path="/datos-maestros"
                   element={
                     <PermissionRoute any={["catalogs.view", "catalogs.manage"]}>
                       <CatalogsManagement />
@@ -381,13 +381,15 @@ const App = () => (
                   }
                 />
                 <Route
-                  path="/catalogos/importar"
+                  path="/datos-maestros/importar"
                   element={
                     <PermissionRoute any={["catalogs.manage"]}>
                       <CatalogImportPage />
                     </PermissionRoute>
                   }
                 />
+                <Route path="/catalogos" element={<Navigate to="/datos-maestros" replace />} />
+                <Route path="/catalogos/importar" element={<Navigate to="/datos-maestros/importar" replace />} />
 
                 {/* Users (Admin) */}
                 <Route
