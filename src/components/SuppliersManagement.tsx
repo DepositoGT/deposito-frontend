@@ -552,7 +552,7 @@ const SuppliersManagement = () => {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {[18, 22, 26, 30].map((n) => (
+                    {[20, 32, 40].map((n) => (
                       <SelectItem key={n} value={String(n)}>{n}</SelectItem>
                     ))}
                   </SelectContent>
