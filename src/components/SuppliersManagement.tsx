@@ -82,7 +82,7 @@ const SuppliersManagement = () => {
     setPageSize,
     viewMode,
     setViewMode,
-  } = usePersistedListUiState("contactos/lista", { defaultPageSize: 18, defaultView: "cards" });
+  } = usePersistedListUiState("contactos/lista", { defaultPageSize: 20, defaultView: "cards" });
   const [partyFilter, setPartyFilter] = useState<"all" | "SUPPLIER" | "CUSTOMER">("all");
   const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(null);
   const [isImportOpen, setIsImportOpen] = useState(false);
