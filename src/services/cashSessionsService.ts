@@ -83,7 +83,7 @@ export async function fetchCashSessionCurrent(
   if (cashRegisterId) params.set('cash_register_id', cashRegisterId)
   const q = params.toString()
   const url = `${API_URL}/cash-sessions/current${q ? `?${q}` : ''}`
-  const res = await fetch(url, { headers: authHeaders() })
+  const res = await fetch(url, { headers: authHeaders(), signal: AbortSignal.timeout(12_000) })
   const data = (await res.json().catch(() => ({}))) as {
     register?: CashRegisterDto | null
     session?: CashRegisterSessionDto | null
