@@ -28,7 +28,7 @@ import { useAuthPermissions } from '@/hooks/useAuthPermissions'
 import { useSystemSettings } from '@/hooks/useSystemSettings'
 
 // Feature imports
-import { useSalesData } from './hooks'
+import { useSalesData, normalizeRawSale } from './hooks'
 import {
     SalesKPICards,
     SalesFilters,
@@ -39,6 +39,7 @@ import {
 import { STATUS_DB_NAMES, NegativeStockDialogState, SaleStatusKey } from './types'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { getApiBaseUrl, getAuthToken } from '@/services/api'
+import { fetchSaleById } from '@/services/saleService'
 import { hasNewSaleDraft } from '@/services/saleDraftStorage'
 
 const API_URL = getApiBaseUrl()
@@ -107,6 +108,21 @@ const SalesManagement = ({ onSectionChange }: SalesManagementProps) => {
             toast({ title: 'Error', description: (e as Error).message, variant: 'destructive' })
         } finally {
             setUpdatingSaleIds(prev => { const n = new Set(prev); n.delete(saleId); return n })
+        }
+    }
+
+    const handleViewSale = async (sale: Sale) => {
+        setSelectedSale(sale)
+        setIsViewSaleOpen(true)
+        try {
+            const raw = await fetchSaleById(sale.reference ?? sale.id)
+            setSelectedSale(normalizeRawSale(raw))
+        } catch (e) {
+            toast({
+                title: 'Error',
+                description: (e as Error).message || 'No se pudo cargar el detalle de la venta',
+                variant: 'destructive',
+            })
         }
     }
 
@@ -235,6 +251,8 @@ const SalesManagement = ({ onSectionChange }: SalesManagementProps) => {
                 onStatusChange={salesData.setStatusFilter}
                 paymentFilter={salesData.filters.paymentFilter}
                 onPaymentChange={salesData.setPaymentFilter}
+                isGlobalSearch={salesData.filters.isGlobalSearch}
+                searchHint={salesData.filters.searchHint}
             />
 
             {/* Sales Tables (solo Completadas y Canceladas) */}
@@ -250,7 +268,7 @@ const SalesManagement = ({ onSectionChange }: SalesManagementProps) => {
                         onPageChange={(page) => salesData.setPageFor(key, page)}
                         canChangeStatus={canChangeSaleStatus}
                         onStatusChange={updateSaleStatus}
-                        onViewSale={(sale) => { setSelectedSale(sale); setIsViewSaleOpen(true) }}
+                        onViewSale={handleViewSale}
                         onViewInvoice={(sale) => navigate(`/ventas/${sale.reference ?? sale.id}/factura`)}
                         canViewDetail={canViewDetail}
                         canViewInvoice={canViewInvoice}
