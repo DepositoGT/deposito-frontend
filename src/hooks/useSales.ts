@@ -8,22 +8,30 @@
  * For licensing inquiries: GitHub @dpatzan2
  */
 
-import { useQuery, useQueries } from "@tanstack/react-query";
-import { fetchSales, SalesQueryParams } from "@/services/salesService";
+import { useQuery, useQueries, type UseQueryOptions } from "@tanstack/react-query";
+import { fetchSales, SalesQueryParams, type SalesListResponse } from "@/services/salesService";
 
 export const SALES_QUERY_KEY = ["sales"] as const;
 
-export const useSales = (params: SalesQueryParams = {}) => {
+export const useSales = (
+  params: SalesQueryParams = {},
+  queryOptions?: Pick<UseQueryOptions<SalesListResponse>, "enabled">
+) => {
   return useQuery({
     queryKey: [...SALES_QUERY_KEY, params] as const,
     queryFn: () => fetchSales(params),
     staleTime: 30 * 1000,
+    enabled: queryOptions?.enabled ?? true,
   });
 };
 
 // Hook to fetch a single status
-export const useSalesByStatus = (status: string, params: Omit<SalesQueryParams, 'status'> = {}) => {
-  return useSales({ ...params, status });
+export const useSalesByStatus = (
+  status: string,
+  params: Omit<SalesQueryParams, "status"> = {},
+  queryOptions?: Pick<UseQueryOptions<SalesListResponse>, "enabled">
+) => {
+  return useSales({ ...params, status }, queryOptions);
 };
 
 // Hook to fetch multiple statuses concurrently. Accepts an array of status names.

@@ -51,6 +51,9 @@ export interface SaleFilters {
     statusFilter: SaleStatus | 'all'
     paymentFilter: PaymentMethod | 'all'
     period: string
+    isGlobalSearch?: boolean
+    searchHint?: string | null
+    minSearchLength?: number
 }
 
 export type SaleStatusKey = 'completed' | 'cancelled'

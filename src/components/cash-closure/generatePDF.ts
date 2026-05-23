@@ -14,7 +14,7 @@
 import jsPDF from 'jspdf'
 import autoTable, { type jsPDFDocument } from 'jspdf-autotable'
 import type { CashClosure } from './types'
-import { formatCurrency, formatDateTime, toNumber } from './types'
+import { formatCurrency, formatDateTime, toNumber, closureOpeningFloat } from './types'
 
 /** Color naranja/ámbar de la plataforma para encabezados en PDF (RGB) */
 const PDF_HEADER_COLOR: [number, number, number] = [217, 119, 6] // amber / liquor-amber
@@ -78,7 +78,10 @@ export const generateClosurePDF = (closure: CashClosure, companyName?: string, c
     doc.text('RESUMEN GENERAL', margin, yPos)
     yPos += 10
 
+    const openingFloat = closureOpeningFloat(closure)
+
     const summaryData = [
+        ...(openingFloat > 0 ? [['Fondo inicial del turno', fmt(openingFloat)]] : []),
         ['Total Teórico', fmt(closure.theoretical_total)],
         ['Ventas Brutas', fmt(closure.theoretical_sales)],
         ['Devoluciones', fmt(closure.theoretical_returns)],

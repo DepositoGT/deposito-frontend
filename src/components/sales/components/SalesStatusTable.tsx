@@ -23,7 +23,7 @@ import { SaleStatusKey, STATUS_LABELS } from '../types'
 interface SalesStatusTableProps {
     statusKey: SaleStatusKey
     sales: Sale[]
-    pageInfo: { page: number; totalPages: number }
+    pageInfo: { page: number; totalPages: number | null; hasMore: boolean }
     isLoading: boolean
     updatingSaleIds: Set<string>
     onPageChange: (page: number) => void
@@ -70,7 +70,11 @@ export const SalesStatusTable = ({
                         <span>{STATUS_LABELS[statusKey]} ({sales.length})</span>
                     </div>
                     <div className='text-sm text-muted-foreground'>
-                        {isLoading ? 'Cargando...' : `Página ${pageInfo.page}/${pageInfo.totalPages}`}
+                        {isLoading
+                            ? 'Cargando...'
+                            : pageInfo.totalPages != null
+                              ? `Página ${pageInfo.page}/${pageInfo.totalPages}`
+                              : `Página ${pageInfo.page}${pageInfo.hasMore ? '+' : ''}`}
                     </div>
                 </CardTitle>
             </CardHeader>
@@ -201,21 +205,28 @@ export const SalesStatusTable = ({
             {/* Pagination */}
             <div className='flex justify-end items-center gap-2 p-4'>
                 <span className='text-sm text-muted-foreground mr-2'>
-                    Página {pageInfo.page} de {pageInfo.totalPages}
+                    {pageInfo.totalPages != null
+                        ? `Página ${pageInfo.page} de ${pageInfo.totalPages}`
+                        : `Página ${pageInfo.page}`}
                 </span>
                 <Button
                     variant="outline"
                     size="sm"
                     onClick={() => onPageChange(Math.max(1, pageInfo.page - 1))}
-                    disabled={pageInfo.page <= 1}
+                    disabled={pageInfo.page <= 1 || isLoading}
                 >
                     <ChevronLeft className='w-4 h-4' />
                 </Button>
                 <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => onPageChange(Math.min(pageInfo.totalPages, pageInfo.page + 1))}
-                    disabled={pageInfo.page >= pageInfo.totalPages}
+                    onClick={() => onPageChange(pageInfo.page + 1)}
+                    disabled={
+                        isLoading ||
+                        (pageInfo.totalPages != null
+                            ? pageInfo.page >= pageInfo.totalPages
+                            : !pageInfo.hasMore)
+                    }
                 >
                     <ChevronRight className='w-4 h-4' />
                 </Button>

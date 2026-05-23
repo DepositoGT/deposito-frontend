@@ -17,7 +17,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Download, ThumbsUp, ThumbsDown } from 'lucide-react'
 import { useSystemSettings } from '@/hooks/useSystemSettings'
 import type { CashClosure } from '../types'
-import { formatCurrency, formatDateTime, toNumber } from '../types'
+import { formatCurrency, formatDateTime, toNumber, closureOpeningFloat, isCashPaymentMethodName } from '../types'
 
 interface ClosureDetailDialogProps {
     open: boolean
@@ -52,6 +52,8 @@ export const ClosureDetailDialog = ({
     const { currencyCode, locale } = useSystemSettings()
     if (!closure) return null
 
+    const openingFloat = closureOpeningFloat(closure)
+
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
@@ -81,6 +83,16 @@ export const ClosureDetailDialog = ({
                     {/* Sección 2: Resumen de totales */}
                     <div className="rounded-lg border bg-muted/50 p-4">
                         <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">Resumen</h4>
+                        {openingFloat > 0 && (
+                            <div className="mb-4 rounded-md border bg-background/80 px-3 py-2 text-sm">
+                                <p className="text-muted-foreground">Fondo inicial del turno</p>
+                                <p className="font-semibold">{formatCurrency(openingFloat, currencyCode, locale)}</p>
+                                <p className="text-xs text-muted-foreground mt-1">
+                                    El teórico de efectivo incluye este fondo más las ventas cobradas en efectivo durante el
+                                    turno.
+                                </p>
+                            </div>
+                        )}
                         <div className="grid grid-cols-3 gap-4">
                             <div>
                                 <p className="text-sm text-muted-foreground">Total Teórico</p>
@@ -103,10 +115,21 @@ export const ClosureDetailDialog = ({
                     <div className="rounded-lg border bg-card p-4">
                         <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">Desglose por método de pago</h4>
                         <div className="space-y-2">
-                            {closure.payment_breakdowns?.map((item) => (
+                            {closure.payment_breakdowns?.map((item) => {
+                                const methodName = item.payment_method?.name || item.payment_method_name
+                                const isCash = isCashPaymentMethodName(methodName)
+                                const theory = toNumber(item.theoretical_amount)
+                                const cashSales =
+                                    isCash && openingFloat > 0
+                                        ? theory >= openingFloat
+                                            ? theory - openingFloat
+                                            : theory
+                                        : null
+
+                                return (
                                 <div key={item.payment_method_id} className="border rounded p-3">
                                     <div className="flex justify-between items-center mb-2">
-                                        <span className="font-medium">{item.payment_method?.name || item.payment_method_name}</span>
+                                        <span className="font-medium">{methodName}</span>
                                         <Badge variant={toNumber(item.difference) === 0 ? 'default' : toNumber(item.difference) > 0 ? 'secondary' : 'destructive'}>
                                             {toNumber(item.difference) >= 0 ? '+' : ''}{formatCurrency(item.difference, currencyCode, locale)}
                                         </Badge>
@@ -115,6 +138,12 @@ export const ClosureDetailDialog = ({
                                         <div>
                                             <span className="text-muted-foreground">Teórico: </span>
                                             <span className="font-medium">{formatCurrency(item.theoretical_amount, currencyCode, locale)}</span>
+                                            {cashSales != null && (
+                                                <p className="text-xs text-muted-foreground mt-0.5">
+                                                    Fondo {formatCurrency(openingFloat, currencyCode, locale)} + ventas{' '}
+                                                    {formatCurrency(cashSales, currencyCode, locale)}
+                                                </p>
+                                            )}
                                         </div>
                                         <div>
                                             <span className="text-muted-foreground">Contado: </span>
@@ -125,7 +154,8 @@ export const ClosureDetailDialog = ({
                                         <p className="text-sm text-muted-foreground mt-2">Nota: {item.notes}</p>
                                     )}
                                 </div>
-                            ))}
+                                )
+                            })}
                         </div>
                     </div>
 
