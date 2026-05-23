@@ -21,9 +21,39 @@ interface TheoreticalSummaryProps {
 
 export const TheoreticalSummary = ({ data }: TheoreticalSummaryProps) => {
     const { currencyCode, locale } = useSystemSettings()
+    const cashSession = data.cash_session
     return (
         <div className="border rounded-lg p-4 bg-muted/50">
             <h3 className="font-semibold mb-3">Resumen Teórico</h3>
+            {cashSession && cashSession.opening_float > 0 && (
+                <div className="mb-4 rounded-md border border-amber-200/80 bg-amber-50/80 dark:bg-amber-950/30 dark:border-amber-900/50 px-3 py-2 text-sm">
+                    <p className="font-medium text-foreground">Efectivo en caja</p>
+                    <div className="mt-1 grid grid-cols-1 sm:grid-cols-3 gap-2 text-muted-foreground">
+                        <span>
+                            Fondo inicial:{' '}
+                            <span className="font-medium text-foreground">
+                                {formatCurrency(cashSession.opening_float, currencyCode, locale)}
+                            </span>
+                        </span>
+                        <span>
+                            + Ventas efectivo:{' '}
+                            <span className="font-medium text-foreground">
+                                {formatCurrency(cashSession.cash_sales_amount, currencyCode, locale)}
+                            </span>
+                        </span>
+                        <span>
+                            = Debe haber:{' '}
+                            <span className="font-medium text-foreground">
+                                {formatCurrency(cashSession.expected_cash_in_drawer, currencyCode, locale)}
+                            </span>
+                        </span>
+                    </div>
+                    <p className="text-xs mt-2">
+                        Cuente todo el efectivo físico en la caja (monedas y billetes), incluido el fondo con el que
+                        abrió el turno.
+                    </p>
+                </div>
+            )}
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                 <div>
                     <p className="text-sm text-muted-foreground">Total Teórico</p>

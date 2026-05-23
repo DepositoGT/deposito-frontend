@@ -21,17 +21,38 @@ interface DenominationsCounterProps {
     denominations: Denomination[]
     onUpdateQuantity: (index: number, quantity: number) => void
     cashTotal: number
+    expectedCashInDrawer?: number
+    openingFloat?: number
 }
 
 export const DenominationsCounter = ({
     denominations,
     onUpdateQuantity,
-    cashTotal
+    cashTotal,
+    expectedCashInDrawer,
+    openingFloat = 0,
 }: DenominationsCounterProps) => {
     const { currencyCode, locale } = useSystemSettings()
     return (
         <div className="space-y-4">
-            <h3 className="font-semibold">Conteo de Efectivo</h3>
+            <div>
+                <h3 className="font-semibold">Conteo de Efectivo</h3>
+                {openingFloat > 0 && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                        Incluya el fondo inicial ({formatCurrency(openingFloat, currencyCode, locale)}) y las ventas en
+                        efectivo del turno.
+                        {expectedCashInDrawer != null && expectedCashInDrawer > 0 && (
+                            <>
+                                {' '}
+                                Teórico en caja:{' '}
+                                <span className="font-medium text-foreground">
+                                    {formatCurrency(expectedCashInDrawer, currencyCode, locale)}
+                                </span>
+                            </>
+                        )}
+                    </p>
+                )}
+            </div>
             <Card>
                 <CardContent className="pt-6">
                     <div className="space-y-3">

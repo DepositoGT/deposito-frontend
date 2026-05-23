@@ -48,6 +48,12 @@ export interface TheoreticalData {
         total_returns: number
         net_total: number
     }
+    /** Presente en «mi cierre» cuando el turno tiene fondo inicial en caja */
+    cash_session?: {
+        opening_float: number
+        cash_sales_amount: number
+        expected_cash_in_drawer: number
+    } | null
     metrics: {
         total_transactions: number
         total_customers: number
@@ -62,6 +68,14 @@ export interface CashClosure {
     date: string
     start_date: string
     end_date: string
+    /** Fondo inicial del turno al arquear (efectivo que ya estaba en caja) */
+    opening_float?: number | string | null
+    cash_register_session?: {
+        id: string
+        opening_float: number | string
+        opened_at: string
+        closed_at: string | null
+    } | null
     cashier_name: string
     cashier_signature: string | null
     supervisor_name: string | null
@@ -100,6 +114,24 @@ export const GUATEMALAN_DENOMINATIONS: Denomination[] = [
     { denomination: 0.10, type: 'Moneda', quantity: 0, subtotal: 0 },
     { denomination: 0.05, type: 'Moneda', quantity: 0, subtotal: 0 },
 ]
+
+/** ¿Método de pago en efectivo? */
+export function isCashPaymentMethodName(name?: string | null): boolean {
+    const n = String(name || '').toLowerCase()
+    return n.includes('efectivo') || n.includes('cash')
+}
+
+/** Fondo inicial del cierre (columna o sesión ligada) */
+export function closureOpeningFloat(closure: CashClosure): number {
+    if (closure.opening_float != null && toNumber(closure.opening_float) > 0) {
+        return toNumber(closure.opening_float)
+    }
+    const fromSession = closure.cash_register_session?.opening_float
+    if (fromSession != null && toNumber(fromSession) > 0) {
+        return toNumber(fromSession)
+    }
+    return 0
+}
 
 /** Convert string/number to number */
 export const toNumber = (value: number | string): number => {

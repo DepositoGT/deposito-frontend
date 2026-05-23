@@ -70,6 +70,7 @@ import {
 } from './components'
 import { OpenCashRegisterPrompt } from './OpenCashRegisterPrompt'
 import { closeCashSession, fetchCashSessionCurrent } from '@/services/cashSessionsService'
+import { CASH_SESSION_CURRENT_QUERY_KEY } from '@/components/cash-closure/hooks/useMineClosureGate'
 import type { CashRegisterSessionDto } from '@/services/cashSessionsService'
 import type { CartProduct } from './types'
 
@@ -310,6 +311,7 @@ export default function NewSalePage() {
       await closeCashSession(
         cashRegisterMeta?.id ? { cash_register_id: cashRegisterMeta.id } : {}
       )
+      await queryClient.invalidateQueries({ queryKey: CASH_SESSION_CURRENT_QUERY_KEY })
       setShowCloseCashDialog(false)
       setCashSessionOpen(false)
       setActiveCashSession(null)
@@ -327,7 +329,7 @@ export default function NewSalePage() {
     } finally {
       setIsClosingCashSession(false)
     }
-  }, [cashRegisterMeta?.id, toast])
+  }, [cashRegisterMeta?.id, toast, queryClient])
 
   const [hasStoredDraft, setHasStoredDraft] = useState(false)
   useEffect(() => {
