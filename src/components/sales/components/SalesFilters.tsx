@@ -24,6 +24,8 @@ interface SalesFiltersProps {
     onStatusChange: (value: SaleStatus | 'all') => void
     paymentFilter: PaymentMethod | 'all'
     onPaymentChange: (value: PaymentMethod | 'all') => void
+    isGlobalSearch?: boolean
+    searchHint?: string | null
 }
 
 export const SalesFilters = ({
@@ -32,13 +34,15 @@ export const SalesFilters = ({
     statusFilter,
     onStatusChange,
     paymentFilter,
-    onPaymentChange
+    onPaymentChange,
+    isGlobalSearch = false,
+    searchHint = null,
 }: SalesFiltersProps) => {
     return (
         <Card>
-            <CardContent className='p-4'>
-                <div className='flex items-center space-x-4'>
-                    <div className='flex-1 relative'>
+            <CardContent className='p-4 space-y-2'>
+                <div className='flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4'>
+                    <div className='flex-1 relative min-w-0'>
                         <Search className='absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground' />
                         <Input
                             placeholder='Buscar por ID, cliente o ID fiscal...'
@@ -47,7 +51,8 @@ export const SalesFilters = ({
                             className='pl-10'
                         />
                     </div>
-                    <div className='w-48'>
+                    <div className='flex flex-wrap gap-3 sm:shrink-0'>
+                    <div className='w-full sm:w-48'>
                         <Select value={statusFilter} onValueChange={(v: SaleStatus | 'all') => onStatusChange(v)}>
                             <SelectTrigger><SelectValue placeholder='Estado' /></SelectTrigger>
                             <SelectContent>
@@ -57,7 +62,7 @@ export const SalesFilters = ({
                             </SelectContent>
                         </Select>
                     </div>
-                    <div className='w-48'>
+                    <div className='w-full sm:w-48'>
                         <Select value={paymentFilter} onValueChange={(v: PaymentMethod | 'all') => onPaymentChange(v)}>
                             <SelectTrigger><SelectValue placeholder='Método de Pago' /></SelectTrigger>
                             <SelectContent>
@@ -68,7 +73,15 @@ export const SalesFilters = ({
                             </SelectContent>
                         </Select>
                     </div>
+                    </div>
                 </div>
+                {isGlobalSearch ? (
+                    <p className='text-xs text-muted-foreground'>
+                        Buscando en todas las ventas del sistema (ignora el filtro de periodo).
+                    </p>
+                ) : searchHint ? (
+                    <p className='text-xs text-amber-700 dark:text-amber-400'>{searchHint}</p>
+                ) : null}
             </CardContent>
         </Card>
     )

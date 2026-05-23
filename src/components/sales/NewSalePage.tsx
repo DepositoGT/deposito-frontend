@@ -38,10 +38,11 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { ArrowLeft, Plus, Receipt, Search, ChevronLeft, ChevronRight, PauseCircle, RotateCcw, Loader2, Landmark, Settings } from 'lucide-react'
+import { ArrowLeft, Plus, Receipt, Search, ChevronLeft, ChevronRight, PauseCircle, RotateCcw, Loader2, Landmark, Settings, List, LayoutGrid, ImageIcon } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { useQueryClient } from '@tanstack/react-query'
 import { useAllProducts, PRODUCTS_QUERY_KEY } from '@/hooks/useProducts'
+import { useCategories } from '@/hooks/useCategories'
 import { usePaymentMethods, PaymentMethod as PaymentMethodType } from '@/hooks/usePaymentMethods'
 import { useAuthPermissions } from '@/hooks/useAuthPermissions'
 import { useSystemSettings } from '@/hooks/useSystemSettings'
@@ -70,8 +71,41 @@ import {
 } from './components'
 import { OpenCashRegisterPrompt } from './OpenCashRegisterPrompt'
 import { closeCashSession, fetchCashSessionCurrent } from '@/services/cashSessionsService'
+import { CASH_SESSION_CURRENT_QUERY_KEY } from '@/components/cash-closure/hooks/useMineClosureGate'
 import type { CashRegisterSessionDto } from '@/services/cashSessionsService'
 import type { CartProduct } from './types'
+
+type ProductBrowseLayout = 'flat' | 'byCategory'
+
+const PRODUCT_LAYOUT_STORAGE_KEY = 'deposito:listUi:v1:ventas/nueva/productos-layout'
+
+function readProductBrowseLayout(): ProductBrowseLayout {
+  try {
+    const v = sessionStorage.getItem(PRODUCT_LAYOUT_STORAGE_KEY)
+    if (v === 'flat') return 'flat'
+    if (v === 'byCategory') return 'byCategory'
+  } catch {
+    /* ignore */
+  }
+  return 'byCategory'
+}
+
+function writeProductBrowseLayout(layout: ProductBrowseLayout) {
+  try {
+    sessionStorage.setItem(PRODUCT_LAYOUT_STORAGE_KEY, layout)
+  } catch {
+    /* ignore */
+  }
+}
+
+function getProductCategoryName(product: Product): string {
+  const c = product.category
+  if (typeof c === 'string' && c.trim()) return c.trim()
+  if (c && typeof c === 'object' && 'name' in c && typeof c.name === 'string' && c.name.trim()) {
+    return c.name.trim()
+  }
+  return 'Sin categoría'
+}
 
 const ProductCard = ({
   product,
@@ -120,6 +154,52 @@ const ProductCard = ({
   </Card>
 )
 
+const CategoryBrowseCard = ({
+  name,
+  count,
+  imageUrl,
+  onSelect,
+  disabled,
+}: {
+  name: string
+  count: number
+  imageUrl?: string | null
+  onSelect: () => void
+  disabled?: boolean
+}) => (
+  <Card
+    className="overflow-hidden transition-shadow hover:shadow-md cursor-pointer"
+    role="button"
+    tabIndex={disabled ? -1 : 0}
+    onClick={() => !disabled && onSelect()}
+    onKeyDown={(e) => {
+      if (disabled) return
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault()
+        onSelect()
+      }
+    }}
+  >
+    <div className="aspect-square bg-muted relative">
+      {imageUrl ? (
+        <img src={imageUrl} alt={name} className="w-full h-full object-cover" />
+      ) : (
+        <div className="w-full h-full flex items-center justify-center text-muted-foreground">
+          <ImageIcon className="h-10 w-10" />
+        </div>
+      )}
+    </div>
+    <CardContent className="p-3 text-center">
+      <p className="font-medium text-sm truncate" title={name}>
+        {name}
+      </p>
+      <p className="text-xs text-muted-foreground">
+        {count} {count === 1 ? 'producto' : 'productos'}
+      </p>
+    </CardContent>
+  </Card>
+)
+
 export default function NewSalePage() {
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
@@ -136,10 +216,13 @@ export default function NewSalePage() {
   const paymentMethods = useMemo(() => paymentMethodsQuery.data ?? [], [paymentMethodsQuery.data])
   const productsQuery = useAllProducts({ forSaleOnly: true })
   const availableProducts = useMemo(() => productsQuery.data ?? [], [productsQuery.data])
+  const categoriesQuery = useCategories()
 
   const [productSearch, setProductSearch] = useState('')
   const [productPage, setProductPage] = useState(1)
   const [productPageSize, setProductPageSize] = useState(9)
+  const [productLayout, setProductLayout] = useState<ProductBrowseLayout>(readProductBrowseLayout)
+  const [selectedCategoryName, setSelectedCategoryName] = useState<string | null>(null)
   const [customer, setCustomer] = useState('')
   const [customerNit, setCustomerNit] = useState('')
   const [pickedCustomerId, setPickedCustomerId] = useState<string>('__none__')
@@ -224,13 +307,55 @@ export default function NewSalePage() {
     [availableProducts, productSearch]
   )
 
+  const isProductSearchActive = productSearch.trim().length > 0
+
+  const categoryImageByName = useMemo(() => {
+    const map = new Map<string, string | null>()
+    for (const c of categoriesQuery.data ?? []) {
+      map.set(c.name, c.image_url ?? null)
+    }
+    return map
+  }, [categoriesQuery.data])
+
+  const categorySummaries = useMemo(() => {
+    const counts = new Map<string, number>()
+    for (const p of filteredProducts) {
+      const name = getProductCategoryName(p)
+      counts.set(name, (counts.get(name) ?? 0) + 1)
+    }
+    return Array.from(counts.entries())
+      .map(([name, count]) => ({
+        name,
+        count,
+        imageUrl: categoryImageByName.get(name) ?? null,
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name, 'es'))
+  }, [filteredProducts, categoryImageByName])
+
+  const browseProducts = useMemo(() => {
+    if (productLayout === 'flat' || isProductSearchActive) return filteredProducts
+    if (!selectedCategoryName) return []
+    return filteredProducts.filter((p) => getProductCategoryName(p) === selectedCategoryName)
+  }, [productLayout, isProductSearchActive, filteredProducts, selectedCategoryName])
+
+  const showCategoryPicker =
+    productLayout === 'byCategory' && !isProductSearchActive && selectedCategoryName === null
+
+  useEffect(() => {
+    writeProductBrowseLayout(productLayout)
+  }, [productLayout])
+
+  useEffect(() => {
+    setProductPage(1)
+  }, [productSearch, productLayout, selectedCategoryName])
+
   const pageSize = productPageSize
-  const totalPages = Math.max(1, Math.ceil(filteredProducts.length / pageSize))
+  const totalPages = Math.max(1, Math.ceil(browseProducts.length / pageSize))
   const safePage = Math.min(productPage, totalPages)
   const pageProducts = useMemo(() => {
     const start = (safePage - 1) * pageSize
-    return filteredProducts.slice(start, start + pageSize)
-  }, [filteredProducts, safePage, pageSize])
+    return browseProducts.slice(start, start + pageSize)
+  }, [browseProducts, safePage, pageSize])
 
   const displayTotal = promotions.finalTotal ?? cart.cartTotal
   const changeAmount =
@@ -310,6 +435,7 @@ export default function NewSalePage() {
       await closeCashSession(
         cashRegisterMeta?.id ? { cash_register_id: cashRegisterMeta.id } : {}
       )
+      await queryClient.invalidateQueries({ queryKey: CASH_SESSION_CURRENT_QUERY_KEY })
       setShowCloseCashDialog(false)
       setCashSessionOpen(false)
       setActiveCashSession(null)
@@ -327,7 +453,7 @@ export default function NewSalePage() {
     } finally {
       setIsClosingCashSession(false)
     }
-  }, [cashRegisterMeta?.id, toast])
+  }, [cashRegisterMeta?.id, toast, queryClient])
 
   const [hasStoredDraft, setHasStoredDraft] = useState(false)
   useEffect(() => {
@@ -1082,35 +1208,123 @@ export default function NewSalePage() {
         {/* Columna derecha: productos en cards */}
         <div className="lg:col-span-3">
           <Card>
-            <CardHeader>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <Input
-                  placeholder="Buscar por nombre o código de barras..."
-                  value={productSearch}
-                  onChange={(e) => {
-                    setProductSearch(e.target.value)
+            <CardHeader className="space-y-3">
+              <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
+                <div className="relative flex-1 min-w-0">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Buscar por nombre o código de barras..."
+                    value={productSearch}
+                    onChange={(e) => {
+                      setProductSearch(e.target.value)
+                      setProductPage(1)
+                    }}
+                    className="pl-9"
+                  />
+                </div>
+                <div
+                  className="flex items-center border rounded-md bg-background/80 shrink-0 self-end sm:self-auto"
+                  role="group"
+                  aria-label="Forma de ver productos"
+                >
+                  <Button
+                    type="button"
+                    variant={productLayout === 'flat' ? 'default' : 'ghost'}
+                    size="sm"
+                    className="h-9 rounded-r-none gap-1.5 px-3"
+                    onClick={() => {
+                      setProductLayout('flat')
+                      setSelectedCategoryName(null)
+                    }}
+                    aria-pressed={productLayout === 'flat'}
+                    title="Lista de todos los productos"
+                  >
+                    <List className="w-4 h-4" />
+                    <span className="hidden sm:inline text-xs">Lista</span>
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={productLayout === 'byCategory' ? 'default' : 'ghost'}
+                    size="sm"
+                    className="h-9 rounded-l-none gap-1.5 px-3"
+                    onClick={() => {
+                      setProductLayout('byCategory')
+                      setSelectedCategoryName(null)
+                    }}
+                    aria-pressed={productLayout === 'byCategory'}
+                    title="Primero elegir categoría"
+                  >
+                    <LayoutGrid className="w-4 h-4" />
+                    <span className="hidden sm:inline text-xs">Categorías</span>
+                  </Button>
+                </div>
+              </div>
+              {productLayout === 'byCategory' && selectedCategoryName && !isProductSearchActive ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="w-fit h-8 px-2 -ml-2 text-muted-foreground hover:text-foreground"
+                  onClick={() => {
+                    setSelectedCategoryName(null)
                     setProductPage(1)
                   }}
-                  className="pl-9"
-                />
-              </div>
+                >
+                  <ChevronLeft className="w-4 h-4 mr-1" />
+                  Todas las categorías
+                </Button>
+              ) : null}
             </CardHeader>
             <CardContent>
               <p className="text-xs text-muted-foreground mb-3">
                 Solo se muestran productos marcados como disponibles para la venta. Puedes cambiarlo en el detalle del
                 producto en Inventario.
+                {productLayout === 'byCategory' && !isProductSearchActive && !selectedCategoryName ? (
+                  <span className="block mt-1">
+                    Elige una categoría para ver sus productos.
+                  </span>
+                ) : null}
+                {productLayout === 'byCategory' && isProductSearchActive ? (
+                  <span className="block mt-1">
+                    Con búsqueda activa se muestran coincidencias en todas las categorías.
+                  </span>
+                ) : null}
               </p>
               {productsQuery.isLoading ? (
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 py-8 text-center text-muted-foreground">
                   Cargando productos...
                 </div>
-              ) : filteredProducts.length === 0 ? (
+              ) : showCategoryPicker ? (
+                categorySummaries.length === 0 ? (
+                  <div className="py-12 text-center text-muted-foreground">
+                    No hay categorías con productos que coincidan
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 max-h-[calc(100vh-16rem)] overflow-y-auto">
+                    {categorySummaries.map((cat) => (
+                      <CategoryBrowseCard
+                        key={cat.name}
+                        name={cat.name}
+                        count={cat.count}
+                        imageUrl={cat.imageUrl}
+                        disabled={isProcessing}
+                        onSelect={() => {
+                          setSelectedCategoryName(cat.name)
+                          setProductPage(1)
+                        }}
+                      />
+                    ))}
+                  </div>
+                )
+              ) : browseProducts.length === 0 ? (
                 <div className="py-12 text-center text-muted-foreground">
                   No hay productos que coincidan
                 </div>
               ) : (
                 <>
+                  {productLayout === 'byCategory' && selectedCategoryName && !isProductSearchActive ? (
+                    <p className="text-sm font-medium text-foreground mb-3">{selectedCategoryName}</p>
+                  ) : null}
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 max-h-[calc(100vh-16rem)] overflow-y-auto">
                     {pageProducts.map((product) => (
                       <ProductCard
@@ -1123,6 +1337,7 @@ export default function NewSalePage() {
                       />
                     ))}
                   </div>
+                  {!showCategoryPicker ? (
                   <div className="flex flex-wrap items-center justify-between gap-4 mt-4">
                     <div className="flex items-center gap-2">
                       <span className="text-sm text-muted-foreground">Productos por página:</span>
@@ -1160,6 +1375,7 @@ export default function NewSalePage() {
                       </Button>
                     </div>
                   </div>
+                  ) : null}
                 </>
               )}
             </CardContent>

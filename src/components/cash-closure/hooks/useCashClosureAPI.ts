@@ -196,11 +196,16 @@ export const useCashClosureAPI = (): UseCashClosureAPIReturn => {
             const data: TheoreticalData = await response.json()
             setTheoreticalData(data)
 
-            if (data.metrics.total_transactions === 0) {
+            if (data.metrics.total_transactions === 0 && !(data.cash_session?.opening_float > 0)) {
                 toast({
                     title: 'Sin ventas en el período',
                     description: 'No hay ventas en el período seleccionado. Puedes guardar el cierre con total Q 0.00 si lo deseas.',
                     variant: 'default',
+                })
+            } else if (data.metrics.total_transactions === 0 && data.cash_session?.opening_float > 0) {
+                toast({
+                    title: 'Cálculo completado',
+                    description: `Sin ventas en el turno. Debe haber ${data.cash_session.expected_cash_in_drawer.toFixed(2)} en efectivo (fondo inicial).`,
                 })
             } else {
                 toast({

@@ -55,6 +55,7 @@ import RoleCreatePage from "@/components/users/RoleCreatePage";
 import { CatalogsManagement } from "@/components/CatalogsManagement";
 import ReturnsManagement from "@/components/ReturnsManagement";
 import CashClosureManagement from "@/components/CashClosureManagement";
+import { CashClosureCreatePage } from "@/components/cash-closure/CashClosureCreatePage";
 import PromotionsManagement from "@/components/PromotionsManagement";
 import PromotionCreatePage from "@/components/promotions/PromotionCreatePage";
 import PromotionEditPage from "@/components/promotions/PromotionEditPage";
@@ -245,6 +246,14 @@ const App = () => (
                   element={
                     <PermissionRoute any={["cashclosure.view", "cashclosure.create"]}>
                       <CashClosureManagement />
+                    </PermissionRoute>
+                  }
+                />
+                <Route
+                  path="/cierre-caja/nuevo"
+                  element={
+                    <PermissionRoute any={["cashclosure.create", "cashclosure.create_day", "cashclosure.create_own"]}>
+                      <CashClosureCreatePage />
                     </PermissionRoute>
                   }
                 />

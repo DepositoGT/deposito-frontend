@@ -15,14 +15,28 @@ export interface SalesQueryParams {
   period?: string;
   page?: number;
   pageSize?: number;
+  search?: string;
 }
 
-export const fetchSales = async (params: SalesQueryParams = {}) => {
+export interface SalesListResponse {
+  items: unknown[];
+  page: number;
+  pageSize: number;
+  totalPages: number | null;
+  totalItems: number | null;
+  nextPage: number | null;
+  prevPage: number | null;
+  hasMore?: boolean;
+  searchMeta?: { tooShort?: boolean; minLength?: number; mode?: string };
+}
+
+export const fetchSales = async (params: SalesQueryParams = {}): Promise<SalesListResponse> => {
   const search = new URLSearchParams();
   if (params.status) search.set("status", params.status);
   if (params.period) search.set("period", params.period);
   if (params.page) search.set("page", String(params.page));
   if (params.pageSize) search.set("pageSize", String(params.pageSize));
+  if (params.search?.trim()) search.set("search", params.search.trim());
 
   const url = `/api/sales${search.toString() ? `?${search.toString()}` : ""}`;
   const data = await apiFetch(url, { method: "GET" });
