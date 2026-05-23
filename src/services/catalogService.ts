@@ -13,6 +13,7 @@ import { apiFetch } from "./api";
 export interface ApiCategory {
   id: number | string;
   name: string;
+  image_url?: string | null;
 }
 
 export const fetchCategories = async (): Promise<ApiCategory[]> => {

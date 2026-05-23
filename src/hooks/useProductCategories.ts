@@ -14,6 +14,7 @@ import { apiFetch } from '../services/api'
 export interface ProductCategory {
   id: number
   name: string
+  image_url?: string | null
   deleted: boolean
   _count?: {
     products: number
@@ -55,12 +56,17 @@ export function useProductCategories(params?: ProductCategoriesQueryParams) {
   })
 }
 
+export interface ProductCategoryPayload {
+  name: string
+  image_url?: string | null
+}
+
 // Crear categoría
 export function useCreateProductCategory() {
   const queryClient = useQueryClient()
   
   return useMutation({
-    mutationFn: async (data: { name: string }) => {
+    mutationFn: async (data: ProductCategoryPayload) => {
       return apiFetch<ProductCategory>('/catalogs/product-categories', {
         method: 'POST',
         body: JSON.stringify(data),
@@ -78,7 +84,7 @@ export function useUpdateProductCategory() {
   const queryClient = useQueryClient()
   
   return useMutation({
-    mutationFn: async ({ id, data }: { id: number; data: { name: string } }) => {
+    mutationFn: async ({ id, data }: { id: number; data: ProductCategoryPayload }) => {
       return apiFetch<ProductCategory>(`/catalogs/product-categories/${id}`, {
         method: 'PUT',
         body: JSON.stringify(data),
