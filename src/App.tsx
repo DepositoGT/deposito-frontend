@@ -65,6 +65,12 @@ import ConfigManagement from "@/components/config/ConfigManagement";
 import InventoryCountListPage from "@/components/inventoryCounts/InventoryCountListPage";
 import InventoryCountNewPage from "@/components/inventoryCounts/InventoryCountNewPage";
 import InventoryCountSessionPage from "@/components/inventoryCounts/InventoryCountSessionPage";
+import QuotesManagement from "@/components/quotes/QuotesManagement";
+import NewQuotePage from "@/components/quotes/NewQuotePage";
+import QuoteDetailPage from "@/components/quotes/QuoteDetailPage";
+import OrdersManagement from "@/components/orders/OrdersManagement";
+import OrderDetailPage from "@/components/orders/OrderDetailPage";
+import PublicQuotePage from "@/pages/PublicQuotePage";
 
 function LegacyProveedorIdRedirect() {
   const { id } = useParams<{ id: string }>();
@@ -85,6 +91,8 @@ const App = () => (
             <Route element={<PublicRoute />}>
               <Route path="/login" element={<Login />} />
             </Route>
+
+            <Route path="/q/:token" element={<PublicQuotePage />} />
 
             {/* Global 404 route (sin layout) */}
             <Route path="/404" element={<NotFound />} />
@@ -127,6 +135,50 @@ const App = () => (
                   element={
                     <PermissionRoute any={["sales.view_invoice", "sales.view_detail"]}>
                       <SaleInvoicePage />
+                    </PermissionRoute>
+                  }
+                />
+
+                {/* Cotizaciones */}
+                <Route
+                  path="/cotizaciones"
+                  element={
+                    <PermissionRoute any={["quotes.view", "quotes.create"]}>
+                      <QuotesManagement />
+                    </PermissionRoute>
+                  }
+                />
+                <Route
+                  path="/cotizaciones/nueva"
+                  element={
+                    <PermissionRoute any={["quotes.create"]}>
+                      <NewQuotePage />
+                    </PermissionRoute>
+                  }
+                />
+                <Route
+                  path="/cotizaciones/:id"
+                  element={
+                    <PermissionRoute any={["quotes.view", "quotes.create"]}>
+                      <QuoteDetailPage />
+                    </PermissionRoute>
+                  }
+                />
+
+                {/* Pedidos */}
+                <Route
+                  path="/pedidos"
+                  element={
+                    <PermissionRoute any={["orders.view", "orders.create"]}>
+                      <OrdersManagement />
+                    </PermissionRoute>
+                  }
+                />
+                <Route
+                  path="/pedidos/:id"
+                  element={
+                    <PermissionRoute any={["orders.view", "orders.create"]}>
+                      <OrderDetailPage />
                     </PermissionRoute>
                   }
                 />

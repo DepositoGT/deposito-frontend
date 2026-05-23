@@ -13,6 +13,8 @@ import type { Permission } from "@/services/userService";
 /** Orden sugerido en la UI de roles (alineado al menú principal). */
 const GROUP_ORDER: string[] = [
   "sales",
+  "quotes",
+  "orders",
   "returns",
   "cashclosure",
   "products",
@@ -33,6 +35,8 @@ const GROUP_ORDER: string[] = [
 /** Títulos en español para el primer segmento del código de permiso (o claves especiales). */
 const GROUP_LABELS: Record<string, string> = {
   sales: "Ventas",
+  quotes: "Cotizaciones",
+  orders: "Pedidos",
   returns: "Devoluciones",
   cashclosure: "Cierre de caja",
   products: "Inventario",

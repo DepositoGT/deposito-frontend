@@ -627,13 +627,13 @@ const ProductManagement = () => {
                 }}
             />
 
-            {/* Export PDF Dialog - choose columns for report / cotización */}
+            {/* Export PDF Dialog — columnas del reporte de inventario */}
             <Dialog open={isExportDialogOpen} onOpenChange={setIsExportDialogOpen}>
                 <DialogContent className="max-w-md">
                     <DialogHeader>
                         <DialogTitle>Exportar inventario</DialogTitle>
                         <p className="text-sm text-muted-foreground">
-                            Elige qué información incluir en el PDF (útil para cotizaciones o listados personalizados).
+                            Elige qué columnas incluir en el PDF del inventario.
                         </p>
                     </DialogHeader>
                     <div className="space-y-4 py-2">
@@ -670,7 +670,7 @@ const ProductManagement = () => {
                                     ])
                                 }
                             >
-                                Solo cotización
+                                Listado de precios
                             </Button>
                             <Button
                                 type="button"
