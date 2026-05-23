@@ -37,8 +37,15 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { ArrowLeft, Plus, Receipt, Search, ChevronLeft, ChevronRight, PauseCircle, RotateCcw, Loader2, Landmark, Settings, List, LayoutGrid, ImageIcon } from 'lucide-react'
+import { ArrowLeft, Plus, Receipt, Search, ChevronLeft, ChevronRight, PauseCircle, RotateCcw, Loader2, Landmark, Settings, List, LayoutGrid, ImageIcon, Package } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { useQueryClient } from '@tanstack/react-query'
 import { useAllProducts, PRODUCTS_QUERY_KEY } from '@/hooks/useProducts'
@@ -48,7 +55,13 @@ import { useAuthPermissions } from '@/hooks/useAuthPermissions'
 import { useSystemSettings } from '@/hooks/useSystemSettings'
 import { formatMoney } from '@/utils'
 import { createSale } from '@/services/saleService'
-import { postPricingPreview } from '@/services/productService'
+import {
+  convertOrderToSale,
+  fetchOrderById,
+  pendingOrderLineQty,
+  type Order,
+} from '@/services/orderService'
+import { postPricingPreview, fetchProductsAvailability } from '@/services/productService'
 import {
   saveNewSaleDraft,
   loadNewSaleDraft,
@@ -113,12 +126,16 @@ const ProductCard = ({
   disabled,
   formatPrice,
   displayUnitPrice,
+  availableQty,
+  physicalStock,
 }: {
   product: Product
   onAdd: () => void
   disabled?: boolean
   formatPrice: (n: number) => string
   displayUnitPrice: number
+  availableQty?: number
+  physicalStock?: number
 }) => (
   <Card className="overflow-hidden transition-shadow hover:shadow-md">
     <div className="aspect-square bg-muted relative">
@@ -139,7 +156,10 @@ const ProductCard = ({
         {product.name}
       </p>
       <p className="text-xs text-muted-foreground">
-        {formatPrice(displayUnitPrice)} · Stock: {product.stock ?? 0}
+        {formatPrice(displayUnitPrice)}
+        {availableQty != null && physicalStock != null && physicalStock !== availableQty
+          ? ` · Disp: ${availableQty} (${physicalStock} fís.)`
+          : ` · Stock: ${availableQty ?? product.stock ?? 0}`}
       </p>
       <Button
         size="sm"
@@ -228,6 +248,7 @@ export default function NewSalePage() {
   const [pickedCustomerId, setPickedCustomerId] = useState<string>('__none__')
   const [salesChannel, setSalesChannel] = useState<'POS' | 'WHOLESALE' | 'ONLINE'>('POS')
   const [unitPricesById, setUnitPricesById] = useState<Record<string, number>>({})
+  const [availabilityById, setAvailabilityById] = useState<Record<string, { stock: number; reserved: number; available: number }>>({})
   const [isFinalConsumer, setIsFinalConsumer] = useState(false)
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethodType | null>(null)
   const [amountReceived, setAmountReceived] = useState('')
@@ -235,6 +256,11 @@ export default function NewSalePage() {
   const [promoCodesToRestore, setPromoCodesToRestore] = useState<string[] | null>(null)
   /** Fuerza recomputar si hay borrador en localStorage (React no observa el storage). */
   const [storedDraftRevision, setStoredDraftRevision] = useState(0)
+  const [loadedOrder, setLoadedOrder] = useState<Order | null>(null)
+  const [loadOrderRef, setLoadOrderRef] = useState('')
+  const [loadOrderOpen, setLoadOrderOpen] = useState(false)
+  const orderLineIdByProductRef = useRef<Map<string, string>>(new Map())
+  const pedidoLoadedRef = useRef<string | null>(null)
 
   const customerContactIdForPricing =
     pickedCustomerId !== '__none__' && pickedCustomerId.trim() ? pickedCustomerId : undefined
@@ -247,7 +273,12 @@ export default function NewSalePage() {
     [unitPricesById]
   )
 
-  const cart = useCart({ availableProducts, getUnitPrice })
+  const getAvailableQty = useCallback(
+    (p: Product) => availabilityById[p.id]?.available ?? Number(p.stock ?? 0),
+    [availabilityById]
+  )
+
+  const cart = useCart({ availableProducts, getUnitPrice, getAvailableQty })
   const repriceCartRef = useRef(cart.repriceCartLines)
   repriceCartRef.current = cart.repriceCartLines
   const promotionCartItems = useMemo(
@@ -357,7 +388,32 @@ export default function NewSalePage() {
     return browseProducts.slice(start, start + pageSize)
   }, [browseProducts, safePage, pageSize])
 
-  const displayTotal = promotions.finalTotal ?? cart.cartTotal
+  useEffect(() => {
+    let cancelled = false
+    const ids = [
+      ...new Set([
+        ...pageProducts.map((p) => p.id),
+        ...cart.cartItems.map((i) => i.id),
+      ]),
+    ]
+    if (ids.length === 0) {
+      setAvailabilityById({})
+      return
+    }
+    void (async () => {
+      try {
+        const map = await fetchProductsAvailability(ids)
+        if (!cancelled) setAvailabilityById(map)
+      } catch {
+        if (!cancelled) setAvailabilityById({})
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [pageProducts, cart.cartItems])
+
+  const displayTotal = loadedOrder ? cart.cartTotal : (promotions.finalTotal ?? cart.cartTotal)
   const changeAmount =
     paymentMethod?.name?.toLowerCase() === 'efectivo' && amountReceived
       ? Math.max(0, parseFloat(amountReceived) - displayTotal)
@@ -696,6 +752,84 @@ export default function NewSalePage() {
     })
   }
 
+  const applyOrderToPos = useCallback(
+    (order: Order) => {
+      if (!['CONFIRMED', 'PARTIALLY_FULFILLED'].includes(order.status)) {
+        toast({
+          title: 'Pedido no disponible',
+          description: 'Solo pedidos confirmados o parciales se cargan en POS.',
+          variant: 'destructive',
+        })
+        return
+      }
+      const prices: Record<string, number> = {}
+      const lines: { productId: string; qty: number }[] = []
+      const map = new Map<string, string>()
+      for (const line of order.lines) {
+        const pending = pendingOrderLineQty(line)
+        if (pending <= 0) continue
+        lines.push({ productId: line.product_id, qty: pending })
+        prices[line.product_id] = Number(line.unit_price)
+        map.set(line.product_id, line.id)
+      }
+      if (lines.length === 0) {
+        toast({ title: 'Sin líneas pendientes', variant: 'destructive' })
+        return
+      }
+      orderLineIdByProductRef.current = map
+      setUnitPricesById(prices)
+      cart.hydrateFromLines(lines, [])
+      setLoadedOrder(order)
+      setCustomer(order.customer || order.customerContact?.name || '')
+      setCustomerNit(order.is_final_consumer ? '' : order.customer_nit || '')
+      setIsFinalConsumer(order.is_final_consumer)
+      if (order.customer_contact_id) setPickedCustomerId(order.customer_contact_id)
+      setSalesChannel(order.sales_channel === 'POS' ? 'POS' : order.sales_channel === 'ONLINE' ? 'ONLINE' : 'WHOLESALE')
+      promotions.clearPromotions()
+      toast({ title: 'Pedido cargado', description: order.reference ?? order.id })
+    },
+    [cart, promotions, toast]
+  )
+
+  const handleLoadOrder = useCallback(async () => {
+    const ref = loadOrderRef.trim()
+    if (!ref) return
+    try {
+      const order = await fetchOrderById(ref)
+      applyOrderToPos(order)
+      setLoadOrderOpen(false)
+      setLoadOrderRef('')
+    } catch (e) {
+      toast({
+        title: 'No se encontró el pedido',
+        description: e instanceof Error ? e.message : 'Error',
+        variant: 'destructive',
+      })
+    }
+  }, [loadOrderRef, applyOrderToPos, toast])
+
+  useEffect(() => {
+    const pedidoRef = searchParams.get('pedido')?.trim()
+    if (!pedidoRef || pedidoLoadedRef.current === pedidoRef || !productsQuery.isSuccess) return
+    pedidoLoadedRef.current = pedidoRef
+    void fetchOrderById(pedidoRef)
+      .then(applyOrderToPos)
+      .catch((e: Error) => {
+        toast({ title: 'Pedido', description: e.message, variant: 'destructive' })
+      })
+  }, [searchParams, productsQuery.isSuccess, applyOrderToPos, toast])
+
+  const clearLoadedOrder = () => {
+    setLoadedOrder(null)
+    orderLineIdByProductRef.current = new Map()
+    cart.clearCart()
+    pedidoLoadedRef.current = null
+    setSearchParams((prev) => {
+      prev.delete('pedido')
+      return prev
+    })
+  }
+
   const handleSubmit = async () => {
     if (!canCreate) {
       toast({ title: 'Sin permiso para crear ventas', variant: 'destructive' })
@@ -749,6 +883,45 @@ export default function NewSalePage() {
     }
     setIsProcessing(true)
     try {
+      if (loadedOrder) {
+        const lines = cart.cartItems
+          .map((item) => ({
+            line_id: orderLineIdByProductRef.current.get(item.id) ?? '',
+            qty: item.qty,
+          }))
+          .filter((x) => x.line_id && x.qty > 0)
+        const [{ company_name: companyNameFromApi }, result] = await Promise.all([
+          getCompanyNamePublic().catch(() => ({ company_name: '' })),
+          convertOrderToSale(loadedOrder.id, {
+            payment_method_id: paymentMethod.id,
+            amount_received: isCash && amountReceived ? Number(amountReceived) : undefined,
+            change: isCash ? changeAmount : undefined,
+            lines,
+          }),
+        ])
+        const created = result.sale as { id?: string; reference?: string }
+        const saleId = created?.id
+        if (saleId && created) {
+          const nameForTicket = (companyNameFromApi && String(companyNameFromApi).trim()) || companyName
+          generateSaleTicket(created as Parameters<typeof generateSaleTicket>[0], {
+            companyName: nameForTicket,
+            locale,
+            currencyCode,
+          })
+        }
+        toast({ title: 'Venta desde pedido registrada' })
+        salesData.refreshSales()
+        await queryClient.invalidateQueries({ queryKey: PRODUCTS_QUERY_KEY })
+        clearLoadedOrder()
+        setCustomer('')
+        setCustomerNit('')
+        setPickedCustomerId('__none__')
+        setPaymentMethod(null)
+        setAmountReceived('')
+        if (saleId) navigate(`/ventas/${saleId}/factura`)
+        return
+      }
+
       // POST devuelve la venta completa; getCompanyNamePublic en paralelo (antes era secuencial + GET extra)
       const [{ company_name: companyNameFromApi }, created] = await Promise.all([
         getCompanyNamePublic().catch(() => ({ company_name: '' })),
@@ -858,10 +1031,18 @@ export default function NewSalePage() {
           <div className="min-w-0">
             <h1 className="text-xl sm:text-2xl font-bold">Nueva Venta</h1>
             <p className="text-sm text-muted-foreground">
-              Completa la información y agrega productos
+              {loadedOrder
+                ? `Venta desde pedido ${loadedOrder.reference ?? loadedOrder.id.slice(0, 8)}`
+                : 'Completa la información y agrega productos'}
             </p>
           </div>
         </div>
+        {!loadedOrder && (
+          <Button variant="outline" size="sm" className="shrink-0" onClick={() => setLoadOrderOpen(true)}>
+            <Package className="h-4 w-4 mr-2" />
+            Cargar pedido
+          </Button>
+        )}
 
         {activeCashSession && (
           <div className="flex flex-wrap items-center gap-2 pl-11 sm:pl-0 sm:justify-end sm:max-w-[min(100%,28rem)] lg:max-w-[32rem]">
@@ -921,6 +1102,19 @@ export default function NewSalePage() {
           </div>
         )}
       </div>
+
+      {loadedOrder && (
+        <Alert className="mb-6">
+          <Package className="h-4 w-4" />
+          <AlertTitle>Pedido {loadedOrder.reference ?? loadedOrder.id.slice(0, 8)}</AlertTitle>
+          <AlertDescription className="flex flex-wrap items-center justify-between gap-2">
+            <span>Registrar venta desde pedido (precios congelados del pedido).</span>
+            <Button type="button" size="sm" variant="outline" onClick={clearLoadedOrder}>
+              Quitar pedido
+            </Button>
+          </AlertDescription>
+        </Alert>
+      )}
 
       {hasStoredDraft && (
         <Alert className="mb-6 border-amber-500/50 bg-amber-500/5">
@@ -1158,6 +1352,7 @@ export default function NewSalePage() {
             </CardContent>
           </Card>
 
+          {!loadedOrder && (
           <PromotionCodeInput
             appliedPromotions={promotions.appliedPromotions ?? []}
             totalDiscount={promotions.totalDiscount ?? 0}
@@ -1165,6 +1360,8 @@ export default function NewSalePage() {
             onApplyCode={promotions.applyCode}
             onRemovePromotion={promotions.removePromotion}
           />
+
+          )}
 
           <div className="flex flex-col sm:flex-row gap-2">
             <Button
@@ -1334,6 +1531,8 @@ export default function NewSalePage() {
                         disabled={isProcessing}
                         formatPrice={fmt}
                         displayUnitPrice={getUnitPrice(product)}
+                        availableQty={availabilityById[product.id]?.available ?? product.stock}
+                        physicalStock={availabilityById[product.id]?.stock ?? product.stock}
                       />
                     ))}
                   </div>
@@ -1433,6 +1632,30 @@ export default function NewSalePage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={loadOrderOpen} onOpenChange={setLoadOrderOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Cargar pedido en POS</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2 py-2">
+            <Label htmlFor="load-order-ref">Referencia P- o UUID</Label>
+            <Input
+              id="load-order-ref"
+              placeholder="P-000001"
+              value={loadOrderRef}
+              onChange={(e) => setLoadOrderRef(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && void handleLoadOrder()}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setLoadOrderOpen(false)}>Cancelar</Button>
+            <Button onClick={() => void handleLoadOrder()} disabled={!loadOrderRef.trim()}>
+              Cargar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

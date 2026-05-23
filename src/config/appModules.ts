@@ -15,6 +15,8 @@
 import {
     DashboardIcon,
     VentasIcon,
+    CotizacionesIcon,
+    PedidosIcon,
     InventarioIcon,
     InventariadoIcon,
     DevolucionesIcon,
@@ -75,6 +77,24 @@ export const appModules: AppModule[] = [
         iconColor: 'text-emerald-800',
         sellerAllowed: true,
         permissions: ['sales.view', 'sales.create']
+    },
+    {
+        id: 'quotes',
+        label: 'Cotizaciones',
+        path: '/cotizaciones',
+        icon: CotizacionesIcon,
+        color: 'bg-sky-100/90',
+        iconColor: 'text-sky-800',
+        permissions: ['quotes.view', 'quotes.create']
+    },
+    {
+        id: 'orders',
+        label: 'Pedidos',
+        path: '/pedidos',
+        icon: PedidosIcon,
+        color: 'bg-teal-100/90',
+        iconColor: 'text-teal-900',
+        permissions: ['orders.view', 'orders.create']
     },
     {
         id: 'inventory',

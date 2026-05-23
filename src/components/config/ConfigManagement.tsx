@@ -68,6 +68,9 @@ export default function ConfigManagement() {
     date_format: 'dd/MM/yyyy',
     locale: 'es-GT',
     cash_closure_max_diff_pct: '5',
+    quote_validity_days: '30',
+    order_validity_days: '7',
+    quote_soft_hold_hours: '48',
   })
   const [fiscalForm, setFiscalForm] = useState({
     company_nit: '',
@@ -106,6 +109,9 @@ export default function ConfigManagement() {
           date_format: data.date_format ?? 'dd/MM/yyyy',
           locale: data.locale ?? 'es-GT',
           cash_closure_max_diff_pct: data.cash_closure_max_diff_pct ?? '5',
+          quote_validity_days: data.quote_validity_days ?? '30',
+          order_validity_days: data.order_validity_days ?? '7',
+          quote_soft_hold_hours: data.quote_soft_hold_hours ?? '48',
         })
         if (Array.isArray(data.cash_closure_denominations)) {
           setDenominations(
@@ -144,6 +150,21 @@ export default function ConfigManagement() {
       toast({ title: 'Seleccione una zona horaria', variant: 'destructive' })
       return
     }
+    const quoteDays = parseInt(form.quote_validity_days, 10)
+    const orderDays = parseInt(form.order_validity_days, 10)
+    const softHoldHours = parseInt(form.quote_soft_hold_hours, 10)
+    if (!Number.isFinite(quoteDays) || quoteDays < 1) {
+      toast({ title: 'Vigencia de cotización debe ser al menos 1 día', variant: 'destructive' })
+      return
+    }
+    if (!Number.isFinite(orderDays) || orderDays < 1) {
+      toast({ title: 'Vigencia de pedido debe ser al menos 1 día', variant: 'destructive' })
+      return
+    }
+    if (!Number.isFinite(softHoldHours) || softHoldHours < 1) {
+      toast({ title: 'Apartado blando debe ser al menos 1 hora', variant: 'destructive' })
+      return
+    }
     setSaving(true)
     try {
       const updated = await updateSettings({
@@ -154,6 +175,9 @@ export default function ConfigManagement() {
         date_format: form.date_format,
         locale: form.locale,
         cash_closure_max_diff_pct: form.cash_closure_max_diff_pct,
+        quote_validity_days: String(quoteDays),
+        order_validity_days: String(orderDays),
+        quote_soft_hold_hours: String(softHoldHours),
       })
       setSettings(updated)
       toast({ title: 'Configuración guardada' })
@@ -384,6 +408,56 @@ export default function ConfigManagement() {
                   disabled={!canManage}
                 />
                 <p className="text-xs text-muted-foreground">Si la diferencia supera este %, se pedirá confirmación al guardar.</p>
+              </div>
+              <div className="grid sm:grid-cols-2 gap-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="quote_validity_days">Vigencia cotizaciones (días)</Label>
+                  <Input
+                    id="quote_validity_days"
+                    type="number"
+                    min="1"
+                    step="1"
+                    value={form.quote_validity_days}
+                    onChange={(e) => setForm((f) => ({ ...f, quote_validity_days: e.target.value }))}
+                    placeholder="30"
+                    disabled={!canManage}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Días por defecto al crear cotizaciones (Q-). Al vencer pasan a «Vencida».
+                  </p>
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="order_validity_days">Vigencia pedidos / reserva (días)</Label>
+                  <Input
+                    id="order_validity_days"
+                    type="number"
+                    min="1"
+                    step="1"
+                    value={form.order_validity_days}
+                    onChange={(e) => setForm((f) => ({ ...f, order_validity_days: e.target.value }))}
+                    placeholder="7"
+                    disabled={!canManage}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Días de reserva al confirmar pedidos (P-). Al vencer se libera stock reservado.
+                  </p>
+                </div>
+                <div className="grid gap-2 sm:col-span-2">
+                  <Label htmlFor="quote_soft_hold_hours">Apartado blando al enviar cotización (horas)</Label>
+                  <Input
+                    id="quote_soft_hold_hours"
+                    type="number"
+                    min="1"
+                    step="1"
+                    value={form.quote_soft_hold_hours}
+                    onChange={(e) => setForm((f) => ({ ...f, quote_soft_hold_hours: e.target.value }))}
+                    placeholder="48"
+                    disabled={!canManage}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Reserva temporal al marcar cotización «Enviada». Típico 24–48 h.
+                  </p>
+                </div>
               </div>
               {canManage && (
                 <Button onClick={handleSaveGeneral} disabled={saving}>
