@@ -14,6 +14,9 @@ export interface SystemSettings {
   date_format?: string
   locale?: string
   cash_closure_max_diff_pct?: string
+  quote_validity_days?: string
+  order_validity_days?: string
+  quote_soft_hold_hours?: string
   cash_closure_denominations?: { denomination: number; type: string }[]
   // Datos fiscales (FEL)
   company_nit?: string

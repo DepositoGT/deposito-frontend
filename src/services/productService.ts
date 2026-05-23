@@ -192,6 +192,20 @@ export const postPricingPreview = async (
   });
 };
 
+export type ProductAvailability = { stock: number; reserved: number; available: number };
+
+export async function fetchProductsAvailability(
+  productIds: string[]
+): Promise<Record<string, ProductAvailability>> {
+  if (productIds.length === 0) return {};
+  const q = new URLSearchParams({ ids: productIds.join(",") });
+  const res = await apiFetch<{ availability: Record<string, ProductAvailability> }>(
+    `/api/products/availability?${q.toString()}`,
+    { method: "GET" }
+  );
+  return res.availability ?? {};
+}
+
 export type CreateProductPayload = CreateProductPayloadType;
 
 export const createProduct = async (payload: CreateProductPayload): Promise<ApiProduct> => {

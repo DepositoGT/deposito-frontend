@@ -21,6 +21,8 @@ interface UseCartOptions {
     availableProducts: Product[]
     /** Precio unitario según cliente/canal (POS); si no se envía, se usa `product.price`. */
     getUnitPrice?: (product: Product) => number
+    /** Cantidad vendible (stock − reservas); por defecto `product.stock`. */
+    getAvailableQty?: (product: Product) => number
 }
 
 interface UseCartReturn {
@@ -55,7 +57,7 @@ interface UseCartReturn {
     closeAdminAuthDialog: () => void
 }
 
-export const useCart = ({ availableProducts, getUnitPrice }: UseCartOptions): UseCartReturn => {
+export const useCart = ({ availableProducts, getUnitPrice, getAvailableQty }: UseCartOptions): UseCartReturn => {
     const { toast } = useToast()
 
     // Cart state
@@ -84,10 +86,15 @@ export const useCart = ({ availableProducts, getUnitPrice }: UseCartOptions): Us
     // Computed
     const cartTotal = cartItems.reduce((sum, item) => sum + item.price * item.qty, 0)
 
+    const resolveAvailable = useCallback(
+        (product: Product) => (getAvailableQty ? getAvailableQty(product) : Number(product.stock ?? 0)),
+        [getAvailableQty]
+    )
+
     // Actions
     const addToCart = useCallback((product: Product) => {
         const unit = getUnitPrice ? getUnitPrice(product) : Number(product.price ?? 0)
-        const available = Number(product.stock ?? 0)
+        const available = resolveAvailable(product)
         const existing = cartItems.find(i => i.id === product.id)
         const currentQty = existing?.qty ?? 0
         const requestedQty = currentQty + 1
@@ -103,7 +110,7 @@ export const useCart = ({ availableProducts, getUnitPrice }: UseCartOptions): Us
         // Insufficient stock: ask for additional quantity
         setAvailabilityDialog({ open: true, product, requestedQty, availableStock: available })
         setAdditionalQty('')
-    }, [cartItems, getUnitPrice])
+    }, [cartItems, getUnitPrice, resolveAvailable])
 
     const removeFromCart = useCallback((productId: string) => {
         setCartItems(prev => prev.filter(i => i.id !== productId))
@@ -120,7 +127,7 @@ export const useCart = ({ availableProducts, getUnitPrice }: UseCartOptions): Us
         const prod = availableProducts.find(p => p.id === productId)
         if (!prod) return
 
-        const available = Number(prod.stock ?? 0)
+        const available = resolveAvailable(prod)
 
         if (newQty <= available) {
             setCartItems(prev => prev.map(i => i.id === productId ? { ...i, qty: newQty } : i))
@@ -130,7 +137,7 @@ export const useCart = ({ availableProducts, getUnitPrice }: UseCartOptions): Us
         // Insufficient stock
         setAvailabilityDialog({ open: true, product: prod, requestedQty: newQty, availableStock: available })
         setAdditionalQty('')
-    }, [availableProducts, removeFromCart])
+    }, [availableProducts, removeFromCart, resolveAvailable])
 
     const clearCart = useCallback(() => {
         setCartItems([])
@@ -151,7 +158,7 @@ export const useCart = ({ availableProducts, getUnitPrice }: UseCartOptions): Us
                     missingProductIds.push(line.productId)
                     continue
                 }
-                const stock = Number(p.stock ?? 0)
+                const stock = resolveAvailable(p)
                 let qty = q
                 if (!adminSet.has(line.productId) && qty > stock) {
                     qty = Math.max(0, stock)
@@ -169,7 +176,7 @@ export const useCart = ({ availableProducts, getUnitPrice }: UseCartOptions): Us
             setAdminAuthorizedProducts(adminSet)
             return { missingProductIds, qtyAdjustedIds }
         },
-        [availableProducts, getUnitPrice]
+        [availableProducts, getUnitPrice, resolveAvailable]
     )
 
     // Dialog handlers
