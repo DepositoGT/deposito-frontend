@@ -58,12 +58,14 @@ import {
   useRestoreProductCategory,
   ProductCategory,
 } from '../hooks/useProductCategories'
-import { Pencil, Trash2, Plus, RotateCcw, Loader2, FileUp } from 'lucide-react'
+import { Pencil, Trash2, Plus, RotateCcw, Loader2, FileUp, ImageIcon } from 'lucide-react'
 import { CatalogImportDialog } from './catalogs/CatalogImportDialog'
 import { PaymentMethodsTab } from './catalogs/PaymentMethodsTab'
 import { Pagination } from './shared/Pagination'
 import { useAuthPermissions } from '../hooks/useAuthPermissions'
 import { usePersistedListUiState, useResetPageOnFilterChange } from '../hooks/usePersistedListUiState'
+import { ImageUploadDropzone } from './ui/image-upload-dropzone'
+import { getApiBaseUrl, getAuthToken } from '../services/api'
 
 /** Filas de catálogo: API actual devuelve `_count.supplier_payment_terms`; respuestas antiguas `suppliers`. */
 function paymentTermSupplierUsageCount(term: {
@@ -586,6 +588,7 @@ function ProductCategoriesTab({
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead className="w-[72px]">Imagen</TableHead>
                 <TableHead>ID</TableHead>
                 <TableHead>Nombre</TableHead>
                 <TableHead>Productos</TableHead>
@@ -597,13 +600,29 @@ function ProductCategoriesTab({
             <TableBody>
               {categories?.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center text-muted-foreground">
+                  <TableCell colSpan={7} className="text-center text-muted-foreground">
                     No hay categorías registradas
                   </TableCell>
                 </TableRow>
               ) : (
                 categories?.map((category) => (
                   <TableRow key={category.id}>
+                    <TableCell>
+                      {category.image_url ? (
+                        <img
+                          src={category.image_url}
+                          alt={category.name}
+                          className="h-12 w-12 rounded-md border border-border object-cover bg-muted"
+                        />
+                      ) : (
+                        <div
+                          className="flex h-12 w-12 items-center justify-center rounded-md border border-dashed border-border bg-muted/50 text-muted-foreground"
+                          aria-hidden
+                        >
+                          <ImageIcon className="h-5 w-5" />
+                        </div>
+                      )}
+                    </TableCell>
                     <TableCell className="font-medium">{category.id}</TableCell>
                     <TableCell>{category.name}</TableCell>
                     <TableCell>{category._count?.products || 0}</TableCell>
@@ -914,17 +933,70 @@ function ProductCategoryDialog({
 }) {
   const { toast } = useToast()
   const [name, setName] = useState('')
+  const [imageUrl, setImageUrl] = useState<string | null>(null)
+  const [isUploadingImage, setIsUploadingImage] = useState(false)
   const createMutation = useCreateProductCategory()
   const updateMutation = useUpdateProductCategory()
 
-  const handleOpenChange = (open: boolean) => {
-    if (!open) {
-      setName('')
-      setDialog({ open: false, mode: 'create' })
-    } else {
-      if (dialog.item) {
+  useEffect(() => {
+    if (dialog.open) {
+      if (dialog.mode === 'edit' && dialog.item) {
         setName(dialog.item.name)
+        setImageUrl(dialog.item.image_url ?? null)
+      } else {
+        setName('')
+        setImageUrl(null)
       }
+    }
+  }, [dialog.open, dialog.mode, dialog.item])
+
+  const resetForm = () => {
+    setName('')
+    setImageUrl(null)
+    setIsUploadingImage(false)
+    setDialog({ open: false, mode: 'create' })
+  }
+
+  const handleOpenChange = (open: boolean) => {
+    if (!open) resetForm()
+  }
+
+  const handleCategoryImageFile = async (file: File) => {
+    try {
+      setIsUploadingImage(true)
+      const token = getAuthToken()
+      if (!token) {
+        toast({
+          variant: 'destructive',
+          title: 'Error de autenticación',
+          description: 'No estás autenticado.',
+        })
+        return
+      }
+      const fd = new FormData()
+      fd.append('image', file)
+      const response = await fetch(`${getApiBaseUrl()}/catalogs/product-categories/upload-image`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body: fd,
+      })
+      const data = await response.json()
+      if (!response.ok) throw new Error(data.message || 'Error al subir la imagen')
+      const uploadedUrl = data.imageUrl ?? data.url
+      if (!uploadedUrl) throw new Error('No se recibió la URL de la imagen')
+      setImageUrl(uploadedUrl)
+      toast({
+        title: 'Imagen subida',
+        description: 'La imagen de la categoría se subió correctamente.',
+      })
+    } catch (error: unknown) {
+      toast({
+        variant: 'destructive',
+        title: 'Error al subir imagen',
+        description: (error as Error)?.message ?? 'No se pudo subir la imagen',
+      })
+    } finally {
+      setIsUploadingImage(false)
     }
   }
 
@@ -940,22 +1012,27 @@ function ProductCategoryDialog({
       return
     }
 
+    const payload = {
+      name: name.trim(),
+      image_url: imageUrl,
+    }
+
     try {
       if (dialog.mode === 'create') {
-        await createMutation.mutateAsync({ name: name.trim() })
+        await createMutation.mutateAsync(payload)
         toast({
           title: 'Categoría creada',
           description: 'La categoría ha sido creada correctamente',
         })
       } else if (dialog.item) {
-        await updateMutation.mutateAsync({ id: dialog.item.id, data: { name: name.trim() } })
+        await updateMutation.mutateAsync({ id: dialog.item.id, data: payload })
         toast({
           title: 'Categoría actualizada',
           description: 'La categoría ha sido actualizada correctamente',
         })
       }
 
-      handleOpenChange(false)
+      resetForm()
     } catch (error: unknown) {
       const apiError = error as { response?: { data?: { message?: string } } }
       toast({
@@ -966,9 +1043,11 @@ function ProductCategoryDialog({
     }
   }
 
+  const isSaving = createMutation.isPending || updateMutation.isPending
+
   return (
     <Dialog open={dialog.open} onOpenChange={handleOpenChange}>
-      <DialogContent>
+      <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>
             {dialog.mode === 'create' ? 'Nueva Categoría' : 'Editar Categoría'}
@@ -981,6 +1060,51 @@ function ProductCategoryDialog({
         </DialogHeader>
         <form onSubmit={handleSubmit}>
           <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Imagen representativa</Label>
+              <div className="rounded-md border border-border bg-muted/30 p-3 space-y-3">
+                {imageUrl ? (
+                  <img
+                    src={imageUrl}
+                    alt={name || 'Categoría'}
+                    className="mx-auto h-32 w-32 rounded-lg border border-border object-cover bg-muted"
+                  />
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-4 text-muted-foreground">
+                    <ImageIcon className="h-10 w-10 mb-2" />
+                    <span className="text-sm">Sin imagen</span>
+                  </div>
+                )}
+                <ImageUploadDropzone
+                  onFileSelect={(f) => {
+                    void handleCategoryImageFile(f)
+                  }}
+                  onReject={(msg) =>
+                    toast({ title: 'Archivo no válido', description: msg, variant: 'destructive' })
+                  }
+                  disabled={isUploadingImage || isSaving}
+                  isUploading={isUploadingImage}
+                  helperText={
+                    <>
+                      Opcional. Máx 5MB. Bucket{' '}
+                      <span className="font-semibold">categorias</span>.
+                    </>
+                  }
+                />
+                {imageUrl && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="w-full"
+                    onClick={() => setImageUrl(null)}
+                    disabled={isUploadingImage || isSaving}
+                  >
+                    Quitar imagen
+                  </Button>
+                )}
+              </div>
+            </div>
             <div className="space-y-2">
               <Label htmlFor="categoryName">Nombre de la categoría</Label>
               <Input
@@ -997,15 +1121,12 @@ function ProductCategoryDialog({
               type="button"
               variant="outline"
               onClick={() => handleOpenChange(false)}
-              disabled={createMutation.isPending || updateMutation.isPending}
+              disabled={isSaving || isUploadingImage}
             >
               Cancelar
             </Button>
-            <Button
-              type="submit"
-              disabled={createMutation.isPending || updateMutation.isPending}
-            >
-              {(createMutation.isPending || updateMutation.isPending) && (
+            <Button type="submit" disabled={isSaving || isUploadingImage}>
+              {(isSaving || isUploadingImage) && (
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
               )}
               {dialog.mode === 'create' ? 'Crear' : 'Guardar'}
