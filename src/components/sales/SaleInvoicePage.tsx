@@ -19,6 +19,7 @@ import type { SaleDte } from '@/types'
 import { formatMoney, formatDateTime } from '@/utils'
 import { fetchSaleById } from '@/services/saleService'
 import { normalizeRawSale } from './hooks'
+import { resolvePdfLogoDataUrl } from '@/utils/pdfBranding'
 import { useSystemSettings } from '@/hooks/useSystemSettings'
 import { getCompanyNamePublic } from '@/services/settingsService'
 import { generateSaleInvoicePDF } from './documents/generateSaleInvoicePDF'
@@ -43,7 +44,7 @@ const getPrincipalDte = (sale: Sale): SaleDte | undefined => {
 export const SaleInvoicePage = () => {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
-  const { locale, currencyCode, companyName } = useSystemSettings()
+  const { locale, currencyCode, companyName, companyLogoUrl } = useSystemSettings()
   const [sale, setSale] = useState<Sale | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -92,9 +93,11 @@ export const SaleInvoicePage = () => {
 
   const handlePrint = async () => {
     try {
-      const { company_name } = await getCompanyNamePublic()
+      const { company_name, company_logo_url } = await getCompanyNamePublic()
+      const logoDataUrl = await resolvePdfLogoDataUrl(company_logo_url || companyLogoUrl)
       generateSaleInvoicePDF(sale, {
         companyName: company_name || companyName,
+        logoDataUrl,
         locale,
         currencyCode,
       })

@@ -13,6 +13,7 @@
  * Improved design with bold title, description, and proper cut lines
  */
 import jsPDF from 'jspdf'
+import { addJsPdfLogoCentered } from '@/utils/pdfBranding'
 
 interface PromotionCode {
     id: number
@@ -113,7 +114,8 @@ const drawTicket = (
     // Header area with logo placeholder and promo value
     if (logoBase64) {
         try {
-            doc.addImage(logoBase64, 'PNG', x + padding, currentY - 3, 25, 15)
+            const logoH = addJsPdfLogoCentered(doc, logoBase64, x + padding + 12.5, currentY - 3, 25, 15)
+            currentY += logoH + 2
         } catch {
             // Draw placeholder
             doc.setDrawColor(180, 180, 180)

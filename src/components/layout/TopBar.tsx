@@ -24,6 +24,7 @@ import {
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { AppLauncher } from './AppLauncher'
+import { CompanyLogo } from '@/components/branding/CompanyLogo'
 import { appModules, getUserRole } from '@/config/appModules'
 import { useAuthPermissions } from '@/hooks/useAuthPermissions'
 import { useCriticalProducts } from '@/hooks/useCriticalProducts'
@@ -56,7 +57,7 @@ export const TopBar = () => {
     const navigate = useNavigate()
     const { user: roleUser } = getUserRole()
     const { user: authUser, logout } = useAuth()
-    const { companyName } = useSystemSettings()
+    const { companyName, companyLogoUrl } = useSystemSettings()
     const { hasPermission } = useAuthPermissions()
     const canViewAlerts = hasPermission('alerts.view') || hasPermission('alerts.manage')
 
@@ -98,13 +99,17 @@ export const TopBar = () => {
 
                 {/* Logo / Brand */}
                 <div
-                    className='flex items-center gap-2 cursor-pointer'
+                    className='flex items-center gap-2 cursor-pointer min-w-0 max-w-[calc(100vw-8rem)] sm:max-w-none'
                     onClick={() => navigate('/')}
                 >
-                    <div className='w-7 h-7 sm:w-8 sm:h-8 bg-primary rounded-lg flex items-center justify-center'>
-                        <span className='text-primary-foreground font-bold text-xs sm:text-sm'>D</span>
-                    </div>
-                    <span className='font-semibold text-base sm:text-lg hidden xs:inline'>{companyName}</span>
+                    <CompanyLogo
+                        src={companyLogoUrl}
+                        fallback={companyName.slice(0, 1) || 'D'}
+                        size="sm"
+                    />
+                    <span className="font-semibold text-sm sm:text-lg truncate max-w-[9rem] sm:max-w-[14rem] md:max-w-none min-w-0">
+                        {companyName}
+                    </span>
                 </div>
 
                 {/* Current Module Name - Hidden on mobile */}

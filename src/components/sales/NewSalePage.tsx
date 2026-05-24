@@ -53,6 +53,7 @@ import { useCategories } from '@/hooks/useCategories'
 import { usePaymentMethods, PaymentMethod as PaymentMethodType } from '@/hooks/usePaymentMethods'
 import { useAuthPermissions } from '@/hooks/useAuthPermissions'
 import { useSystemSettings } from '@/hooks/useSystemSettings'
+import { resolvePdfLogoDataUrl } from '@/utils/pdfBranding'
 import { formatMoney } from '@/utils'
 import { createSale } from '@/services/saleService'
 import {
@@ -228,7 +229,7 @@ export default function NewSalePage() {
   const { user } = useAuth()
   const { hasPermission } = useAuthPermissions()
   const userId = user?.id ?? ''
-  const { locale, currencyCode, companyName } = useSystemSettings()
+  const { locale, currencyCode, companyName, companyLogoUrl } = useSystemSettings()
   const fmt = (n: number) => formatMoney(n, locale, currencyCode)
   const salesData = useSalesData()
 
@@ -903,8 +904,10 @@ export default function NewSalePage() {
         const saleId = created?.id
         if (saleId && created) {
           const nameForTicket = (companyNameFromApi && String(companyNameFromApi).trim()) || companyName
+          const logoDataUrl = await resolvePdfLogoDataUrl(companyLogoUrl)
           generateSaleTicket(created as Parameters<typeof generateSaleTicket>[0], {
             companyName: nameForTicket,
+            logoDataUrl,
             locale,
             currencyCode,
           })
@@ -930,8 +933,10 @@ export default function NewSalePage() {
       const saleId = created?.id
       if (saleId) {
         const nameForTicket = (companyNameFromApi && String(companyNameFromApi).trim()) || companyName
+        const logoDataUrl = await resolvePdfLogoDataUrl(companyLogoUrl)
         generateSaleTicket(created, {
           companyName: nameForTicket,
+          logoDataUrl,
           locale,
           currencyCode,
         })

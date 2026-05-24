@@ -7,8 +7,9 @@ import jsPDF from 'jspdf'
 import autoTable, { type jsPDFDocument } from 'jspdf-autotable'
 import type { Sale } from '@/types'
 import { formatMoney, formatDateTime } from '@/utils/formatters'
+import { addJsPdfCompanyHeader } from '@/utils/pdfBranding'
 
-/** Color naranja/ámbar de la plataforma para encabezados en PDF (igual que cierre de caja, etc.) */
+/** Color naranja/ámbar de la plataforma para encabezados en PDF (RGB) */
 const PDF_HEADER_COLOR: [number, number, number] = [217, 119, 6] // amber / liquor-amber
 const MARGIN = 18
 const PAGE_WIDTH = 210 // A4
@@ -16,6 +17,7 @@ const CONTENT_WIDTH = PAGE_WIDTH - 2 * MARGIN
 
 export interface SaleInvoicePDFOptions {
   companyName?: string
+  logoDataUrl?: string
   locale?: string
   currencyCode?: string
 }
@@ -24,18 +26,10 @@ export function generateSaleInvoicePDF(
   sale: Sale,
   options: SaleInvoicePDFOptions = {}
 ): void {
-  const { companyName, locale = 'es-GT', currencyCode = 'GTQ' } = options
+  const { companyName, logoDataUrl, locale = 'es-GT', currencyCode = 'GTQ' } = options
   const doc = new jsPDF() as jsPDFDocument
   const fmt = (n: number) => formatMoney(n, locale, currencyCode)
-  let y = 20
-
-  if (companyName?.trim()) {
-    doc.setFontSize(11)
-    doc.setFont('helvetica', 'normal')
-    doc.setTextColor(80, 80, 80)
-    doc.text(companyName.trim(), PAGE_WIDTH / 2, y, { align: 'center' })
-    y += 8
-  }
+  let y = addJsPdfCompanyHeader(doc, { companyName, logoDataUrl, pageWidth: PAGE_WIDTH, startY: 20 })
 
   doc.setFontSize(18)
   doc.setFont('helvetica', 'bold')
