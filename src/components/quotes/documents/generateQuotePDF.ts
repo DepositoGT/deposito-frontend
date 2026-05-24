@@ -6,6 +6,7 @@ import autoTable, { type jsPDFDocument } from "jspdf-autotable";
 import type { Quote } from "@/services/quoteService";
 import { num } from "@/services/quoteService";
 import { formatMoney, formatDateTime } from "@/utils/formatters";
+import { addJsPdfCompanyHeader } from "@/utils/pdfBranding";
 
 const PDF_HEADER_COLOR: [number, number, number] = [217, 119, 6];
 const MARGIN = 18;
@@ -14,23 +15,16 @@ const CONTENT_WIDTH = PAGE_WIDTH - 2 * MARGIN;
 
 export interface QuotePDFOptions {
   companyName?: string;
+  logoDataUrl?: string;
   locale?: string;
   currencyCode?: string;
 }
 
 export function generateQuotePDF(quote: Quote, options: QuotePDFOptions = {}): void {
-  const { companyName, locale = "es-GT", currencyCode = "GTQ" } = options;
+  const { companyName, logoDataUrl, locale = "es-GT", currencyCode = "GTQ" } = options;
   const doc = new jsPDF() as jsPDFDocument;
   const fmt = (n: number) => formatMoney(n, locale, currencyCode);
-  let y = 20;
-
-  if (companyName?.trim()) {
-    doc.setFontSize(11);
-    doc.setFont("helvetica", "normal");
-    doc.setTextColor(80, 80, 80);
-    doc.text(companyName.trim(), PAGE_WIDTH / 2, y, { align: "center" });
-    y += 8;
-  }
+  let y = addJsPdfCompanyHeader(doc, { companyName, logoDataUrl, pageWidth: PAGE_WIDTH, startY: 20 });
 
   doc.setFontSize(18);
   doc.setFont("helvetica", "bold");

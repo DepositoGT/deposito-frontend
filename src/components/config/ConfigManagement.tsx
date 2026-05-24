@@ -20,8 +20,10 @@ import {
 import { useToast } from '@/hooks/use-toast'
 import { useAuthPermissions } from '@/hooks/useAuthPermissions'
 import { useSystemSettings } from '@/hooks/useSystemSettings'
-import { getSettings, updateSettings, type SystemSettings, type DenominationItem } from '@/services/settingsService'
-import { Loader2, Save } from 'lucide-react'
+import { getSettings, updateSettings, uploadCompanyLogo, removeCompanyLogo, type SystemSettings, type DenominationItem } from '@/services/settingsService'
+import { ImageUploadDropzone } from '@/components/ui/image-upload-dropzone'
+import { CompanyLogo } from '@/components/branding/CompanyLogo'
+import { Loader2, Save, Trash2 } from 'lucide-react'
 
 const CURRENCIES: { code: string; name: string }[] = [
   { code: 'GTQ', name: 'Quetzal' },
@@ -82,6 +84,8 @@ export default function ConfigManagement() {
     vat_affiliation: '',
   })
   const [denominations, setDenominations] = useState<DenominationItem[]>([])
+  const [logoUrl, setLogoUrl] = useState('')
+  const [logoUploading, setLogoUploading] = useState(false)
 
   const localePreview = useMemo(() => {
     const loc = form.locale || 'es-GT'
@@ -101,6 +105,7 @@ export default function ConfigManagement() {
       .then((data) => {
         if (cancelled) return
         setSettings(data)
+        setLogoUrl(data.company_logo_url ?? '')
         setForm({
           company_name: data.company_name ?? '',
           currency_code: data.currency_code ?? 'GTQ',
@@ -233,6 +238,46 @@ export default function ConfigManagement() {
     }
   }
 
+  const handleLogoUpload = async (file: File) => {
+    if (!canManage) return
+    setLogoUploading(true)
+    try {
+      const { company_logo_url } = await uploadCompanyLogo(file)
+      setLogoUrl(company_logo_url)
+      setSettings((s) => ({ ...s, company_logo_url }))
+      await refetchSystemSettings()
+      toast({ title: 'Logo actualizado', description: 'Se usará en la app, reportes y documentos.' })
+    } catch (err) {
+      toast({
+        title: 'Error al subir logo',
+        description: err instanceof Error ? err.message : 'No se pudo subir la imagen',
+        variant: 'destructive',
+      })
+    } finally {
+      setLogoUploading(false)
+    }
+  }
+
+  const handleLogoRemove = async () => {
+    if (!canManage) return
+    setLogoUploading(true)
+    try {
+      await removeCompanyLogo()
+      setLogoUrl('')
+      setSettings((s) => ({ ...s, company_logo_url: '' }))
+      await refetchSystemSettings()
+      toast({ title: 'Logo eliminado' })
+    } catch (err) {
+      toast({
+        title: 'Error',
+        description: err instanceof Error ? err.message : 'No se pudo quitar el logo',
+        variant: 'destructive',
+      })
+    } finally {
+      setLogoUploading(false)
+    }
+  }
+
   const addDenomination = () => {
     setDenominations((d) => [...d, { denomination: 0, type: 'Billete' }])
   }
@@ -278,9 +323,46 @@ export default function ConfigManagement() {
           <Card>
             <CardHeader>
               <CardTitle>Datos generales</CardTitle>
-              <CardDescription>Nombre de la empresa, moneda y zona horaria.</CardDescription>
+              <CardDescription>Nombre, logo y parámetros regionales del negocio.</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-6">
+              <div className="grid gap-4 sm:grid-cols-[auto_1fr] sm:items-start">
+                <div className="flex flex-col items-center gap-2">
+                  <CompanyLogo src={logoUrl} size="lg" fallback={form.company_name?.slice(0, 1) || 'D'} />
+                  {logoUrl && canManage && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="text-destructive hover:text-destructive"
+                      disabled={logoUploading}
+                      onClick={handleLogoRemove}
+                    >
+                      <Trash2 className="h-4 w-4 mr-1" />
+                      Quitar
+                    </Button>
+                  )}
+                </div>
+                <div className="space-y-3 min-w-0">
+                  <div>
+                    <Label>Logo del negocio</Label>
+                    <p className="text-xs text-muted-foreground mt-1 mb-2">
+                      Aparece en la app, cotizaciones, tickets, facturas y reportes PDF.
+                    </p>
+                    {canManage ? (
+                      <ImageUploadDropzone
+                        onFileSelect={handleLogoUpload}
+                        onReject={(msg) => toast({ title: msg, variant: 'destructive' })}
+                        disabled={!canManage}
+                        isUploading={logoUploading}
+                        helperText="PNG o JPG · fondo transparente recomendado · máx. 5 MB"
+                      />
+                    ) : (
+                      <p className="text-sm text-muted-foreground">Sin permiso para cambiar el logo.</p>
+                    )}
+                  </div>
+                </div>
+              </div>
               <div className="grid gap-2">
                 <Label htmlFor="company_name">Nombre de la empresa</Label>
                 <Input

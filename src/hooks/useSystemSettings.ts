@@ -37,6 +37,7 @@ export interface UseSystemSettingsReturn {
   currencyCode: string
   currencyName: string
   companyName: string
+  companyLogoUrl: string
   dateFormat: string
   locale: string
   /** Diferencia máxima (%) en cierre de caja para mostrar advertencia */
@@ -55,6 +56,7 @@ export function useSystemSettings(): UseSystemSettingsReturn {
       currencyCode: DEFAULT_CURRENCY_CODE,
       currencyName: DEFAULT_CURRENCY_NAME,
       companyName: DEFAULT_COMPANY_NAME,
+      companyLogoUrl: '',
       dateFormat: DEFAULT_DATE_FORMAT,
       locale: DEFAULT_LOCALE,
       cashClosureMaxDiffPct: DEFAULT_CASH_CLOSURE_MAX_DIFF_PCT,
@@ -67,6 +69,7 @@ export function useSystemSettings(): UseSystemSettingsReturn {
     currencyCode: toValidCurrencyCode(ctx.currencyCode),
     currencyName: ctx.currencyName,
     companyName: ctx.companyName,
+    companyLogoUrl: ctx.companyLogoUrl,
     dateFormat: ctx.dateFormat,
     locale: ctx.locale,
     cashClosureMaxDiffPct: ctx.cashClosureMaxDiffPct,

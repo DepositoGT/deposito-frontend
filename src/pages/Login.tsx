@@ -15,15 +15,25 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Lock, Mail } from "lucide-react";
 import { getCompanyNamePublic } from "@/services/settingsService";
+import { applyDocumentBranding } from "@/utils/documentBranding";
+import { CompanyLogo } from "@/components/branding/CompanyLogo";
 
 const Login = () => {
   const { mutateAsync, isPending, error } = useLogin();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [companyName, setCompanyName] = useState("Deposito");
+  const [companyLogoUrl, setCompanyLogoUrl] = useState("");
 
   useEffect(() => {
-    getCompanyNamePublic().then((d) => setCompanyName(d.company_name));
+    getCompanyNamePublic().then((d) => {
+      setCompanyName(d.company_name);
+      setCompanyLogoUrl(d.company_logo_url ?? "");
+      applyDocumentBranding({
+        companyName: d.company_name,
+        companyLogoUrl: d.company_logo_url,
+      });
+    });
   }, []);
 
   const onSubmit = async (e: React.FormEvent) => {
@@ -34,7 +44,8 @@ const Login = () => {
   return (
     <div className="min-h-screen flex items-center justify-center bg-background px-4">
       <Card className="w-full max-w-sm border-border">
-        <CardHeader>
+        <CardHeader className="items-center space-y-3">
+          <CompanyLogo src={companyLogoUrl} size="lg" fallback={companyName.slice(0, 1) || "D"} />
           <CardTitle className="text-center text-2xl">{companyName}</CardTitle>
           <p className="text-sm text-muted-foreground text-center">Accede a tu cuenta</p>
         </CardHeader>

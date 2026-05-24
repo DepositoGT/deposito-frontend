@@ -5,6 +5,7 @@
  */
 
 import { useQuery } from "@tanstack/react-query";
+import { useEffect } from "react";
 import { useParams } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -18,6 +19,8 @@ import {
 } from "@/components/ui/table";
 import { fetchPublicQuote, quoteStatusLabel, num } from "@/services/quoteService";
 import { formatMoney, formatDateTime } from "@/utils/formatters";
+import { CompanyLogo } from "@/components/branding/CompanyLogo";
+import { applyDocumentBranding } from "@/utils/documentBranding";
 
 export default function PublicQuotePage() {
   const { token } = useParams<{ token: string }>();
@@ -31,6 +34,15 @@ export default function PublicQuotePage() {
     enabled: Boolean(token),
     retry: false,
   });
+
+  useEffect(() => {
+    if (!data) return;
+    applyDocumentBranding({
+      companyName: data.company_name,
+      companyLogoUrl: data.company_logo_url,
+      pageTitle: data.reference ? `Cotización ${data.reference}` : "Cotización",
+    });
+  }, [data]);
 
   if (isLoading) {
     return (
@@ -55,7 +67,13 @@ export default function PublicQuotePage() {
   return (
     <div className="min-h-screen bg-muted/30 p-4 sm:p-8">
       <div className="max-w-3xl mx-auto space-y-4">
-        <div className="text-center space-y-1">
+        <div className="text-center space-y-2">
+          <CompanyLogo
+            src={data.company_logo_url}
+            size="lg"
+            fallback={data.company_name?.slice(0, 1) || "D"}
+            className="mx-auto"
+          />
           <p className="text-sm text-muted-foreground">{data.company_name}</p>
           <h1 className="text-xl sm:text-2xl font-bold">Cotización {data.reference ?? ""}</h1>
           <Badge variant="outline">{quoteStatusLabel(data.status)}</Badge>
