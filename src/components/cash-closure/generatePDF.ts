@@ -15,23 +15,23 @@ import jsPDF from 'jspdf'
 import autoTable, { type jsPDFDocument } from 'jspdf-autotable'
 import type { CashClosure } from './types'
 import { formatCurrency, formatDateTime, toNumber, closureOpeningFloat } from './types'
+import { addJsPdfCompanyHeader } from '@/utils/pdfBranding'
 
 /** Color naranja/ámbar de la plataforma para encabezados en PDF (RGB) */
 const PDF_HEADER_COLOR: [number, number, number] = [217, 119, 6] // amber / liquor-amber
 
-export const generateClosurePDF = (closure: CashClosure, companyName?: string, currencyCode?: string, locale?: string) => {
+export const generateClosurePDF = (
+  closure: CashClosure,
+  companyName?: string,
+  currencyCode?: string,
+  locale?: string,
+  logoDataUrl?: string
+) => {
     const fmt = (amount: number | string) => formatCurrency(amount, currencyCode, locale)
     const doc = new jsPDF() as jsPDFDocument
     const pageWidth = doc.internal.pageSize.getWidth()
     const margin = 15
-    let yPos = 20
-
-    if (companyName?.trim()) {
-      doc.setFontSize(12)
-      doc.setFont('helvetica', 'normal')
-      doc.text(companyName.trim(), pageWidth / 2, yPos, { align: 'center' })
-      yPos += 8
-    }
+    let yPos = addJsPdfCompanyHeader(doc, { companyName, logoDataUrl, pageWidth, startY: 20 })
     doc.setFontSize(18)
     doc.setFont('helvetica', 'bold')
     doc.text('CIERRE DE CAJA', pageWidth / 2, yPos, { align: 'center' })

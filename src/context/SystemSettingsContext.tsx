@@ -21,6 +21,7 @@ export interface SystemSettingsState {
   currencyCode: string
   currencyName: string
   companyName: string
+  companyLogoUrl: string
   dateFormat: string
   locale: string
   /** Diferencia máxima permitida en cierre de caja (%) para mostrar advertencia */
@@ -36,6 +37,7 @@ const defaultState: Omit<SystemSettingsState, 'refetch'> = {
   currencyCode: DEFAULT_CURRENCY_CODE,
   currencyName: DEFAULT_CURRENCY_NAME,
   companyName: DEFAULT_COMPANY_NAME,
+  companyLogoUrl: '',
   dateFormat: DEFAULT_DATE_FORMAT,
   locale: DEFAULT_LOCALE,
   cashClosureMaxDiffPct: DEFAULT_CASH_CLOSURE_MAX_DIFF_PCT,
@@ -59,6 +61,7 @@ export function SystemSettingsProvider({ children }: { children: React.ReactNode
           currencyCode: (d?.currency_code && String(d.currency_code).trim()) || DEFAULT_CURRENCY_CODE,
           currencyName: (d?.currency_name && String(d.currency_name).trim()) || DEFAULT_CURRENCY_NAME,
           companyName: (d?.company_name && String(d.company_name).trim()) || DEFAULT_COMPANY_NAME,
+          companyLogoUrl: (d?.company_logo_url && String(d.company_logo_url).trim()) || '',
           dateFormat: (d?.date_format && String(d.date_format).trim()) || DEFAULT_DATE_FORMAT,
           locale: (d?.locale && String(d.locale).trim()) || DEFAULT_LOCALE,
           cashClosureMaxDiffPct: pct,
@@ -73,6 +76,7 @@ export function SystemSettingsProvider({ children }: { children: React.ReactNode
           currencyCode: DEFAULT_CURRENCY_CODE,
           currencyName: DEFAULT_CURRENCY_NAME,
           companyName: DEFAULT_COMPANY_NAME,
+          companyLogoUrl: '',
           dateFormat: DEFAULT_DATE_FORMAT,
           locale: DEFAULT_LOCALE,
           cashClosureMaxDiffPct: DEFAULT_CASH_CLOSURE_MAX_DIFF_PCT,

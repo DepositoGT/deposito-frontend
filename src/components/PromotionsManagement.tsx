@@ -57,6 +57,7 @@ import {
 } from './ui/alert-dialog'
 import { useToast } from '@/hooks/use-toast'
 import { useSystemSettings } from '@/hooks/useSystemSettings'
+import { resolvePdfLogoDataUrl } from '@/utils/pdfBranding'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { apiFetch } from '@/services/api'
 import { generatePromotionTicketsPDF } from './promotions/generatePromotionTicketsPDF'
@@ -142,7 +143,7 @@ const PromotionsManagement = () => {
     const navigate = useNavigate()
     const { toast } = useToast()
     const queryClient = useQueryClient()
-    const { locale, currencyCode } = useSystemSettings()
+    const { locale, currencyCode, companyLogoUrl } = useSystemSettings()
     const [searchTerm, setSearchTerm] = useState('')
     const [codesDialog, setCodesDialog] = useState<CodesDialogState>({ open: false })
 
@@ -384,6 +385,7 @@ const PromotionsManagement = () => {
                 onCopyCode={copyCode}
                 locale={locale}
                 currencyCode={currencyCode}
+                companyLogoUrl={companyLogoUrl}
             />
         </div>
     )
@@ -398,9 +400,10 @@ interface CodesDialogProps {
     onCopyCode: (code: string) => void
     locale?: string
     currencyCode?: string
+    companyLogoUrl?: string
 }
 
-const CodesDialog = ({ dialog, setDialog, onCopyCode, locale, currencyCode }: CodesDialogProps) => {
+const CodesDialog = ({ dialog, setDialog, onCopyCode, locale, currencyCode, companyLogoUrl }: CodesDialogProps) => {
     const [selectedCodes, setSelectedCodes] = useState<string[]>([])
     const [termsText, setTermsText] = useState('Válido solo en tiendas participantes. No acumulable con otras promociones.')
 
@@ -422,17 +425,20 @@ const CodesDialog = ({ dialog, setDialog, onCopyCode, locale, currencyCode }: Co
         }
     }
 
-    const handleGeneratePDF = () => {
+    const handleGeneratePDF = async () => {
         if (!promotion) return
 
         const codesToExport = selectedCodes.length > 0
             ? promotion.codes?.filter(c => selectedCodes.includes(c.code)) || []
             : promotion.codes || []
 
+        const logoBase64 = await resolvePdfLogoDataUrl(companyLogoUrl)
+
         generatePromotionTicketsPDF({
             codes: codesToExport,
             promotion: promotion,
             terms: termsText,
+            logoBase64,
             locale,
             currencyCode
         })

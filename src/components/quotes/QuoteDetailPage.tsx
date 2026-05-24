@@ -23,6 +23,7 @@ import { useAuthPermissions } from "@/hooks/useAuthPermissions";
 import { useSystemSettings } from "@/hooks/useSystemSettings";
 import { formatMoney, formatDateTime } from "@/utils/formatters";
 import { getCompanyNamePublic } from "@/services/settingsService";
+import { resolvePdfLogoDataUrl } from "@/utils/pdfBranding";
 import {
   convertQuoteToOrder,
   fetchQuoteById,
@@ -47,7 +48,7 @@ export default function QuoteDetailPage() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { hasPermission } = useAuthPermissions();
-  const { locale, currencyCode } = useSystemSettings();
+  const { locale, currencyCode, companyName, companyLogoUrl } = useSystemSettings();
   const fmt = (n: number) => formatMoney(n, locale, currencyCode);
 
   const canManage = hasPermission("quotes.manage");
@@ -90,14 +91,19 @@ export default function QuoteDetailPage() {
   const handlePdf = async () => {
     if (!quote) return;
     try {
-      const { company_name } = await getCompanyNamePublic().catch(() => ({ company_name: "" }));
+      const branding = await getCompanyNamePublic().catch(() => ({
+        company_name: companyName,
+        company_logo_url: companyLogoUrl,
+      }));
+      const logoDataUrl = await resolvePdfLogoDataUrl(branding.company_logo_url || companyLogoUrl);
       generateQuotePDF(quote, {
-        companyName: company_name,
+        companyName: branding.company_name || companyName,
+        logoDataUrl,
         locale,
         currencyCode,
       });
     } catch {
-      generateQuotePDF(quote, { locale, currencyCode });
+      generateQuotePDF(quote, { companyName, locale, currencyCode });
     }
   };
 
