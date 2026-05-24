@@ -174,6 +174,7 @@ export type PublicQuote = {
   total: number | string;
   notes?: string | null;
   company_name: string;
+  company_logo_url?: string;
   lines: Array<{
     product_name?: string | null;
     barcode?: string | null;

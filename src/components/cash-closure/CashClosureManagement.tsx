@@ -14,6 +14,7 @@ import { FileText, Plus, Calculator } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { useAuth } from '@/context/useAuth'
 import { useAuthPermissions } from '@/hooks/useAuthPermissions'
+import { resolvePdfLogoDataUrl } from '@/utils/pdfBranding'
 import { useSystemSettings } from '@/hooks/useSystemSettings'
 import { useCashClosureForm, useCashClosureAPI, useMineClosureGate, canRegisterMineClosure, mineClosureBlockedHint } from './hooks'
 import { ClosuresHistoryList, ClosureDetailDialog, RejectClosureDialog } from './components'
@@ -26,7 +27,7 @@ const CashClosureManagement = () => {
   const { toast } = useToast()
   const { user } = useAuth()
   const { hasPermission } = useAuthPermissions()
-  const { companyName, currencyCode, locale, timezone } = useSystemSettings()
+  const { companyName, companyLogoUrl, currencyCode, locale, timezone } = useSystemSettings()
 
   const form = useCashClosureForm()
   const api = useCashClosureAPI()
@@ -135,9 +136,10 @@ const CashClosureManagement = () => {
     }
   }
 
-  const handleDownloadPDF = () => {
+  const handleDownloadPDF = async () => {
     if (selectedClosure) {
-      generateClosurePDF(selectedClosure, companyName, currencyCode, locale)
+      const logoDataUrl = await resolvePdfLogoDataUrl(companyLogoUrl)
+      generateClosurePDF(selectedClosure, companyName, currencyCode, locale, logoDataUrl)
       toast({ title: 'PDF generado', description: `Cierre #${selectedClosure.closure_number} descargado` })
     }
   }

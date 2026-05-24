@@ -15,6 +15,7 @@
 import jsPDF from 'jspdf'
 import type { Sale, SaleDte } from '@/services/saleService'
 import { formatMoney, formatDateTime } from '@/utils/formatters'
+import { addJsPdfLogoCentered } from '@/utils/pdfBranding'
 
 const WIDTH_MM = 80
 const MARGIN_MM = 4
@@ -36,6 +37,7 @@ const DESC_MAX_MM = X_DESC_END - X_DESC     // ancho máximo descripción en mm
 export interface SaleTicketOptions {
   companyName?: string
   companyNit?: string
+  logoDataUrl?: string
   locale?: string
   currencyCode?: string
 }
@@ -100,7 +102,7 @@ function computeTicketHeightMm(sale: Sale, options: SaleTicketOptions): number {
 }
 
 export function generateSaleTicket(sale: Sale, options: SaleTicketOptions = {}): void {
-  const { companyName, companyNit, locale = 'es-GT', currencyCode = 'GTQ' } = options
+  const { companyName, companyNit, logoDataUrl, locale = 'es-GT', currencyCode = 'GTQ' } = options
   const fmt = (n: number) => formatMoney(n, locale, currencyCode)
   const heightMm = computeTicketHeightMm(sale, options)
   const doc = new jsPDF({
@@ -110,6 +112,14 @@ export function generateSaleTicket(sale: Sale, options: SaleTicketOptions = {}):
   let y = MARGIN_MM + 2
 
   // ----- Encabezado -----
+  if (logoDataUrl) {
+    try {
+      const logoH = addJsPdfLogoCentered(doc, logoDataUrl, WIDTH_MM / 2, y - 1, 28, 14)
+      y += logoH + 2
+    } catch {
+      /* sin logo */
+    }
+  }
   if (companyName?.trim()) {
     doc.setFontSize(TITLE_FONT + 1)
     doc.setFont('helvetica', 'bold')
