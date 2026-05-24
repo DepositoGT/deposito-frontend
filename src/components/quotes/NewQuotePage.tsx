@@ -13,6 +13,13 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { useAllProducts } from "@/hooks/useProducts";
 import { useSystemSettings } from "@/hooks/useSystemSettings";
@@ -20,9 +27,22 @@ import { useAuthPermissions } from "@/hooks/useAuthPermissions";
 import { formatMoney } from "@/utils/formatters";
 import { postPricingPreview, fetchProductsAvailability } from "@/services/productService";
 import { createQuote } from "@/services/quoteService";
+import { adaptApiSupplier, fetchSupplierById } from "@/services/supplierService";
 import { SavedCustomerMany2One } from "@/components/sales/components/SavedCustomerMany2One";
 import type { Product } from "@/types/product";
 import type { Supplier } from "@/types";
+import {
+  type QuotePriceTier,
+  QUOTE_PRICE_TIER_LABELS,
+  QUOTE_PRICE_TIER_ORDER,
+  QUOTE_PRICE_TIER_SHORT,
+  catalogPriceForProduct,
+  normalizeQuotePriceTier,
+  productSupportsPriceTier,
+  resolvePriceTierForCustomer,
+  resolveUnitPriceFromProduct,
+  unitPriceForTier,
+} from "@/utils/productPricing";
 
 type CartLine = {
   id: string;
@@ -58,8 +78,14 @@ export default function NewQuotePage() {
     Record<string, { stock: number; reserved: number; available: number }>
   >({});
   const [isSaving, setIsSaving] = useState(false);
+  const [manualPriceTier, setManualPriceTier] = useState(false);
+  const [selectedPriceTier, setSelectedPriceTier] = useState<QuotePriceTier>("WHOLESALE");
+  const [resolvedPriceTier, setResolvedPriceTier] = useState<QuotePriceTier>("WHOLESALE");
+  const [pickedCustomer, setPickedCustomer] = useState<Supplier | null>(null);
 
+  const salesChannel = "WHOLESALE" as const;
   const customerContactId = pickedCustomerId !== "__none__" ? pickedCustomerId : undefined;
+  const effectivePriceTier = manualPriceTier ? selectedPriceTier : resolvedPriceTier;
 
   const getAvailableQty = useCallback(
     (product: Product) => {
@@ -84,25 +110,49 @@ export default function NewQuotePage() {
     try {
       const res = await postPricingPreview({
         customer_contact_id: customerContactId,
-        sales_channel: "WHOLESALE",
+        sales_channel: salesChannel,
         product_ids: ids,
+        ...(manualPriceTier ? { price_tier: selectedPriceTier } : {}),
       });
       const map = res.unit_prices ?? {};
       setPriceMap(map);
+      if (!manualPriceTier) {
+        setResolvedPriceTier(normalizeQuotePriceTier(res.price_tier_used));
+      }
       setCartItems((prev) =>
         prev.map((line) => ({
           ...line,
           price: map[line.id] ?? line.price,
         }))
       );
+      if (manualPriceTier && res.tier_unavailable?.length) {
+        const names = res.tier_unavailable.map((x) => x.name).join(", ");
+        toast({
+          title: "Productos sin esta tarifa",
+          description: names,
+          variant: "destructive",
+        });
+      }
     } catch {
       /* mantener precios actuales */
     }
-  }, [cartItems, customerContactId]);
+  }, [cartItems, customerContactId, manualPriceTier, selectedPriceTier, salesChannel, toast]);
+
+  useEffect(() => {
+    if (manualPriceTier) return;
+    setResolvedPriceTier(resolvePriceTierForCustomer(pickedCustomer, salesChannel));
+    void postPricingPreview({
+      customer_contact_id: customerContactId,
+      sales_channel: salesChannel,
+      product_ids: [],
+    }).then((res) => {
+      setResolvedPriceTier(normalizeQuotePriceTier(res.price_tier_used));
+    });
+  }, [manualPriceTier, pickedCustomer, customerContactId, salesChannel]);
 
   useEffect(() => {
     void refreshPrices();
-  }, [customerContactId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [customerContactId, manualPriceTier, selectedPriceTier, resolvedPriceTier]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const filteredProducts = useMemo(() => {
     const q = productSearch.trim().toLowerCase();
@@ -145,6 +195,18 @@ export default function NewQuotePage() {
   };
 
   const addProduct = (product: Product) => {
+    if (manualPriceTier) {
+      const tierCheck = productSupportsPriceTier(product, selectedPriceTier);
+      if (!tierCheck.ok) {
+        toast({
+          title: "Tarifa no disponible",
+          description: `${product.name}: ${tierCheck.message}`,
+          variant: "destructive",
+        });
+        return;
+      }
+    }
+
     const available = getAvailableQty(product);
     const current = getCartQty(product.id);
     if (available <= 0) {
@@ -164,7 +226,11 @@ export default function NewQuotePage() {
       return;
     }
 
-    const unit = priceMap[product.id] ?? Number(product.price_wholesale || product.price || 0);
+    const unit =
+      priceMap[product.id] ??
+      (manualPriceTier
+        ? unitPriceForTier(product, selectedPriceTier) ?? Number(product.price || 0)
+        : resolveUnitPriceFromProduct(product, effectivePriceTier));
     setCartItems((prev) => {
       const existing = prev.find((x) => x.id === product.id);
       if (existing) {
@@ -174,7 +240,8 @@ export default function NewQuotePage() {
     });
     void postPricingPreview({
       customer_contact_id: customerContactId,
-      sales_channel: "WHOLESALE",
+      sales_channel: salesChannel,
+      ...(manualPriceTier ? { price_tier: selectedPriceTier } : {}),
       product_ids: [product.id],
     }).then((res) => {
       const price = res.unit_prices?.[product.id];
@@ -215,10 +282,19 @@ export default function NewQuotePage() {
     setCustomer(row.name);
     setCustomerNit(row.taxId ?? "");
     setIsFinalConsumer(false);
+    setPickedCustomer(row);
+    void fetchSupplierById(row.id)
+      .then((full) => {
+        if (full) setPickedCustomer(adaptApiSupplier(full));
+      })
+      .catch(() => {
+        /* mantener datos del listado */
+      });
   };
 
   const handleClearCustomer = () => {
     setPickedCustomerId("__none__");
+    setPickedCustomer(null);
     setCustomer("");
     setCustomerNit("");
     setIsFinalConsumer(true);
@@ -236,6 +312,17 @@ export default function NewQuotePage() {
     for (const line of cartItems) {
       const product = products.find((p) => p.id === line.id);
       if (!product) continue;
+      if (manualPriceTier) {
+        const tierCheck = productSupportsPriceTier(product, selectedPriceTier);
+        if (!tierCheck.ok) {
+          toast({
+            title: "Tarifa no válida en el carrito",
+            description: `${line.name}: ${tierCheck.message}`,
+            variant: "destructive",
+          });
+          return;
+        }
+      }
       const available = getAvailableQty(product);
       if (line.qty > available) {
         toast({
@@ -253,7 +340,8 @@ export default function NewQuotePage() {
         customer_nit: customerNit.trim() || undefined,
         is_final_consumer: isFinalConsumer,
         customer_contact_id: customerContactId,
-        sales_channel: "WHOLESALE",
+        sales_channel: salesChannel,
+        ...(manualPriceTier ? { price_tier: selectedPriceTier } : {}),
         notes: notes.trim() || undefined,
         valid_until: validUntil ? new Date(validUntil).toISOString() : undefined,
         items: cartItems.map((l) => ({
@@ -283,7 +371,12 @@ export default function NewQuotePage() {
         </Button>
         <div>
           <h1 className="text-lg sm:text-2xl font-bold">Nueva cotización</h1>
-          <p className="text-sm text-muted-foreground">Canal mayoreo · valida disponible neto</p>
+          <p className="text-sm text-muted-foreground">
+            Canal mayoreo ·{" "}
+            {manualPriceTier
+              ? `tarifa manual: ${QUOTE_PRICE_TIER_SHORT[selectedPriceTier]}`
+              : `tarifa automática: ${QUOTE_PRICE_TIER_SHORT[effectivePriceTier]}`}
+          </p>
         </div>
       </div>
 
@@ -329,6 +422,40 @@ export default function NewQuotePage() {
             <div className="space-y-2">
               <Label htmlFor="notes">Notas</Label>
               <Textarea id="notes" value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} />
+            </div>
+            <div className="rounded-md border p-3 space-y-3">
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id="manual-tier"
+                  checked={manualPriceTier}
+                  onCheckedChange={(v) => setManualPriceTier(Boolean(v))}
+                />
+                <Label htmlFor="manual-tier">Elegir tarifa de precio manualmente</Label>
+              </div>
+              {manualPriceTier ? (
+                <div className="space-y-2">
+                  <Label htmlFor="price-tier">Tarifa</Label>
+                  <Select
+                    value={selectedPriceTier}
+                    onValueChange={(v) => setSelectedPriceTier(v as QuotePriceTier)}
+                  >
+                    <SelectTrigger id="price-tier">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {QUOTE_PRICE_TIER_ORDER.map((tier) => (
+                        <SelectItem key={tier} value={tier}>
+                          {QUOTE_PRICE_TIER_LABELS[tier]}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  Se usa la tarifa del cliente y canal ({QUOTE_PRICE_TIER_SHORT[effectivePriceTier]}).
+                </p>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -405,7 +532,11 @@ export default function NewQuotePage() {
             {filteredProducts.map((p) => {
               const available = getAvailableQty(p);
               const inCart = getCartQty(p.id);
-              const canAdd = inCart < available;
+              const tierOk = manualPriceTier
+                ? productSupportsPriceTier(p, selectedPriceTier).ok
+                : true;
+              const canAdd = tierOk && inCart < available;
+              const displayPrice = fmt(catalogPriceForProduct(p, effectivePriceTier, priceMap));
               return (
               <button
                 key={p.id}
@@ -416,7 +547,8 @@ export default function NewQuotePage() {
               >
                 <p className="text-sm font-medium line-clamp-2">{p.name}</p>
                 <p className="text-xs text-muted-foreground mt-1">
-                  {fmt(Number(p.price_wholesale || p.price || 0))} · disp. {available}
+                  {displayPrice} · disp. {available}
+                  {!tierOk && manualPriceTier ? " · sin tarifa" : ""}
                 </p>
               </button>
             );

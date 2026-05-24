@@ -175,12 +175,20 @@ export interface PricingPreviewRequest {
   customer_contact_id?: string | null;
   sales_channel?: string;
   product_ids: string[];
+  price_tier?: "LIST" | "WHOLESALE" | "PROMOTION";
+}
+
+export interface PricingPreviewTierUnavailable {
+  product_id: string;
+  name: string;
+  reason: string;
 }
 
 export interface PricingPreviewResponse {
   price_tier_used: string;
   sales_channel: string;
   unit_prices: Record<string, number>;
+  tier_unavailable?: PricingPreviewTierUnavailable[];
 }
 
 export const postPricingPreview = async (
