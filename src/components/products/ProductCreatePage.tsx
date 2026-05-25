@@ -32,6 +32,14 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Switch } from '@/components/ui/switch'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import { ProductKitComponentsEditor } from './ProductKitComponentsEditor'
 import { getApiBaseUrl, getAuthToken } from '@/services/api'
 import type { ApiProduct } from '@/services/productService'
 import type { ProductFormData } from './types'
@@ -128,12 +136,13 @@ export default function ProductCreatePage() {
 
   const handleSubmit = () => {
     if (!productForm.validateForm()) return
+    const isKit = formData.productKind === 'KIT'
     const payload = {
       name: formData.name.trim(),
       category_id: Number(formData.category),
       brand: formData.brand?.trim() || undefined,
       size: formData.size?.trim() || undefined,
-      stock: formData.stock ? Number(formData.stock) : 0,
+      stock: isKit ? 0 : formData.stock ? Number(formData.stock) : 0,
       min_stock: formData.minStock ? Number(formData.minStock) : 0,
       price: Number(formData.price),
       price_wholesale: formData.priceWholesale?.trim()
@@ -152,6 +161,17 @@ export default function ProductCreatePage() {
       description: formData.description?.trim() || undefined,
       status_id: 1,
       available_for_sale: formData.availableForSale,
+      kind: formData.productKind,
+      ...(isKit
+        ? {
+            bom_components: formData.kitComponents
+              .filter((c) => c.component_product_id && c.qty_per_unit > 0)
+              .map((c) => ({
+                component_product_id: c.component_product_id,
+                qty_per_unit: c.qty_per_unit,
+              })),
+          }
+        : {}),
     }
     createProductMutation.mutate(payload, {
       onSuccess: (data: ApiProduct) => {
@@ -172,6 +192,7 @@ export default function ProductCreatePage() {
   }
 
   const isLoading = createProductMutation.isPending || isUploadingImage
+  const isKit = formData.productKind === 'KIT'
 
   return (
     <div className="p-6 space-y-6 animate-fade-in">
@@ -357,6 +378,36 @@ export default function ProductCreatePage() {
                     </div>
                   </div>
                   <div>
+                    <Label className="text-muted-foreground">Tipo de producto</Label>
+                    <Select
+                      value={formData.productKind}
+                      onValueChange={(v) =>
+                        onFormChange('productKind', v as ProductFormData['productKind'])
+                      }
+                    >
+                      <SelectTrigger className="mt-1">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="STANDARD">Producto normal</SelectItem>
+                        <SelectItem value="KIT">Kit / combo</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {isKit ? (
+                    <div className="rounded-md border p-4 bg-muted/30">
+                      <ProductKitComponentsEditor
+                        value={formData.kitComponents}
+                        onChange={(kitComponents) => onFormChange('kitComponents', kitComponents)}
+                      />
+                      <p className="text-xs text-muted-foreground mt-3">
+                        El stock del kit se calcula según los componentes. No lleva stock propio.
+                      </p>
+                    </div>
+                  ) : (
+                <div className="grid sm:grid-cols-2 gap-4">
+                  <div>
                     <Label className="text-muted-foreground">Stock Inicial</Label>
                     <div className="relative mt-1">
                       <Package className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -382,6 +433,8 @@ export default function ProductCreatePage() {
                       />
                     </div>
                   </div>
+                </div>
+                  )}
                 </div>
 
                 <div className="mt-4">
