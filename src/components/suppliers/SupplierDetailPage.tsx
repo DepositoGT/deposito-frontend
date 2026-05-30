@@ -42,8 +42,10 @@ import { adaptApiSupplier } from '@/services/supplierService'
 import type { Supplier, Sale } from '@/types'
 import { SaleDetailDialog } from '@/components/sales/components/SaleDetailDialog'
 import { normalizeRawSale } from '@/components/sales/hooks/useSalesData'
-import { generateSupplierPDF, type SupplierPDFOptions, type SupplierPDFMerchandiseEntry } from '@/components/suppliers/generateSupplierPDF'
+import { generateSupplierPDF, type SupplierPDFOptions, type SupplierPDFMerchandiseEntry, type CustomerPDFMetrics } from '@/components/suppliers/generateSupplierPDF'
+import { resolvePdfLogoDataUrl } from '@/utils/pdfBranding'
 import { fetchIncomingMerchandise } from '@/services/incomingMerchandiseService'
+import { fetchSalesByCustomerContact } from '@/services/saleService'
 import { Pagination } from '@/components/shared/Pagination'
 import { Checkbox } from '@/components/ui/checkbox'
 import {
@@ -98,7 +100,7 @@ const getStatusBadge = (status: string | undefined) =>
 export default function SupplierDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
-  const { locale, currencyCode } = useSystemSettings()
+  const { locale, currencyCode, companyName, companyLogoUrl } = useSystemSettings()
   const formatCurrency = (value: number) =>
     new Intl.NumberFormat(locale || 'es-GT', { style: 'currency', currency: currencyCode || 'GTQ' }).format(value)
   const formatDate = (dateString: string) => {
@@ -637,14 +639,33 @@ export default function SupplierDetailPage() {
                       totalValue: entry.totalValue,
                     }))
                   }
+                  let customerMetrics: CustomerPDFMetrics | undefined
+                  if (!isSupplierParty && canViewCustomerSales && id) {
+                    const salesData =
+                      customerPurchaseSummary != null
+                        ? {
+                            customerPurchaseSummary,
+                            totalItems: customerSalesData?.totalItems ?? 0,
+                          }
+                        : await fetchSalesByCustomerContact(id, { page: 1, pageSize: 1 })
+                    const summary = salesData.customerPurchaseSummary
+                    customerMetrics = {
+                      totalPurchases: summary?.totalPurchases ?? 0,
+                      lastSaleDate: summary?.lastSaleDate ?? null,
+                      salesCount: salesData.totalItems ?? 0,
+                    }
+                  }
                   const pdfOptsEffective: SupplierPDFOptions = {
                     ...pdfOptions,
                     includeProducts: isSupplierParty ? (pdfOptions.includeProducts ?? true) : false,
                     includeMerchandiseEntries: isSupplierParty
                       ? (pdfOptions.includeMerchandiseEntries ?? false)
                       : false,
+                    companyName,
+                    customerMetrics,
                   }
-                  generateSupplierPDF(supplier, pdfOptsEffective, merchEntries)
+                  const logoDataUrl = await resolvePdfLogoDataUrl(companyLogoUrl)
+                  generateSupplierPDF(supplier, { ...pdfOptsEffective, logoDataUrl }, merchEntries)
                   toast({
                     title: 'PDF Generado',
                     description: `Reporte de "${supplier.name}" descargado correctamente`,

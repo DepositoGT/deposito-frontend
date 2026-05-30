@@ -31,6 +31,9 @@ export interface ProductFormData {
     imageUrl: string
     /** Si es false, no se muestra en el punto de venta. */
     availableForSale: boolean
+    /** STANDARD = producto normal; KIT = combo armado con componentes. */
+    productKind: 'STANDARD' | 'KIT'
+    kitComponents: import('@/types/product').ProductBomComponentDraft[]
 }
 
 export interface ProductFilters {
@@ -63,6 +66,8 @@ export const EMPTY_PRODUCT_FORM: ProductFormData = {
     description: '',
     imageUrl: '',
     availableForSale: true,
+    productKind: 'STANDARD',
+    kitComponents: [],
 }
 
 export const getProductStatusBadge = (product: Product) => {

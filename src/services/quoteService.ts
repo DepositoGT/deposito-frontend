@@ -79,6 +79,7 @@ export type CreateQuotePayload = {
   is_final_consumer?: boolean;
   customer_contact_id?: string;
   sales_channel?: string;
+  price_tier?: "LIST" | "WHOLESALE" | "PROMOTION";
   notes?: string;
   valid_until?: string;
   items: QuoteLinePayload[];

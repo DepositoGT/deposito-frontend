@@ -10,7 +10,29 @@
 
 import { BaseEntity, ProductCategory, StockStatus } from "./common";
 
-// Interfaz principal de producto
+export type ProductKind = "STANDARD" | "KIT";
+
+export type ProductBomComponentDraft = {
+  component_product_id: string;
+  qty_per_unit: number;
+  component_name?: string;
+};
+
+export type ProductBomLineApi = {
+  id: string;
+  component_product_id: string;
+  qty_per_unit: number;
+  sort_order?: number;
+  component_product?: {
+    id: string;
+    name: string;
+    barcode?: string | null;
+    price?: number | string;
+    stock?: number;
+    kind?: ProductKind;
+  };
+};
+
 export interface Product extends BaseEntity {
   name: string;
   category: ProductCategory | string; // Permitir string para flexibilidad
@@ -35,6 +57,8 @@ export interface Product extends BaseEntity {
   deleted_at?: string | null; // Fecha de eliminación
   /** Si es false, no aparece en ventas (POS) y la API rechaza incluirlo en una venta. */
   availableForSale?: boolean;
+  kind?: ProductKind;
+  kitComponents?: ProductBomLineApi[];
 }
 
 // Interfaz para nuevo producto (form)
@@ -109,6 +133,8 @@ export interface ApiProduct {
   status?: string | { id: string | number; name: string };
   status_id?: number | string;
   available_for_sale?: boolean;
+  kind?: ProductKind;
+  kit_components?: ProductBomLineApi[];
   [key: string]: unknown;
 }
 
@@ -131,6 +157,8 @@ export interface CreateProductPayload {
   description?: string;
   status_id?: number;
   available_for_sale?: boolean;
+  kind?: ProductKind;
+  bom_components?: ProductBomComponentDraft[];
 }
 
 export interface UpdateProductPayload extends CreateProductPayload {

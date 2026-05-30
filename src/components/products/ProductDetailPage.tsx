@@ -38,10 +38,14 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { useDeleteProduct } from '@/hooks/useDeleteProduct'
+import { ProductKitSection } from './ProductKitSection'
 
 type CategoryItem = { id: number | string; name: string }
 
 const getStatusBadge = (product: Product) => {
+  if (product.kind === 'KIT') {
+    return <Badge variant="outline">Kit / combo</Badge>
+  }
   if (product.stock === 0 || product.status === 'out_of_stock') {
     return <Badge variant="destructive">Sin Stock</Badge>
   }
@@ -99,6 +103,12 @@ export default function ProductDetailPage() {
     }
     load()
   }, [id, toast])
+
+  const reloadProduct = async () => {
+    if (!id) return
+    const data = await fetchProductById(id)
+    setRawProduct(data)
+  }
 
   const product: Product | null = useMemo(
     () => (rawProduct ? adaptApiProduct(rawProduct) : null),
@@ -624,6 +634,15 @@ export default function ProductDetailPage() {
           </div>
         </CardContent>
       </Card>
+
+      {product && id && (
+        <ProductKitSection
+          product={product}
+          productId={id}
+          canEdit={canEdit}
+          onUpdated={() => void reloadProduct()}
+        />
+      )}
     </div>
   )
 }
