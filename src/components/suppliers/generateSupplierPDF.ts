@@ -14,12 +14,23 @@
 import jsPDF from 'jspdf'
 import autoTable, { type jsPDFDocument } from 'jspdf-autotable'
 import type { Supplier } from '@/types'
+import { addJsPdfCompanyHeader } from '@/utils/pdfBranding'
+
+export interface CustomerPDFMetrics {
+  totalPurchases: number
+  lastSaleDate: string | null
+  salesCount?: number
+}
 
 export interface SupplierPDFOptions {
   includeBasic?: boolean
   includeMetrics?: boolean
   includeProducts?: boolean
   includeMerchandiseEntries?: boolean
+  companyName?: string
+  logoDataUrl?: string
+  /** Métricas de compras (solo clientes); si no se pasan, el PDF muestra 0. */
+  customerMetrics?: CustomerPDFMetrics
 }
 
 /** Entrada de mercancía para incluir en el PDF (resumen por registro) */
@@ -69,15 +80,22 @@ export const generateSupplierPDF = (
 ) => {
   const opts = { ...defaultOptions, ...options }
   const isPerson = supplier.entityKind === 'PERSON'
+  const isCustomer = supplier.party_type === 'CUSTOMER'
   const doc = new jsPDF() as jsPDFDocument
   const pageWidth = doc.internal.pageSize.getWidth()
   const margin = 15
-  let yPos = 20
+  let yPos = addJsPdfCompanyHeader(doc, {
+    companyName: opts.companyName,
+    logoDataUrl: opts.logoDataUrl,
+    pageWidth,
+    startY: 20,
+  })
 
-  // Header
+  const reportTitle = isCustomer ? 'INFORMACIÓN DEL CLIENTE' : 'INFORMACIÓN DEL PROVEEDOR'
+
   doc.setFontSize(18)
   doc.setFont('helvetica', 'bold')
-  doc.text('INFORMACIÓN DEL PROVEEDOR', pageWidth / 2, yPos, { align: 'center' })
+  doc.text(reportTitle, pageWidth / 2, yPos, { align: 'center' })
 
   yPos += 10
   doc.setFontSize(12)
@@ -163,9 +181,14 @@ export const generateSupplierPDF = (
     rightY += 7
 
     doc.setFont('helvetica', 'bold')
-    doc.text('Último Pedido:', rightCol, rightY)
+    doc.text(isCustomer ? 'Última compra:' : 'Último Pedido:', rightCol, rightY)
     doc.setFont('helvetica', 'normal')
-    doc.text(supplier.lastOrder || 'N/A', rightCol + 30, rightY)
+    const lastActivityLabel = isCustomer
+      ? opts.customerMetrics?.lastSaleDate
+        ? formatDateForPDF(opts.customerMetrics.lastSaleDate)
+        : 'N/A'
+      : supplier.lastOrder || 'N/A'
+    doc.text(lastActivityLabel, rightCol + 30, rightY)
 
     yPos = Math.max(leftY, rightY) + 15
   }
@@ -181,11 +204,31 @@ export const generateSupplierPDF = (
     doc.text('MÉTRICAS', margin, yPos)
     yPos += 10
 
-    const metricsData = [
-      ['Total de Productos', ((supplier.productsList?.length ?? supplier.products) ?? 0).toString()],
-      ['Total de Compras', formatCurrency(supplier.totalPurchases ?? 0)],
-      ['Último Pedido', supplier.lastOrder ?? 'N/A']
-    ]
+    const metricsData = isCustomer
+      ? [
+          [
+            'Ventas registradas',
+            String(opts.customerMetrics?.salesCount ?? 0),
+          ],
+          [
+            'Total comprado',
+            formatCurrency(opts.customerMetrics?.totalPurchases ?? 0),
+          ],
+          [
+            'Última compra',
+            opts.customerMetrics?.lastSaleDate
+              ? formatDateForPDF(opts.customerMetrics.lastSaleDate)
+              : 'N/A',
+          ],
+        ]
+      : [
+          [
+            'Total de Productos',
+            String((supplier.productsList?.length ?? supplier.products) ?? 0),
+          ],
+          ['Total de Compras', formatCurrency(supplier.totalPurchases ?? 0)],
+          ['Último Pedido', supplier.lastOrder ?? 'N/A'],
+        ]
 
     autoTable(doc, {
       startY: yPos,
@@ -308,5 +351,6 @@ export const generateSupplierPDF = (
 
   // Save PDF
   const safeName = supplier.name.replace(/[^a-z0-9]/gi, '_').toLowerCase()
-  doc.save(`Proveedor_${safeName}_${new Date().toISOString().split('T')[0]}.pdf`)
+  const prefix = isCustomer ? 'Cliente' : 'Proveedor'
+  doc.save(`${prefix}_${safeName}_${new Date().toISOString().split('T')[0]}.pdf`)
 }

@@ -111,6 +111,8 @@ export const adaptApiProduct = (p: ApiProduct): Product => {
     deleted: p.deleted === true || p.deleted === 1 || (p as { deleted?: boolean }).deleted === true,
     deleted_at: (p as { deleted_at?: string | null }).deleted_at || null,
     availableForSale: (p as { available_for_sale?: boolean }).available_for_sale !== false,
+    kind: (p.kind === "KIT" ? "KIT" : "STANDARD") as import("@/types/product").ProductKind,
+    kitComponents: Array.isArray(p.kit_components) ? p.kit_components : undefined,
   };
 };
 
@@ -175,12 +177,20 @@ export interface PricingPreviewRequest {
   customer_contact_id?: string | null;
   sales_channel?: string;
   product_ids: string[];
+  price_tier?: "LIST" | "WHOLESALE" | "PROMOTION";
+}
+
+export interface PricingPreviewTierUnavailable {
+  product_id: string;
+  name: string;
+  reason: string;
 }
 
 export interface PricingPreviewResponse {
   price_tier_used: string;
   sales_channel: string;
   unit_prices: Record<string, number>;
+  tier_unavailable?: PricingPreviewTierUnavailable[];
 }
 
 export const postPricingPreview = async (
@@ -209,11 +219,32 @@ export async function fetchProductsAvailability(
 export type CreateProductPayload = CreateProductPayloadType;
 
 export const createProduct = async (payload: CreateProductPayload): Promise<ApiProduct> => {
-  const data = await apiFetch<ApiProduct>("/api/products", {
+  const data = await apiFetch<{ product?: ApiProduct } & ApiProduct>("/api/products", {
     method: "POST",
     body: JSON.stringify(payload),
   });
-  return data;
+  return (data as { product?: ApiProduct }).product ?? data;
+};
+
+export type ProductBomResponse = {
+  kind: string;
+  components: import("@/types/product").ProductBomLineApi[];
+};
+
+export const fetchProductBom = async (productId: string): Promise<ProductBomResponse> => {
+  return apiFetch<ProductBomResponse>(`/api/products/${encodeURIComponent(productId)}/bom`, {
+    method: "GET",
+  });
+};
+
+export const updateProductBom = async (
+  productId: string,
+  components: import("@/types/product").ProductBomComponentDraft[]
+): Promise<ProductBomResponse> => {
+  return apiFetch<ProductBomResponse>(`/api/products/${encodeURIComponent(productId)}/bom`, {
+    method: "PUT",
+    body: JSON.stringify({ components }),
+  });
 };
 
 export const deleteProduct = async (id: string): Promise<{ ok?: boolean }> => {

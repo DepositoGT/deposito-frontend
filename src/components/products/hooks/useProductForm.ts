@@ -70,6 +70,20 @@ export const useProductForm = (): UseProductFormReturn => {
             return false
         }
 
+        if (formData.productKind === 'KIT') {
+            const valid = formData.kitComponents.filter(
+                (c) => c.component_product_id && c.qty_per_unit > 0
+            )
+            if (valid.length === 0) {
+                toast({
+                    title: 'Kit incompleto',
+                    description: 'Agrega al menos un componente con cantidad',
+                    variant: 'destructive',
+                })
+                return false
+            }
+        }
+
         if (formData.minStock && Number(formData.minStock) < 0) {
             toast({
                 title: 'Valor inválido',
@@ -157,6 +171,12 @@ export const useProductForm = (): UseProductFormReturn => {
             description: product.description || '',
             imageUrl: product.imageUrl || '',
             availableForSale: product.availableForSale !== false,
+            productKind: product.kind === 'KIT' ? 'KIT' : 'STANDARD',
+            kitComponents: (product.kitComponents ?? []).map((line) => ({
+                component_product_id: line.component_product_id,
+                qty_per_unit: line.qty_per_unit,
+                component_name: line.component_product?.name,
+            })),
         })
     }, [])
 
