@@ -8,7 +8,7 @@
  * For licensing inquiries: GitHub @dpatzan2
  */
 
-import { apiFetch, getApiBaseUrl, getAuthToken } from './api'
+import { apiFetch } from './api'
 
 export interface IncomingMerchandiseItem {
   id: string
@@ -155,30 +155,3 @@ export const deleteIncomingMerchandisePayment = async (
   })
 }
 
-export const generateMerchandiseReport = async (params?: {
-  supplier_id?: string
-  start_date?: string
-  end_date?: string
-  payment_status?: MerchandisePaymentStatus
-}): Promise<Blob> => {
-  const search = new URLSearchParams()
-  if (params?.supplier_id) search.set('supplier_id', params.supplier_id)
-  if (params?.start_date) search.set('start_date', params.start_date)
-  if (params?.end_date) search.set('end_date', params.end_date)
-  if (params?.payment_status) search.set('payment_status', params.payment_status)
-
-  /** Misma base que `apiFetch`: VITE_API_URL ya incluye `/api`; no anteponer otro `/api`. */
-  const path = `/incoming-merchandise/report/pdf${search.toString() ? `?${search.toString()}` : ''}`
-  const response = await fetch(`${getApiBaseUrl()}${path}`, {
-    method: 'GET',
-    headers: {
-      Authorization: `Bearer ${getAuthToken() ?? ''}`,
-    },
-  })
-
-  if (!response.ok) {
-    throw new Error('Error al generar el reporte')
-  }
-
-  return response.blob()
-}

@@ -23,7 +23,6 @@ import {
   Building2,
   LayoutGrid,
   List,
-  Download,
   Plus,
   Filter,
   X,
@@ -35,12 +34,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { useToast } from '@/hooks/use-toast'
 import { useIncomingMerchandise } from '@/hooks/useIncomingMerchandise'
 import { useSuppliers } from '@/hooks/useSuppliers'
 import { SUPPLIERS_DROPDOWN_PARAMS } from '@/services/supplierService'
 import { Pagination } from '@/components/shared/Pagination'
-import { generateMerchandiseReport } from '@/services/incomingMerchandiseService'
 import { useAuthPermissions } from '@/hooks/useAuthPermissions'
 import { usePersistedListUiState, useResetPageOnFilterChange } from '@/hooks/usePersistedListUiState'
 import { useSystemSettings } from '@/hooks/useSystemSettings'
@@ -59,7 +56,6 @@ function PaymentStatusBadge({ status }: { status?: MerchandisePaymentStatus }) {
 
 const IncomingMerchandiseManagement = () => {
   const navigate = useNavigate()
-  const { toast } = useToast()
   const { hasPermission } = useAuthPermissions()
   const { currencyCode, locale } = useSystemSettings()
 
@@ -81,7 +77,6 @@ const IncomingMerchandiseManagement = () => {
   const canView = hasPermission('merchandise.view')
   const canRegister = hasPermission('products.register_incoming')
   const canDetails = hasPermission('merchandise.details')
-  const canReports = hasPermission('merchandise.reports')
 
   const { data: recordsData, isLoading } = useIncomingMerchandise({
     page: currentPage,
@@ -111,38 +106,6 @@ const IncomingMerchandiseManagement = () => {
 
   const handleViewDetails = (id: string) => {
     navigate(`/mercancia/${id}`)
-  }
-
-  const handleGenerateReport = async () => {
-    try {
-      const blob = await generateMerchandiseReport({
-        supplier_id: selectedSupplierId !== 'all' ? selectedSupplierId : undefined,
-        start_date: startDate || undefined,
-        end_date: endDate || undefined,
-        payment_status: paymentStatusFilter === 'all' ? undefined : paymentStatusFilter,
-      })
-
-      const url = window.URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `reporte-mercancia-${new Date().toISOString().split('T')[0]}.pdf`
-      document.body.appendChild(a)
-      a.click()
-      document.body.removeChild(a)
-      window.URL.revokeObjectURL(url)
-
-      toast({
-        title: 'Reporte generado',
-        description: 'El reporte PDF se descargó correctamente',
-      })
-    } catch (err: unknown) {
-      const message = (err as { message?: string })?.message || 'No se pudo generar el reporte'
-      toast({
-        title: 'Error',
-        description: message,
-        variant: 'destructive',
-      })
-    }
   }
 
   const clearFilters = () => {
@@ -201,12 +164,6 @@ const IncomingMerchandiseManagement = () => {
           </p>
         </div>
         <div className="flex gap-2 overflow-x-auto pb-1 -mx-3 px-3 sm:mx-0 sm:px-0 sm:overflow-visible">
-          {canReports && (
-            <Button variant="outline" onClick={handleGenerateReport} size="sm" className="shrink-0">
-              <Download className="w-4 h-4 sm:mr-2" />
-              <span className="hidden sm:inline">Reporte</span>
-            </Button>
-          )}
           {canRegister && (
             <Button
               size="sm"
