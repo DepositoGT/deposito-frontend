@@ -10,6 +10,7 @@
 
 export { default as CashClosureManagement } from './CashClosureManagement'
 export { CashClosureCreatePage, CASH_CLOSURE_CREATE_PATH } from './CashClosureCreatePage'
+export { ClosureDetailPage, CASH_CLOSURE_DETAIL_PATH } from './ClosureDetailPage'
 export * from './types'
 export * from './hooks'
 export * from './components'
