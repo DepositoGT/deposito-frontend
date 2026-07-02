@@ -14,10 +14,12 @@ import { Badge } from '@/components/ui/badge'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Scale } from 'lucide-react'
+import { Download, Scale } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 import { useToast } from '@/hooks/use-toast'
 import { getTrialBalance, type TrialBalanceResponse } from '@/services/accountingService'
 import { fmtQ, TYPE_LABELS, todayISO } from './format'
+import { exportTrialBalance } from './exportExcel'
 
 const firstOfMonthISO = () => {
   const d = new Date()
@@ -52,11 +54,20 @@ export const TrialBalanceTab = () => {
           <CardTitle className="flex items-center gap-2 text-lg">
             <Scale className="h-5 w-5" />Balanza de Comprobación
           </CardTitle>
-          {data && (
-            <Badge variant={squared ? 'default' : 'destructive'}>
-              {squared ? 'Cuadrada' : 'Descuadrada'}
-            </Badge>
-          )}
+          <div className="flex items-center gap-2">
+            {data && (
+              <Badge variant={squared ? 'default' : 'destructive'}>
+                {squared ? 'Cuadrada' : 'Descuadrada'}
+              </Badge>
+            )}
+            <Button
+              variant="outline" size="sm"
+              disabled={!data || data.rows.length === 0 || loading}
+              onClick={() => data && exportTrialBalance(data, { from: from || undefined, to: to || undefined })}
+            >
+              <Download className="h-4 w-4 mr-2" />Exportar Excel
+            </Button>
+          </div>
         </div>
       </CardHeader>
       <CardContent className="space-y-4">

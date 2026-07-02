@@ -16,10 +16,12 @@ import { Skeleton } from '@/components/ui/skeleton'
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
-import { BookText } from 'lucide-react'
+import { BookText, Download } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 import { useToast } from '@/hooks/use-toast'
 import { getLedger, type Account, type LedgerResponse } from '@/services/accountingService'
 import { fmtQ, fmtDate } from './format'
+import { exportLedger } from './exportExcel'
 
 export const LedgerTab = ({ accounts }: { accounts: Account[] }) => {
   const { toast } = useToast()
@@ -47,9 +49,18 @@ export const LedgerTab = ({ accounts }: { accounts: Account[] }) => {
   return (
     <Card>
       <CardHeader className="pb-3">
-        <CardTitle className="flex items-center gap-2 text-lg">
-          <BookText className="h-5 w-5" />Libro Mayor
-        </CardTitle>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <CardTitle className="flex items-center gap-2 text-lg">
+            <BookText className="h-5 w-5" />Libro Mayor
+          </CardTitle>
+          <Button
+            variant="outline" size="sm"
+            disabled={!data || loading}
+            onClick={() => data && exportLedger(data, { from: from || undefined, to: to || undefined })}
+          >
+            <Download className="h-4 w-4 mr-2" />Exportar Excel
+          </Button>
+        </div>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="flex flex-wrap items-end gap-3">

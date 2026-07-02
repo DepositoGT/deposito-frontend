@@ -18,13 +18,14 @@ import { Skeleton } from '@/components/ui/skeleton'
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
-import { BookOpen, ChevronDown, ChevronRight, Plus, RefreshCcw, Undo2 } from 'lucide-react'
+import { BookOpen, ChevronDown, ChevronRight, Download, Plus, RefreshCcw, Undo2 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import {
   getJournal, postPending, reverseJournalEntry,
   type Account, type JournalEntry,
 } from '@/services/accountingService'
 import { fmtQ, fmtDate, SOURCE_LABELS } from './format'
+import { exportJournal } from './exportExcel'
 import { NewEntryDialog } from './NewEntryDialog'
 
 const entryTotal = (entry: JournalEntry) =>
@@ -43,6 +44,7 @@ export const JournalTab = ({ accounts, canCreate }: { accounts: Account[]; canCr
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [isNewOpen, setIsNewOpen] = useState(false)
   const [posting, setPosting] = useState(false)
+  const [exporting, setExporting] = useState(false)
 
   const load = useCallback(async (p: number) => {
     setLoading(true)
@@ -77,6 +79,35 @@ export const JournalTab = ({ accounts, canCreate }: { accounts: Account[]; canCr
     }
   }
 
+  const handleExport = async () => {
+    setExporting(true)
+    try {
+      // Descarga todas las páginas con los filtros activos (el backend pagina a 100 máx.)
+      const filters = { from: from || undefined, to: to || undefined, source: source || undefined }
+      const all: JournalEntry[] = []
+      let p = 1
+      let pages = 1
+      do {
+        const res = await getJournal({ ...filters, page: p, pageSize: 100 })
+        all.push(...res.items)
+        pages = res.totalPages
+        p += 1
+      } while (p <= pages)
+      if (all.length === 0) {
+        toast({ title: 'Sin datos', description: 'No hay asientos en el rango seleccionado' })
+        return
+      }
+      // El diario se exporta en orden cronológico
+      all.reverse()
+      exportJournal(all, filters)
+      toast({ title: 'Excel generado', description: `Libro Diario con ${all.length} asientos` })
+    } catch (e) {
+      toast({ title: 'Error', description: e instanceof Error ? e.message : 'No se pudo exportar', variant: 'destructive' })
+    } finally {
+      setExporting(false)
+    }
+  }
+
   const handleReverse = async (entry: JournalEntry) => {
     if (!window.confirm(`¿Anular el asiento ${entry.entry_number}? Se creará un contra-asiento.`)) return
     try {
@@ -103,6 +134,10 @@ export const JournalTab = ({ accounts, canCreate }: { accounts: Account[]; canCr
             <span className="text-sm font-normal text-muted-foreground">({totalItems} asientos)</span>
           </CardTitle>
           <div className="flex flex-wrap items-center gap-2">
+            <Button variant="outline" size="sm" onClick={handleExport} disabled={exporting || totalItems === 0}>
+              <Download className="h-4 w-4 mr-2" />
+              {exporting ? 'Exportando…' : 'Exportar Excel'}
+            </Button>
             {canCreate && (
               <>
                 <Button variant="outline" size="sm" onClick={handlePostPending} disabled={posting}>

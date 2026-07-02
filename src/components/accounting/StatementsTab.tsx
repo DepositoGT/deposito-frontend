@@ -14,13 +14,15 @@ import { Badge } from '@/components/ui/badge'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
-import { FileBarChart2, Landmark } from 'lucide-react'
+import { Download, FileBarChart2, Landmark } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 import { useToast } from '@/hooks/use-toast'
 import {
   getIncomeStatement, getBalanceSheet,
   type IncomeStatementResponse, type BalanceSheetResponse, type StatementRow,
 } from '@/services/accountingService'
 import { fmtQ, todayISO } from './format'
+import { exportStatements } from './exportExcel'
 
 const firstOfYearISO = () => `${new Date().getFullYear()}-01-01`
 
@@ -78,7 +80,17 @@ export const StatementsTab = () => {
   }, [asOf, toast])
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+    <div className="space-y-4">
+      <div className="flex justify-end">
+        <Button
+          variant="outline" size="sm"
+          disabled={!pnl || !bs || loadingPnl || loadingBs}
+          onClick={() => pnl && bs && exportStatements(pnl, bs, { from: from || undefined, to: to || undefined, asOf: asOf || undefined })}
+        >
+          <Download className="h-4 w-4 mr-2" />Exportar Excel (ambos estados)
+        </Button>
+      </div>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
       {/* Estado de Resultados */}
       <Card>
         <CardHeader className="pb-3">
@@ -178,6 +190,7 @@ export const StatementsTab = () => {
           )}
         </CardContent>
       </Card>
+      </div>
     </div>
   )
 }
