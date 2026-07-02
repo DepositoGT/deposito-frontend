@@ -21,6 +21,8 @@ import { useToast } from '@/hooks/use-toast'
 import { useAuthPermissions } from '@/hooks/useAuthPermissions'
 import { getAccounts, postPending, type Account } from '@/services/accountingService'
 import { JournalTab } from './JournalTab'
+import { LedgerTab } from './LedgerTab'
+import { TrialBalanceTab } from './TrialBalanceTab'
 
 const Placeholder = ({ label }: { label: string }) => (
   <Card><CardContent className="py-12 text-center text-muted-foreground">{label} (próximamente)</CardContent></Card>
@@ -82,10 +84,10 @@ const AccountingManagement = () => {
           <JournalTab accounts={accounts} canCreate={canCreate} />
         </TabsContent>
         <TabsContent value="mayor">
-          <Placeholder label="Libro Mayor" />
+          <LedgerTab accounts={accounts} />
         </TabsContent>
         <TabsContent value="balanza">
-          <Placeholder label="Balanza de Comprobación" />
+          <TrialBalanceTab />
         </TabsContent>
         <TabsContent value="estados">
           <Placeholder label="Estados Financieros" />
