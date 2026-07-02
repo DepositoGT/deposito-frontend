@@ -35,6 +35,7 @@ import { MainLayout } from "@/components/layout";
 import Dashboard from "@/components/Dashboard";
 import ProductManagement from "@/components/ProductManagement";
 import Analytics from "@/components/Analytics";
+import AccountingManagement from "@/components/accounting/AccountingManagement";
 import SalesManagement from "@/components/SalesManagement";
 import NewSalePage from "@/components/sales/NewSalePage";
 import { SaleInvoicePage } from "@/components/sales/SaleInvoicePage";
@@ -381,6 +382,16 @@ const App = () => (
                   element={
                     <PermissionRoute any={["analytics.view"]}>
                       <Analytics />
+                    </PermissionRoute>
+                  }
+                />
+
+                {/* Contabilidad */}
+                <Route
+                  path="/contabilidad"
+                  element={
+                    <PermissionRoute any={["accounting.view"]}>
+                      <AccountingManagement />
                     </PermissionRoute>
                   }
                 />
