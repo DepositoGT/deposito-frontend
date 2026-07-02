@@ -16,7 +16,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Card, CardContent } from '@/components/ui/card'
-import { BookOpen, BookText, Scale, FileBarChart2, ListTree, Settings2 } from 'lucide-react'
+import { BookOpen, BookText, Scale, FileBarChart2, Percent, ListTree, Settings2 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { useAuthPermissions } from '@/hooks/useAuthPermissions'
 import { getAccounts, postPending, type Account } from '@/services/accountingService'
@@ -24,6 +24,7 @@ import { JournalTab } from './JournalTab'
 import { LedgerTab } from './LedgerTab'
 import { TrialBalanceTab } from './TrialBalanceTab'
 import { StatementsTab } from './StatementsTab'
+import { TaxesTab } from './TaxesTab'
 import { AccountsTab } from './AccountsTab'
 import { SettingsTab } from './SettingsTab'
 
@@ -70,11 +71,12 @@ const AccountingManagement = () => {
       </div>
 
       <Tabs defaultValue="diario" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-2 sm:w-auto sm:inline-grid sm:grid-cols-3 lg:grid-cols-6">
+        <TabsList className="grid w-full grid-cols-2 sm:w-auto sm:inline-grid sm:grid-cols-4 lg:grid-cols-7">
           <TabsTrigger value="diario"><BookOpen className="w-4 h-4 mr-2" />Diario</TabsTrigger>
           <TabsTrigger value="mayor"><BookText className="w-4 h-4 mr-2" />Mayor</TabsTrigger>
           <TabsTrigger value="balanza"><Scale className="w-4 h-4 mr-2" />Balanza</TabsTrigger>
           <TabsTrigger value="estados"><FileBarChart2 className="w-4 h-4 mr-2" />Estados</TabsTrigger>
+          <TabsTrigger value="impuestos"><Percent className="w-4 h-4 mr-2" />Impuestos</TabsTrigger>
           <TabsTrigger value="catalogo"><ListTree className="w-4 h-4 mr-2" />Catálogo</TabsTrigger>
           <TabsTrigger value="configuracion"><Settings2 className="w-4 h-4 mr-2" />Configuración</TabsTrigger>
         </TabsList>
@@ -90,6 +92,9 @@ const AccountingManagement = () => {
         </TabsContent>
         <TabsContent value="estados">
           <StatementsTab />
+        </TabsContent>
+        <TabsContent value="impuestos">
+          <TaxesTab />
         </TabsContent>
         <TabsContent value="catalogo">
           <AccountsTab accounts={accounts} canManage={canManage} onChanged={() => void loadAccounts()} />

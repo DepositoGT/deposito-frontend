@@ -16,9 +16,9 @@
 import * as XLSX from 'xlsx'
 import type {
   JournalEntry, LedgerResponse, TrialBalanceResponse,
-  IncomeStatementResponse, BalanceSheetResponse, StatementRow,
+  IncomeStatementResponse, BalanceSheetResponse, StatementRow, TaxesReportResponse,
 } from '@/services/accountingService'
-import { SOURCE_LABELS, TYPE_LABELS, fmtDate } from './format'
+import { SOURCE_LABELS, TYPE_LABELS, MONTH_LABELS, fmtDate } from './format'
 
 type Cell = string | number | null
 type Sheet = { name: string; rows: Cell[][]; colWidths?: number[] }
@@ -172,5 +172,25 @@ export function exportStatements(
   download(`estados-financieros-${stamp()}.xlsx`, [
     { name: 'Estado de Resultados', rows: pnlRows, colWidths: [44, 16] },
     { name: 'Balance General', rows: bsRows, colWidths: [44, 16] },
+  ])
+}
+
+export function exportTaxes(data: TaxesReportResponse) {
+  const regimeLabel = data.regime === 'PEQUENO'
+    ? `Pequeño contribuyente — tarifa ${Math.round(data.pequenoRate * 100)}% sobre ventas brutas`
+    : `Régimen general — IVA ${Math.round(data.ivaRate * 100)}%`
+  const rows: Cell[][] = [
+    [`Impuestos ${data.year}`],
+    [`${regimeLabel} · Calculado sobre asientos automáticos (ventas, devoluciones y compras)`],
+    [],
+    ['Mes', 'Ventas netas', 'IVA débito (ventas)', 'IVA crédito (compras)', 'IVA pequeño contribuyente', 'Impuesto a pagar'],
+  ]
+  for (const m of data.months) {
+    rows.push([MONTH_LABELS[m.month - 1], num(m.netSales), num(m.ivaDebit), num(m.ivaCredit), num(m.pequenoTax), num(m.toPay)])
+  }
+  rows.push([])
+  rows.push(['Totales', num(data.totals.netSales), num(data.totals.ivaDebit), num(data.totals.ivaCredit), num(data.totals.pequenoTax), num(data.totals.toPay)])
+  download(`impuestos-${data.year}.xlsx`, [
+    { name: 'Impuestos', rows, colWidths: [14, 14, 18, 20, 24, 16] },
   ])
 }

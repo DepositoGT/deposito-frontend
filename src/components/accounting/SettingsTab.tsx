@@ -13,6 +13,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Label } from '@/components/ui/label'
+import { Input } from '@/components/ui/input'
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
@@ -35,6 +36,8 @@ const KEY_LABELS: Record<string, string> = {
   payables: 'Proveedores (cuentas por pagar)',
   ivaDebit: 'IVA débito fiscal',
   ivaCredit: 'IVA crédito fiscal',
+  pequenoTax: 'IVA pequeño contribuyente por pagar',
+  pequenoTaxExpense: 'IVA pequeño contribuyente (gasto)',
   currentEarnings: 'Utilidad del ejercicio',
   retainedEarnings: 'Utilidades acumuladas',
 }
@@ -56,6 +59,9 @@ export const SettingsTab = ({ accounts, canManage }: { accounts: Account[]; canM
 
   const [vatRegime, setVatRegime] = useState<'general' | 'pequeno'>('general')
   const [savingRegime, setSavingRegime] = useState(false)
+  const [ivaRate, setIvaRate] = useState('12')
+  const [pequenoRate, setPequenoRate] = useState('5')
+  const [savingRates, setSavingRates] = useState(false)
 
   const postables = accounts.filter((a) => a.active && !a.is_group)
   const years = Array.from({ length: 6 }, (_, i) => currentYear - 4 + i)
@@ -65,8 +71,12 @@ export const SettingsTab = ({ accounts, canManage }: { accounts: Account[]; canM
       .then((res) => { setDefaults(res.defaults); setKeys(res.keys) })
       .catch(() => { /* config puede no existir aún */ })
     getSettings()
-      .then((s) => setVatRegime(/peque/i.test(s.vat_affiliation || '') ? 'pequeno' : 'general'))
-      .catch(() => { /* default: general */ })
+      .then((s) => {
+        setVatRegime(/peque/i.test(s.vat_affiliation || '') ? 'pequeno' : 'general')
+        if (s.iva_rate) setIvaRate(s.iva_rate)
+        if (s.pequeno_rate) setPequenoRate(s.pequeno_rate)
+      })
+      .catch(() => { /* defaults legales GT: general, 12%, 5% */ })
   }, [])
 
   const handleSaveRegime = async (value: 'general' | 'pequeno') => {
@@ -77,13 +87,31 @@ export const SettingsTab = ({ accounts, canManage }: { accounts: Account[]; canM
       toast({
         title: 'Régimen de IVA actualizado',
         description: value === 'pequeno'
-          ? 'Los próximos asientos se registrarán por totales, sin desglose de IVA'
-          : 'Los próximos asientos desglosarán IVA débito y crédito (12%)',
+          ? `Los próximos asientos acumularán el ${pequenoRate}% sobre ventas, sin desglose de IVA`
+          : `Los próximos asientos desglosarán IVA débito y crédito (${ivaRate}%)`,
       })
     } catch (e) {
       toast({ title: 'Error', description: e instanceof Error ? e.message : 'No se pudo guardar el régimen', variant: 'destructive' })
     } finally {
       setSavingRegime(false)
+    }
+  }
+
+  const handleSaveRates = async () => {
+    const iva = Number(ivaRate)
+    const pequeno = Number(pequenoRate)
+    if (!Number.isFinite(iva) || iva < 0 || iva >= 100 || !Number.isFinite(pequeno) || pequeno < 0 || pequeno >= 100) {
+      toast({ title: 'Tasas inválidas', description: 'Deben ser números entre 0 y 99', variant: 'destructive' })
+      return
+    }
+    setSavingRates(true)
+    try {
+      await updateSettings({ iva_rate: String(iva), pequeno_rate: String(pequeno) })
+      toast({ title: 'Tasas guardadas', description: 'Aplican a los próximos asientos automáticos' })
+    } catch (e) {
+      toast({ title: 'Error', description: e instanceof Error ? e.message : 'No se pudieron guardar las tasas', variant: 'destructive' })
+    } finally {
+      setSavingRates(false)
     }
   }
 
@@ -155,27 +183,42 @@ export const SettingsTab = ({ accounts, canManage }: { accounts: Account[]; canM
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="flex items-center gap-2 text-lg">
-            <Landmark className="h-5 w-5" />Régimen de IVA (SAT)
+            <Landmark className="h-5 w-5" />Impuestos (SAT)
           </CardTitle>
           <CardDescription>
-            Define cómo se contabilizan las operaciones automáticas. Afecta solo a los asientos futuros.
+            Régimen y tasas con que se contabilizan las operaciones automáticas. Afecta solo a los asientos futuros.
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-3">
-          <div className="space-y-1 max-w-md">
-            <Label className="text-xs">Régimen</Label>
-            <Select value={vatRegime} onValueChange={(v) => void handleSaveRegime(v as 'general' | 'pequeno')} disabled={savingRegime}>
-              <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="general">Régimen general — desglosa IVA débito/crédito (12%)</SelectItem>
-                <SelectItem value="pequeno">Pequeño contribuyente — sin desglose, montos totales</SelectItem>
-              </SelectContent>
-            </Select>
+        <CardContent className="space-y-4">
+          <div className="flex flex-wrap items-end gap-3">
+            <div className="space-y-1 w-full max-w-md">
+              <Label className="text-xs">Régimen</Label>
+              <Select value={vatRegime} onValueChange={(v) => void handleSaveRegime(v as 'general' | 'pequeno')} disabled={savingRegime}>
+                <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="general">Régimen general — desglosa IVA débito/crédito ({ivaRate}%)</SelectItem>
+                  <SelectItem value="pequeno">Pequeño contribuyente — {pequenoRate}% sobre ventas brutas</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1 w-[150px]">
+              <Label className="text-xs">Tasa IVA general (%)</Label>
+              <Input type="number" min={0} max={99} step="0.5" className="h-9" value={ivaRate} onChange={(e) => setIvaRate(e.target.value)} />
+            </div>
+            <div className="space-y-1 w-[190px]">
+              <Label className="text-xs">Tarifa pequeño contribuyente (%)</Label>
+              <Input type="number" min={0} max={99} step="0.5" className="h-9" value={pequenoRate} onChange={(e) => setPequenoRate(e.target.value)} />
+            </div>
+            <Button variant="outline" onClick={handleSaveRates} disabled={savingRates}>
+              {savingRates ? 'Guardando…' : 'Guardar tasas'}
+            </Button>
           </div>
           <p className="text-xs text-muted-foreground max-w-2xl">
             En régimen general las ventas separan el IVA débito, las compras el IVA crédito, y el costo de
             ventas se registra sin IVA (los costos capturados se asumen a precio de factura, con IVA incluido).
-            Como pequeño contribuyente no se acredita IVA: todo se registra por el total. Confírmalo con tu contador.
+            Como pequeño contribuyente no se acredita IVA: las operaciones se registran por el total y cada venta
+            acumula la tarifa fija sobre ingresos brutos como gasto contra «IVA pequeño contribuyente por pagar».
+            El detalle mensual está en la pestaña Impuestos. Confírmalo con tu contador.
           </p>
         </CardContent>
       </Card>

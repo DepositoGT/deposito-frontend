@@ -27,6 +27,8 @@ export interface SystemSettings {
   company_postal_code?: string
   establishment_code?: string
   vat_affiliation?: string
+  iva_rate?: string
+  pequeno_rate?: string
 }
 
 export interface DenominationItem {
@@ -50,6 +52,8 @@ export async function getPublicSettings(): Promise<{
   date_format: string
   locale: string
   cash_closure_max_diff_pct: string
+  vat_affiliation: string
+  iva_rate: string
 }> {
   return apiFetch('/settings/public')
 }

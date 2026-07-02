@@ -168,3 +168,24 @@ export const getIncomeStatement = (params: { from?: string; to?: string }) =>
 
 export const getBalanceSheet = (asOf?: string) =>
   apiFetch<BalanceSheetResponse>(`/accounting/balance-sheet${qs({ asOf })}`)
+
+export type TaxesMonthRow = {
+  month: number
+  netSales: number
+  ivaDebit: number
+  ivaCredit: number
+  pequenoTax: number
+  toPay: number
+}
+
+export type TaxesReportResponse = {
+  year: number
+  regime: 'GENERAL' | 'PEQUENO'
+  ivaRate: number
+  pequenoRate: number
+  months: TaxesMonthRow[]
+  totals: Omit<TaxesMonthRow, 'month'>
+}
+
+export const getTaxesReport = (year: number) =>
+  apiFetch<TaxesReportResponse>(`/accounting/taxes-report${qs({ year })}`)
