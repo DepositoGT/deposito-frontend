@@ -25,10 +25,14 @@ type Sheet = { name: string; rows: Cell[][]; colWidths?: number[] }
 
 const num = (v: string | number) => Math.round((Number(v) || 0) * 100) / 100
 
+/** Evita inyección de fórmulas (CWE-1236) si el archivo se reabre/guarda como CSV. */
+const sanitizeCell = (cell: Cell): Cell =>
+  typeof cell === 'string' && /^[=+@\t\r]/.test(cell) ? `'${cell}` : cell
+
 function download(filename: string, sheets: Sheet[]) {
   const wb = XLSX.utils.book_new()
   for (const sheet of sheets) {
-    const ws = XLSX.utils.aoa_to_sheet(sheet.rows)
+    const ws = XLSX.utils.aoa_to_sheet(sheet.rows.map((row) => row.map(sanitizeCell)))
     if (sheet.colWidths) ws['!cols'] = sheet.colWidths.map((wch) => ({ wch }))
     XLSX.utils.book_append_sheet(wb, ws, sheet.name.slice(0, 31))
   }
