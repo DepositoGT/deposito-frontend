@@ -16,12 +16,13 @@ import { Label } from '@/components/ui/label'
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
-import { CalendarCheck2, Lock, LockOpen, Settings2, ShieldAlert } from 'lucide-react'
+import { CalendarCheck2, Landmark, Lock, LockOpen, Settings2, ShieldAlert } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import {
   getAccountingConfig, updateAccountingConfig, getPeriods, closePeriod, reopenPeriod, closeYear,
   type Account, type AccountingPeriod,
 } from '@/services/accountingService'
+import { getSettings, updateSettings } from '@/services/settingsService'
 import { MONTH_LABELS } from './format'
 
 const KEY_LABELS: Record<string, string> = {
@@ -53,6 +54,9 @@ export const SettingsTab = ({ accounts, canManage }: { accounts: Account[]; canM
   const [closingYear, setClosingYear] = useState(currentYear - 1)
   const [closingBusy, setClosingBusy] = useState(false)
 
+  const [vatRegime, setVatRegime] = useState<'general' | 'pequeno'>('general')
+  const [savingRegime, setSavingRegime] = useState(false)
+
   const postables = accounts.filter((a) => a.active && !a.is_group)
   const years = Array.from({ length: 6 }, (_, i) => currentYear - 4 + i)
 
@@ -60,7 +64,28 @@ export const SettingsTab = ({ accounts, canManage }: { accounts: Account[]; canM
     getAccountingConfig()
       .then((res) => { setDefaults(res.defaults); setKeys(res.keys) })
       .catch(() => { /* config puede no existir aún */ })
+    getSettings()
+      .then((s) => setVatRegime(/peque/i.test(s.vat_affiliation || '') ? 'pequeno' : 'general'))
+      .catch(() => { /* default: general */ })
   }, [])
+
+  const handleSaveRegime = async (value: 'general' | 'pequeno') => {
+    setSavingRegime(true)
+    setVatRegime(value)
+    try {
+      await updateSettings({ vat_affiliation: value === 'pequeno' ? 'Pequeño contribuyente' : 'Régimen general' })
+      toast({
+        title: 'Régimen de IVA actualizado',
+        description: value === 'pequeno'
+          ? 'Los próximos asientos se registrarán por totales, sin desglose de IVA'
+          : 'Los próximos asientos desglosarán IVA débito y crédito (12%)',
+      })
+    } catch (e) {
+      toast({ title: 'Error', description: e instanceof Error ? e.message : 'No se pudo guardar el régimen', variant: 'destructive' })
+    } finally {
+      setSavingRegime(false)
+    }
+  }
 
   const loadPeriods = (year: number) => {
     getPeriods(year)
@@ -126,6 +151,35 @@ export const SettingsTab = ({ accounts, canManage }: { accounts: Account[]; canM
 
   return (
     <div className="space-y-6">
+      {/* Régimen de IVA */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-lg">
+            <Landmark className="h-5 w-5" />Régimen de IVA (SAT)
+          </CardTitle>
+          <CardDescription>
+            Define cómo se contabilizan las operaciones automáticas. Afecta solo a los asientos futuros.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="space-y-1 max-w-md">
+            <Label className="text-xs">Régimen</Label>
+            <Select value={vatRegime} onValueChange={(v) => void handleSaveRegime(v as 'general' | 'pequeno')} disabled={savingRegime}>
+              <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="general">Régimen general — desglosa IVA débito/crédito (12%)</SelectItem>
+                <SelectItem value="pequeno">Pequeño contribuyente — sin desglose, montos totales</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <p className="text-xs text-muted-foreground max-w-2xl">
+            En régimen general las ventas separan el IVA débito, las compras el IVA crédito, y el costo de
+            ventas se registra sin IVA (los costos capturados se asumen a precio de factura, con IVA incluido).
+            Como pequeño contribuyente no se acredita IVA: todo se registra por el total. Confírmalo con tu contador.
+          </p>
+        </CardContent>
+      </Card>
+
       {/* Cuentas por defecto */}
       <Card>
         <CardHeader className="pb-3">
