@@ -21,13 +21,14 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
 import { Checkbox } from '@/components/ui/checkbox'
-import { ListTree, Pencil, Plus } from 'lucide-react'
+import { ListTree, Pencil, Plus, Upload } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import {
   createAccount, updateAccount,
   type Account, type AccountType,
 } from '@/services/accountingService'
 import { TYPE_LABELS } from './format'
+import { AccountingImportDialog } from './AccountingImportDialog'
 
 const ACCOUNT_TYPES = Object.keys(TYPE_LABELS) as AccountType[]
 
@@ -49,6 +50,7 @@ export const AccountsTab = ({ accounts, canManage, onChanged }: {
 }) => {
   const { toast } = useToast()
   const [isNewOpen, setIsNewOpen] = useState(false)
+  const [isImportOpen, setIsImportOpen] = useState(false)
   const [editing, setEditing] = useState<Account | null>(null)
   const [saving, setSaving] = useState(false)
 
@@ -126,9 +128,14 @@ export const AccountsTab = ({ accounts, canManage, onChanged }: {
             </CardDescription>
           </div>
           {canManage && (
-            <Button size="sm" onClick={() => setIsNewOpen(true)} className="bg-liquor-amber hover:bg-liquor-amber/90 text-white">
-              <Plus className="h-4 w-4 mr-2" />Nueva cuenta
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" onClick={() => setIsImportOpen(true)}>
+                <Upload className="h-4 w-4 mr-2" />Importar
+              </Button>
+              <Button size="sm" onClick={() => setIsNewOpen(true)} className="bg-liquor-amber hover:bg-liquor-amber/90 text-white">
+                <Plus className="h-4 w-4 mr-2" />Nueva cuenta
+              </Button>
+            </div>
           )}
         </div>
       </CardHeader>
@@ -253,6 +260,9 @@ export const AccountsTab = ({ accounts, canManage, onChanged }: {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Importar catálogo desde Excel */}
+      <AccountingImportDialog open={isImportOpen} onOpenChange={setIsImportOpen} type="accounts" />
     </Card>
   )
 }

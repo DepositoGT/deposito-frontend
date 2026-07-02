@@ -36,6 +36,7 @@ import Dashboard from "@/components/Dashboard";
 import ProductManagement from "@/components/ProductManagement";
 import Analytics from "@/components/Analytics";
 import AccountingManagement from "@/components/accounting/AccountingManagement";
+import AccountingImportPage from "@/pages/AccountingImportPage";
 import SalesManagement from "@/components/SalesManagement";
 import NewSalePage from "@/components/sales/NewSalePage";
 import { SaleInvoicePage } from "@/components/sales/SaleInvoicePage";
@@ -392,6 +393,14 @@ const App = () => (
                   element={
                     <PermissionRoute any={["accounting.view"]}>
                       <AccountingManagement />
+                    </PermissionRoute>
+                  }
+                />
+                <Route
+                  path="/contabilidad/importar"
+                  element={
+                    <PermissionRoute any={["accounting.create", "accounting.manage"]}>
+                      <AccountingImportPage />
                     </PermissionRoute>
                   }
                 />

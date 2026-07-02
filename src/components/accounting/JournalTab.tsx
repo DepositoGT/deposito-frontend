@@ -18,7 +18,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
-import { BookOpen, ChevronDown, ChevronRight, Download, Plus, RefreshCcw, Undo2 } from 'lucide-react'
+import { BookOpen, ChevronDown, ChevronRight, Download, Plus, RefreshCcw, Undo2, Upload } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import {
   getJournal, postPending, reverseJournalEntry,
@@ -27,6 +27,7 @@ import {
 import { fmtQ, fmtDate, SOURCE_LABELS } from './format'
 import { exportJournal } from './exportExcel'
 import { NewEntryDialog } from './NewEntryDialog'
+import { AccountingImportDialog } from './AccountingImportDialog'
 
 const entryTotal = (entry: JournalEntry) =>
   entry.lines.reduce((s, l) => s + (Number(l.debit) || 0), 0)
@@ -43,6 +44,7 @@ export const JournalTab = ({ accounts, canCreate }: { accounts: Account[]; canCr
   const [source, setSource] = useState('')
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [isNewOpen, setIsNewOpen] = useState(false)
+  const [isImportOpen, setIsImportOpen] = useState(false)
   const [posting, setPosting] = useState(false)
   const [exporting, setExporting] = useState(false)
 
@@ -140,6 +142,9 @@ export const JournalTab = ({ accounts, canCreate }: { accounts: Account[]; canCr
             </Button>
             {canCreate && (
               <>
+                <Button variant="outline" size="sm" onClick={() => setIsImportOpen(true)}>
+                  <Upload className="h-4 w-4 mr-2" />Importar
+                </Button>
                 <Button variant="outline" size="sm" onClick={handlePostPending} disabled={posting}>
                   <RefreshCcw className={`h-4 w-4 mr-2 ${posting ? 'animate-spin' : ''}`} />
                   {posting ? 'Contabilizando…' : 'Contabilizar pendientes'}
@@ -250,6 +255,7 @@ export const JournalTab = ({ accounts, canCreate }: { accounts: Account[]; canCr
       </CardContent>
 
       <NewEntryDialog open={isNewOpen} onOpenChange={setIsNewOpen} accounts={accounts} onSaved={() => void load(1)} />
+      <AccountingImportDialog open={isImportOpen} onOpenChange={setIsImportOpen} type="journal" />
     </Card>
   )
 }
