@@ -21,6 +21,7 @@ import {
   ReporteFinancieroIcon,
   AlertasIcon,
   AnalyticsIcon,
+  MercanciaIcon,
 } from "@/components/icons/CustomIcons";
 import {
   Select,
@@ -127,6 +128,16 @@ const ReportsManagement = () => {
       bgColor: "bg-liquor-amber/10",
       lastGenerated: "2024-01-09 14:30",
       size: "1.5 MB"
+    },
+    {
+      id: "merchandise",
+      name: "Reporte de Mercancía",
+      description: "Ingresos de mercancía del período: montos, estado de pago y por proveedor",
+      icon: MercanciaIcon,
+      color: "text-primary",
+      bgColor: "bg-primary/10",
+      lastGenerated: "—",
+      size: "—"
     }
   ];
 

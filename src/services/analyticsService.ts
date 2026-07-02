@@ -31,7 +31,25 @@ export type AnalyticsResponse = {
     ventasNetas?: number;
   }[];
   topProducts: { id: string; name: string; category: string; ventas: number; revenue: number }[];
-  categoryPerformance: { category: string; revenue: number; percentage: number }[];
+  categoryPerformance: { category: string; revenue: number; cost: number; profit: number; margin: number; percentage: number }[];
+  paymentMethods: { method: string; total: number; count: number }[];
+  channels: { channel: string; label: string; total: number; count: number }[];
+  inventory: {
+    stockValue: number;
+    retailValue: number;
+    potentialProfit: number;
+    lowStockCount: number;
+    outOfStockCount: number;
+    productsCount: number;
+    byCategory: { category: string; value: number; units: number }[];
+  };
+  purchases: {
+    total: number;
+    payableCount: number;
+    payablePending: number;
+    monthly: { month: number; amount: number }[];
+    topSuppliers: { name: string; amount: number }[];
+  };
 }
 
 export async function getAnalytics(year: number | 'all'): Promise<AnalyticsResponse> {
