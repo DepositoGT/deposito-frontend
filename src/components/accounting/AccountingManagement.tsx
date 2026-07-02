@@ -23,10 +23,9 @@ import { getAccounts, postPending, type Account } from '@/services/accountingSer
 import { JournalTab } from './JournalTab'
 import { LedgerTab } from './LedgerTab'
 import { TrialBalanceTab } from './TrialBalanceTab'
-
-const Placeholder = ({ label }: { label: string }) => (
-  <Card><CardContent className="py-12 text-center text-muted-foreground">{label} (próximamente)</CardContent></Card>
-)
+import { StatementsTab } from './StatementsTab'
+import { AccountsTab } from './AccountsTab'
+import { SettingsTab } from './SettingsTab'
 
 const AccountingManagement = () => {
   const { toast } = useToast()
@@ -90,17 +89,15 @@ const AccountingManagement = () => {
           <TrialBalanceTab />
         </TabsContent>
         <TabsContent value="estados">
-          <Placeholder label="Estados Financieros" />
+          <StatementsTab />
         </TabsContent>
         <TabsContent value="catalogo">
-          <Placeholder label="Catálogo de cuentas" />
+          <AccountsTab accounts={accounts} canManage={canManage} onChanged={() => void loadAccounts()} />
         </TabsContent>
         <TabsContent value="configuracion">
-          <Placeholder label="Configuración" />
+          <SettingsTab accounts={accounts} canManage={canManage} />
         </TabsContent>
       </Tabs>
-      {/* canManage se usa en los tabs de Catálogo/Configuración (Tareas 10-11) */}
-      <span className="hidden">{String(canManage)}</span>
     </div>
   )
 }
