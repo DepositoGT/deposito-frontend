@@ -15,6 +15,7 @@ const DEFAULT_CURRENCY_NAME = 'Quetzal'
 const DEFAULT_DATE_FORMAT = 'dd/MM/yyyy'
 const DEFAULT_LOCALE = 'es-GT'
 const DEFAULT_CASH_CLOSURE_MAX_DIFF_PCT = 5
+const DEFAULT_IVA_RATE = 12
 
 export interface SystemSettingsState {
   timezone: string
@@ -26,6 +27,10 @@ export interface SystemSettingsState {
   locale: string
   /** Diferencia máxima permitida en cierre de caja (%) para mostrar advertencia */
   cashClosureMaxDiffPct: number
+  /** Régimen de IVA ante la SAT (SystemSetting vat_affiliation) */
+  vatRegime: 'general' | 'pequeno'
+  /** Tasa de IVA general en % (SystemSetting iva_rate) */
+  ivaRate: number
   loading: boolean
   error: boolean
   /** Recarga la configuración pública desde el servidor (p. ej. tras guardar en Configuración). */
@@ -41,6 +46,8 @@ const defaultState: Omit<SystemSettingsState, 'refetch'> = {
   dateFormat: DEFAULT_DATE_FORMAT,
   locale: DEFAULT_LOCALE,
   cashClosureMaxDiffPct: DEFAULT_CASH_CLOSURE_MAX_DIFF_PCT,
+  vatRegime: 'general',
+  ivaRate: DEFAULT_IVA_RATE,
   loading: true,
   error: false
 }
@@ -65,6 +72,8 @@ export function SystemSettingsProvider({ children }: { children: React.ReactNode
           dateFormat: (d?.date_format && String(d.date_format).trim()) || DEFAULT_DATE_FORMAT,
           locale: (d?.locale && String(d.locale).trim()) || DEFAULT_LOCALE,
           cashClosureMaxDiffPct: pct,
+          vatRegime: /peque/i.test(d?.vat_affiliation || '') ? 'pequeno' : 'general',
+          ivaRate: (() => { const n = parseFloat(String(d?.iva_rate ?? '')); return Number.isFinite(n) && n >= 0 && n < 100 ? n : DEFAULT_IVA_RATE })(),
           loading: false,
           error: false
         })
@@ -80,6 +89,8 @@ export function SystemSettingsProvider({ children }: { children: React.ReactNode
           dateFormat: DEFAULT_DATE_FORMAT,
           locale: DEFAULT_LOCALE,
           cashClosureMaxDiffPct: DEFAULT_CASH_CLOSURE_MAX_DIFF_PCT,
+          vatRegime: 'general',
+          ivaRate: DEFAULT_IVA_RATE,
           loading: false,
           error: true
         }))

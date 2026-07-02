@@ -35,6 +35,8 @@ import { MainLayout } from "@/components/layout";
 import Dashboard from "@/components/Dashboard";
 import ProductManagement from "@/components/ProductManagement";
 import Analytics from "@/components/Analytics";
+import AccountingManagement from "@/components/accounting/AccountingManagement";
+import AccountingImportPage from "@/pages/AccountingImportPage";
 import SalesManagement from "@/components/SalesManagement";
 import NewSalePage from "@/components/sales/NewSalePage";
 import { SaleInvoicePage } from "@/components/sales/SaleInvoicePage";
@@ -56,6 +58,7 @@ import { CatalogsManagement } from "@/components/CatalogsManagement";
 import ReturnsManagement from "@/components/ReturnsManagement";
 import CashClosureManagement from "@/components/CashClosureManagement";
 import { CashClosureCreatePage } from "@/components/cash-closure/CashClosureCreatePage";
+import { ClosureDetailPage } from "@/components/cash-closure/ClosureDetailPage";
 import PromotionsManagement from "@/components/PromotionsManagement";
 import PromotionCreatePage from "@/components/promotions/PromotionCreatePage";
 import PromotionEditPage from "@/components/promotions/PromotionEditPage";
@@ -309,6 +312,14 @@ const App = () => (
                     </PermissionRoute>
                   }
                 />
+                <Route
+                  path="/cierre-caja/:id"
+                  element={
+                    <PermissionRoute any={["cashclosure.view", "cashclosure.create"]}>
+                      <ClosureDetailPage />
+                    </PermissionRoute>
+                  }
+                />
 
                 {/* Contactos (API /suppliers; rutas antiguas /proveedores redirigen) */}
                 <Route path="/proveedores" element={<Navigate to="/contactos" replace />} />
@@ -372,6 +383,24 @@ const App = () => (
                   element={
                     <PermissionRoute any={["analytics.view"]}>
                       <Analytics />
+                    </PermissionRoute>
+                  }
+                />
+
+                {/* Contabilidad */}
+                <Route
+                  path="/contabilidad"
+                  element={
+                    <PermissionRoute any={["accounting.view"]}>
+                      <AccountingManagement />
+                    </PermissionRoute>
+                  }
+                />
+                <Route
+                  path="/contabilidad/importar"
+                  element={
+                    <PermissionRoute any={["accounting.create", "accounting.manage"]}>
+                      <AccountingImportPage />
                     </PermissionRoute>
                   }
                 />

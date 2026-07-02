@@ -23,6 +23,7 @@ import {
     CierreCajaIcon,
     ProveedoresIcon,
     AnalyticsIcon,
+    ReporteFinancieroIcon,
     ReportesIcon,
     AlertasIcon,
     PromocionesIcon,
@@ -164,6 +165,15 @@ export const appModules: AppModule[] = [
         color: 'bg-teal-100/90',
         iconColor: 'text-teal-800',
         permissions: ['analytics.view']
+    },
+    {
+        id: 'accounting',
+        label: 'Contabilidad',
+        path: '/contabilidad',
+        icon: ReporteFinancieroIcon,
+        color: 'bg-cyan-100/90',
+        iconColor: 'text-cyan-800',
+        permissions: ['accounting.view']
     },
     {
         id: 'reports',

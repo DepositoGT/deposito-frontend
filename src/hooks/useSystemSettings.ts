@@ -42,6 +42,10 @@ export interface UseSystemSettingsReturn {
   locale: string
   /** Diferencia máxima (%) en cierre de caja para mostrar advertencia */
   cashClosureMaxDiffPct: number
+  /** Régimen de IVA ante la SAT */
+  vatRegime: 'general' | 'pequeno'
+  /** Tasa de IVA general en % */
+  ivaRate: number
   loading: boolean
   /** Recarga la configuración pública (útil tras guardar en Configuración). */
   refetch: () => void
@@ -60,6 +64,8 @@ export function useSystemSettings(): UseSystemSettingsReturn {
       dateFormat: DEFAULT_DATE_FORMAT,
       locale: DEFAULT_LOCALE,
       cashClosureMaxDiffPct: DEFAULT_CASH_CLOSURE_MAX_DIFF_PCT,
+      vatRegime: 'general',
+      ivaRate: 12,
       loading: false,
       refetch: () => {}
     }
@@ -73,6 +79,8 @@ export function useSystemSettings(): UseSystemSettingsReturn {
     dateFormat: ctx.dateFormat,
     locale: ctx.locale,
     cashClosureMaxDiffPct: ctx.cashClosureMaxDiffPct,
+    vatRegime: ctx.vatRegime,
+    ivaRate: ctx.ivaRate,
     loading: ctx.loading,
     refetch: ctx.refetch
   }

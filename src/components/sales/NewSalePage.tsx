@@ -229,7 +229,7 @@ export default function NewSalePage() {
   const { user } = useAuth()
   const { hasPermission } = useAuthPermissions()
   const userId = user?.id ?? ''
-  const { locale, currencyCode, companyName, companyLogoUrl } = useSystemSettings()
+  const { locale, currencyCode, companyName, companyLogoUrl, vatRegime, ivaRate } = useSystemSettings()
   const fmt = (n: number) => formatMoney(n, locale, currencyCode)
   const salesData = useSalesData()
 
@@ -1350,7 +1350,13 @@ export default function NewSalePage() {
                   </p>
                 </div>
               ) : null}
-              <div className="flex justify-between font-semibold text-lg pt-2">
+              {vatRegime === 'general' && displayTotal > 0 && (
+                <div className="flex justify-between text-xs text-muted-foreground pt-2">
+                  <span>IVA incluido ({ivaRate}%)</span>
+                  <span>{fmt(displayTotal - displayTotal / (1 + ivaRate / 100))}</span>
+                </div>
+              )}
+              <div className={`flex justify-between font-semibold text-lg ${vatRegime === 'general' ? '' : 'pt-2'}`}>
                 <span>Total</span>
                 <span>{fmt(displayTotal)}</span>
               </div>
