@@ -25,10 +25,12 @@ import {
 } from '@/services/accountingService'
 import { getSettings, updateSettings } from '@/services/settingsService'
 import { MONTH_LABELS } from './format'
+import { OpeningBalancesCard } from './OpeningBalancesCard'
 
 const KEY_LABELS: Record<string, string> = {
   cash: 'Caja (ventas en efectivo)',
   bank: 'Bancos (tarjeta / transferencia)',
+  receivables: 'Clientes (ventas al crédito)',
   sales: 'Ventas',
   salesReturns: 'Devoluciones sobre ventas',
   cogs: 'Costo de ventas',
@@ -255,6 +257,9 @@ export const SettingsTab = ({ accounts, canManage }: { accounts: Account[]; canM
           </Button>
         </CardContent>
       </Card>
+
+      {/* Saldos iniciales (asiento de apertura) */}
+      <OpeningBalancesCard accounts={accounts} />
 
       {/* Períodos */}
       <Card>
