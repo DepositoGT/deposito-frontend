@@ -25,9 +25,9 @@ type Sheet = { name: string; rows: Cell[][]; colWidths?: number[] }
 
 const num = (v: string | number) => Math.round((Number(v) || 0) * 100) / 100
 
-/** Evita inyección de fórmulas (CWE-1236) si el archivo se reabre/guarda como CSV. */
+/** Evita inyección de fórmulas (CWE-1236): set completo OWASP (=, +, -, @, tab, CR). */
 const sanitizeCell = (cell: Cell): Cell =>
-  typeof cell === 'string' && /^[=+@\t\r]/.test(cell) ? `'${cell}` : cell
+  typeof cell === 'string' && /^[=+\-@\t\r]/.test(cell) ? `'${cell}` : cell
 
 function download(filename: string, sheets: Sheet[]) {
   const wb = XLSX.utils.book_new()
