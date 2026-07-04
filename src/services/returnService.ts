@@ -35,12 +35,30 @@ export interface ReturnItem {
   }
 }
 
+export type ReturnType = 'REFUND' | 'EXCHANGE'
+
+export interface ReturnReplacementItem {
+  id: number
+  return_id: string
+  product_id: string
+  qty: number
+  unit_price: number
+  line_total: number
+  product?: {
+    id: string
+    name: string
+    barcode?: string | null
+  }
+}
+
 export interface Return {
   id: string
   sale_id: string
   return_date: string
+  type: ReturnType
   reason?: string | null
   total_refund: number
+  price_difference: number
   items_count: number
   status_id: number
   processed_by?: string | null
@@ -48,6 +66,7 @@ export interface Return {
   notes?: string | null
   status: ReturnStatus
   return_items: ReturnItem[]
+  replacement_items?: ReturnReplacementItem[]
   sale?: {
     id: string
     customer?: string | null
@@ -68,6 +87,7 @@ export interface Return {
 
 export interface CreateReturnPayload {
   sale_id: string
+  type?: ReturnType
   reason?: string
   notes?: string
   items: {
@@ -75,6 +95,12 @@ export interface CreateReturnPayload {
     product_id: string
     qty_returned: number
     reason?: string
+  }[]
+  // Solo para cambios (type === 'EXCHANGE'): productos que se lleva el cliente.
+  replacements?: {
+    product_id: string
+    qty: number
+    unit_price: number
   }[]
 }
 
