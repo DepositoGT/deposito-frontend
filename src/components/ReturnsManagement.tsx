@@ -84,6 +84,11 @@ const ReturnsManagement = () => {
     }
   }
 
+  const getTypeBadge = (type: Return['type']) =>
+    type === 'EXCHANGE'
+      ? <Badge className="bg-blue-500 text-white">Cambio</Badge>
+      : <Badge className="bg-orange-500 text-white">Devolución</Badge>
+
   const viewReturn = (returnRecord: Return) => {
     setSelectedReturn(returnRecord)
     setIsViewOpen(true)
@@ -234,6 +239,7 @@ const ReturnsManagement = () => {
                   <thead>
                     <tr className="border-b">
                       <th className="text-left p-3 font-medium">ID Devolución</th>
+                      <th className="text-left p-3 font-medium">Tipo</th>
                       <th className="text-left p-3 font-medium">Fecha</th>
                       <th className="text-left p-3 font-medium">Venta</th>
                       <th className="text-left p-3 font-medium">Cliente</th>
@@ -258,6 +264,7 @@ const ReturnsManagement = () => {
                         }}
                       >
                         <td className="p-3 font-mono text-sm">{ret.id.substring(0, 8)}...</td>
+                        <td className="p-3">{getTypeBadge(ret.type)}</td>
                         <td className="p-3 text-sm">{formatDateTime(ret.return_date, undefined, locale)}</td>
                         <td className="p-3 font-mono text-sm">{ret.sale_id.substring(0, 8)}...</td>
                         <td className="p-3">{ret.sale?.customer || 'N/A'}</td>
@@ -301,7 +308,7 @@ const ReturnsManagement = () => {
       <Dialog open={isViewOpen} onOpenChange={setIsViewOpen}>
         <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Detalle de Devolución</DialogTitle>
+            <DialogTitle>{selectedReturn?.type === 'EXCHANGE' ? 'Detalle de Cambio' : 'Detalle de Devolución'}</DialogTitle>
           </DialogHeader>
           {selectedReturn && (
             <div className="space-y-4">
@@ -323,11 +330,15 @@ const ReturnsManagement = () => {
                   <div>{selectedReturn.sale?.customer || 'N/A'}</div>
                 </div>
                 <div>
+                  <Label>Tipo</Label>
+                  <div>{getTypeBadge(selectedReturn.type)}</div>
+                </div>
+                <div>
                   <Label>Estado</Label>
                   <div>{getStatusBadge(selectedReturn.status.name)}</div>
                 </div>
                 <div>
-                  <Label>Total Reembolso</Label>
+                  <Label>{selectedReturn.type === 'EXCHANGE' ? 'Valor Devuelto' : 'Total Reembolso'}</Label>
                   <div className="font-bold text-lg">{formatMoney(selectedReturn.total_refund, locale, currencyCode)}</div>
                 </div>
               </div>
@@ -347,7 +358,7 @@ const ReturnsManagement = () => {
               )}
 
               <div>
-                <Label>Productos Devueltos</Label>
+                <Label>{selectedReturn.type === 'EXCHANGE' ? 'Productos que Entregó el Cliente' : 'Productos Devueltos'}</Label>
                 <div className="border rounded-lg divide-y mt-2">
                   {selectedReturn.return_items.map((item) => (
                     <div key={item.id} className="p-3 flex justify-between items-center">
@@ -370,6 +381,43 @@ const ReturnsManagement = () => {
                   ))}
                 </div>
               </div>
+
+              {selectedReturn.type === 'EXCHANGE' && (
+                <>
+                  <div>
+                    <Label>Productos de Reemplazo (se llevó el cliente)</Label>
+                    <div className="border rounded-lg divide-y mt-2">
+                      {(selectedReturn.replacement_items ?? []).map((item) => (
+                        <div key={item.id} className="p-3 flex justify-between items-center">
+                          <div className="flex-1">
+                            <div className="font-medium">{item.product?.name}</div>
+                            <div className="text-sm text-muted-foreground">Cantidad: {item.qty}</div>
+                          </div>
+                          <div className="text-right">
+                            <div className="font-medium">{formatMoney(item.line_total, locale, currencyCode)}</div>
+                            <div className="text-sm text-muted-foreground">
+                              {formatMoney(item.unit_price, locale, currencyCode)}/u
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="bg-muted/50 p-4 rounded-lg flex justify-between items-center">
+                    <span className="font-bold">
+                      {Number(selectedReturn.price_difference) > 0
+                        ? 'A cobrar al cliente:'
+                        : Number(selectedReturn.price_difference) < 0
+                          ? 'A devolver al cliente:'
+                          : 'Sin diferencia:'}
+                    </span>
+                    <span className={`text-xl font-bold ${Number(selectedReturn.price_difference) > 0 ? 'text-red-600' : Number(selectedReturn.price_difference) < 0 ? 'text-green-600' : ''}`}>
+                      {formatMoney(Math.abs(Number(selectedReturn.price_difference)), locale, currencyCode)}
+                    </span>
+                  </div>
+                </>
+              )}
 
               {selectedReturn.processed_at && (
                 <div className="text-sm text-muted-foreground">
