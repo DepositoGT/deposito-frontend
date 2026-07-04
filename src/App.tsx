@@ -493,7 +493,7 @@ const App = () => (
                 <Route
                   path="/usuarios/nuevo"
                   element={
-                    <PermissionRoute any={["users.create", "users.view", "roles.manage"]}>
+                    <PermissionRoute any={["users.create"]}>
                       <UserCreatePage />
                     </PermissionRoute>
                   }
@@ -501,7 +501,7 @@ const App = () => (
                 <Route
                   path="/usuarios/importar"
                   element={
-                    <PermissionRoute any={["users.view", "roles.manage"]}>
+                    <PermissionRoute any={["users.import"]}>
                       <UserImportPage />
                     </PermissionRoute>
                   }

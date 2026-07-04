@@ -157,7 +157,8 @@ const ProductManagement = () => {
 
     // Permisos
     const canImport = hasPermission('products.import')
-    const canExport = canImport && hasPermission('products.view', 'reports.view')
+    // Exportar usa su permiso dedicado (antes exigía products.import, que es otra cosa)
+    const canExport = hasPermission('products.export', 'reports.view')
     const canCreate = hasPermission('products.create')
     const canDelete = hasPermission('products.delete')
     const canRegisterIncoming = hasPermission('products.register_incoming')

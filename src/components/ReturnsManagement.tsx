@@ -31,12 +31,16 @@ import { useReturns, useUpdateReturnStatus } from '@/hooks/useReturns'
 import { Return } from '@/services/returnService'
 import { formatMoney, formatDateTime } from '@/utils'
 import { usePersistedListUiState, useResetPageOnFilterChange } from '@/hooks/usePersistedListUiState'
+import { useAuthPermissions } from '@/hooks/useAuthPermissions'
 
 type ReturnStatusName = 'Pendiente' | 'Aprobada' | 'Rechazada' | 'Completada'
 
 const ReturnsManagement = () => {
   const { toast } = useToast()
   const { locale, currencyCode } = useSystemSettings()
+  const { hasPermission } = useAuthPermissions()
+  // Con solo returns.view se puede consultar, pero no aprobar/rechazar/completar
+  const canManageReturns = hasPermission('returns.manage')
 
   // Filters
   const [statusFilter, setStatusFilter] = useState<string>('all')
@@ -425,7 +429,7 @@ const ReturnsManagement = () => {
                 </div>
               )}
 
-              {(selectedReturn.status.name === 'Pendiente' || selectedReturn.status.name === 'Aprobada') && (
+              {canManageReturns && (selectedReturn.status.name === 'Pendiente' || selectedReturn.status.name === 'Aprobada') && (
                 <div className="flex flex-wrap gap-2 pt-4 border-t">
                   {selectedReturn.status.name === 'Pendiente' && (
                     <>
