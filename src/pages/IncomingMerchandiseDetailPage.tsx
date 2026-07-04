@@ -76,12 +76,8 @@ export default function IncomingMerchandiseDetailPage() {
   const { hasPermission } = useAuthPermissions()
   const { currencyCode, locale } = useSystemSettings()
 
-  /** Quien registra ingresos puede registrar también el pago en el detalle (misma operación de compras). */
-  const canEditPayment = hasPermission(
-    'merchandise.mark_paid',
-    'merchandise.details',
-    'products.register_incoming'
-  )
+  /** Solo el permiso dedicado permite tocar pagos/abonos: ver detalles NO implica poder abonar. */
+  const canEditPayment = hasPermission('merchandise.mark_paid')
 
   const [editPaymentStatus, setEditPaymentStatus] = useState<MerchandisePaymentStatus>('PENDING')
   const [editPaymentTermId, setEditPaymentTermId] = useState('')
