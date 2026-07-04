@@ -10,7 +10,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { AuthContext, type AuthUser } from "./AuthContext";
-import { getAuthToken, setAuthToken } from "@/services/api";
+import { fetchMe, logoutRequest } from "@/services/authService";
 
 const AUTH_KEY = "auth:isAuthenticated";
 const USER_KEY = "auth:user";
@@ -21,32 +21,30 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<AuthUser | null>(null);
 
   useEffect(() => {
-    const token = getAuthToken();
-    const storedUser = localStorage.getItem(USER_KEY);
-
-    if (token) {
-      setIsAuthenticated(true);
-      if (storedUser) {
-        try {
-          const parsedUser = JSON.parse(storedUser);
-          setUser(parsedUser);
-        } catch (e) {
-          console.error("Error parsing stored user:", e);
-        }
-      }
-    } else if (localStorage.getItem(AUTH_KEY) === "true") {
-      setIsAuthenticated(true);
-      if (storedUser) {
-        try {
-          const parsedUser = JSON.parse(storedUser);
-          setUser(parsedUser);
-        } catch (e) {
-          console.error("Error parsing stored user:", e);
-        }
+    // Cache optimista para evitar parpadeo; la verdad la da /auth/me (lee la cookie httpOnly).
+    const cached = localStorage.getItem(USER_KEY);
+    if (cached) {
+      try {
+        setUser(JSON.parse(cached));
+        setIsAuthenticated(true);
+      } catch {
+        /* cache corrupta: la ignoramos */
       }
     }
-    // Done loading auth state
-    setIsLoading(false);
+
+    fetchMe()
+      .then(({ user }) => {
+        setUser(user);
+        setIsAuthenticated(true);
+        localStorage.setItem(USER_KEY, JSON.stringify(user));
+      })
+      .catch(() => {
+        // Sin sesión válida (ni siquiera tras intentar refresh).
+        setUser(null);
+        setIsAuthenticated(false);
+        localStorage.removeItem(USER_KEY);
+      })
+      .finally(() => setIsLoading(false));
   }, []);
 
   useEffect(() => {
@@ -55,7 +53,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   useEffect(() => {
     const onUnauthorized = () => {
-      setAuthToken(null);
       localStorage.removeItem(USER_KEY);
       setIsAuthenticated(false);
       setUser(null);
@@ -93,7 +90,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         }
       },
       logout: () => {
-        setAuthToken(null);
+        void logoutRequest(); // revoca el refresh token en el backend (best-effort)
         localStorage.removeItem(USER_KEY);
         setIsAuthenticated(false);
         setUser(null);

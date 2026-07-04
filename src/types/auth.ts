@@ -27,6 +27,6 @@ export interface LoginRequest {
 }
 
 export interface LoginResponse {
-  user: AuthUser;
-  token: string;
+  // El token ya no viaja en el body: la sesión va en cookies httpOnly.
+  user: AuthUser & { permissions?: string[] };
 }
