@@ -43,7 +43,33 @@ export const setAuthToken = (token: string | null) => {
   else localStorage.removeItem("auth:token");
 };
 
-export const apiFetch = async <T>(path: string, options: RequestInit = {}): Promise<T> => {
+// El refresh es idempotente por sesión: si varias requests reciben 401 a la vez,
+// comparten un único POST /auth/refresh en lugar de rotar el token N veces.
+let refreshInFlight: Promise<boolean> | null = null;
+const tryRefresh = (): Promise<boolean> => {
+  if (!refreshInFlight) {
+    refreshInFlight = fetch(`${VITE_API_URL}/auth/refresh`, {
+      method: "POST",
+      credentials: "include",
+    })
+      .then((r) => r.ok)
+      .catch(() => false)
+      .finally(() => {
+        refreshInFlight = null;
+      });
+  }
+  return refreshInFlight;
+};
+
+// No intentar refrescar sobre las propias rutas de sesión (evita loops).
+const isSessionPath = (p: string) =>
+  /\/auth\/(login|refresh|logout)\b/.test(p);
+
+export const apiFetch = async <T>(
+  path: string,
+  options: RequestInit = {},
+  _retried = false
+): Promise<T> => {
   const token = getAuthToken();
   const headers: HeadersInit = {
     "Content-Type": "application/json",
@@ -62,7 +88,15 @@ export const apiFetch = async <T>(path: string, options: RequestInit = {}): Prom
   const res = await fetch(`${VITE_API_URL}${cleanPath}`, {
     ...options,
     headers,
+    credentials: "include", // manda las cookies httpOnly de sesión
   });
+
+  // Access token vencido: intentar refrescar una vez y reintentar la request original.
+  if (res.status === 401 && !_retried && !isSessionPath(cleanPath)) {
+    if (await tryRefresh()) {
+      return apiFetch<T>(path, options, true);
+    }
+  }
 
   const text = await res.text();
   let data: unknown = undefined;

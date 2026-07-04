@@ -1,6 +1,6 @@
 {
-  "routes": [
-    { "handle": "filesystem" },
-    { "src": "/.*", "dest": "/index.html" }
+  "rewrites": [
+    { "source": "/api/:path*", "destination": "https://deposito-backend-hsfi.vercel.app/api/:path*" },
+    { "source": "/(.*)", "destination": "/index.html" }
   ]
 }
