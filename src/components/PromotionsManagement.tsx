@@ -84,6 +84,7 @@ import {
     Package
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
+import { useAuthPermissions } from '@/hooks/useAuthPermissions'
 
 // Types
 interface PromotionType {
@@ -144,6 +145,9 @@ const PromotionsManagement = () => {
     const { toast } = useToast()
     const queryClient = useQueryClient()
     const { locale, currencyCode, companyLogoUrl } = useSystemSettings()
+    const { hasPermission } = useAuthPermissions()
+    // Con solo promotions.view se consulta; crear/editar/eliminar/activar requiere promotions.manage
+    const canManagePromos = hasPermission('promotions.manage')
     const [searchTerm, setSearchTerm] = useState('')
     const [codesDialog, setCodesDialog] = useState<CodesDialogState>({ open: false })
 
@@ -241,10 +245,12 @@ const PromotionsManagement = () => {
                                 Administra códigos de descuento
                             </CardDescription>
                         </div>
-                        <Button onClick={() => navigate('/promociones/nueva')} size='sm' className='w-full sm:w-auto'>
-                            <Plus className='w-4 h-4 mr-2' />
-                            Nueva Promoción
-                        </Button>
+                        {canManagePromos && (
+                            <Button onClick={() => navigate('/promociones/nueva')} size='sm' className='w-full sm:w-auto'>
+                                <Plus className='w-4 h-4 mr-2' />
+                                Nueva Promoción
+                            </Button>
+                        )}
                     </div>
                 </CardHeader>
                 <CardContent className='p-3 sm:p-6 pt-0 sm:pt-0'>
@@ -325,6 +331,7 @@ const PromotionsManagement = () => {
                                             <TableCell>
                                                 <Switch
                                                     checked={promo.active}
+                                                    disabled={!canManagePromos}
                                                     onCheckedChange={(active) =>
                                                         toggleActiveMutation.mutate({ id: promo.id, active })
                                                     }
@@ -332,6 +339,8 @@ const PromotionsManagement = () => {
                                             </TableCell>
                                             <TableCell className='text-right'>
                                                 <div className='flex justify-end gap-1'>
+                                                    {canManagePromos && (
+                                                    <>
                                                     <Button
                                                         variant='ghost'
                                                         size='sm'
@@ -367,6 +376,8 @@ const PromotionsManagement = () => {
                                                             </AlertDialogFooter>
                                                         </AlertDialogContent>
                                                     </AlertDialog>
+                                                    </>
+                                                    )}
                                                 </div>
                                             </TableCell>
                                         </TableRow>
