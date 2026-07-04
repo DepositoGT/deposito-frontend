@@ -15,7 +15,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { AlertTriangle, PackageX, RotateCcw, Tag } from 'lucide-react'
+import { AlertTriangle, PackageX, RefreshCw, RotateCcw, Tag } from 'lucide-react'
 import { Sale, SaleStatus } from '@/types'
 import { formatMoney, formatDateTime } from '@/utils'
 import { useNavigate } from 'react-router-dom'
@@ -216,18 +216,28 @@ export const SaleDetailDialog = ({
                         )}
                     </div>
 
-                    {/* Return Button - solo si tiene permiso returns.manage */}
+                    {/* Return / Exchange Buttons - solo si tiene permiso returns.manage */}
                     {sale.status === 'completed' && canManageReturns && (
-                        <div className='pt-4 border-t'>
+                        <div className='pt-4 border-t grid grid-cols-2 gap-2'>
                             <Button
                                 variant='outline'
-                                className='w-full text-orange-600 border-orange-300 hover:bg-orange-50'
+                                className='text-orange-600 border-orange-300 hover:bg-orange-50'
                                 onClick={() => {
                                     onOpenChange(false)
                                     navigate(`/returns/new?sale_id=${sale.reference ?? sale.id}`)
                                 }}
                             >
-                                <RotateCcw className='w-4 h-4 mr-2' />Procesar Devolución
+                                <RotateCcw className='w-4 h-4 mr-2' />Devolución
+                            </Button>
+                            <Button
+                                variant='outline'
+                                className='text-blue-600 border-blue-300 hover:bg-blue-50'
+                                onClick={() => {
+                                    onOpenChange(false)
+                                    navigate(`/returns/new?sale_id=${sale.reference ?? sale.id}&mode=exchange`)
+                                }}
+                            >
+                                <RefreshCw className='w-4 h-4 mr-2' />Cambio
                             </Button>
                         </div>
                     )}

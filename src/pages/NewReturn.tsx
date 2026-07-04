@@ -10,16 +10,19 @@
 
 import { useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
-import { ArrowLeft, Minus, Plus, RotateCcw } from 'lucide-react'
+import { ArrowLeft, Minus, Plus, RotateCcw, RefreshCw, Trash2 } from 'lucide-react'
+import { ProductCombobox } from '@/components/promotions/ProductCombobox'
 import { useToast } from '@/hooks/use-toast'
 import { useCreateReturn } from '@/hooks/useReturns'
-import { fetchSaleById, Sale, SaleItem } from '@/services/saleService'
+import { fetchSaleById, Sale } from '@/services/saleService'
+import { fetchAllProducts } from '@/services/productService'
 import { formatMoney, formatDateTime } from '@/utils'
 
 interface ReturnItem {
@@ -32,17 +35,31 @@ interface ReturnItem {
   reason: string
 }
 
+interface ReplacementRow {
+  product_id: string
+  qty: number
+  unit_price: number
+}
+
 const NewReturn = () => {
   const { toast } = useToast()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const saleId = searchParams.get('sale_id')
+  const isExchange = searchParams.get('mode') === 'exchange'
 
   const [sale, setSale] = useState<Sale | null>(null)
   const [loading, setLoading] = useState(true)
   const [returnItems, setReturnItems] = useState<ReturnItem[]>([])
+  const [replacements, setReplacements] = useState<ReplacementRow[]>([])
   const [generalReason, setGeneralReason] = useState('')
   const [notes, setNotes] = useState('')
+
+  const { data: products = [] } = useQuery({
+    queryKey: ['products-list'],
+    queryFn: fetchAllProducts,
+    staleTime: 5 * 60 * 1000,
+  })
 
   const createReturnMutation = useCreateReturn()
 
@@ -127,6 +144,35 @@ const NewReturn = () => {
     }, 0)
   }
 
+  const productById = (id: string) => products.find((p) => p.id === id)
+
+  const addReplacement = () => {
+    setReplacements((rows) => [...rows, { product_id: '', qty: 1, unit_price: 0 }])
+  }
+
+  const removeReplacement = (index: number) => {
+    setReplacements((rows) => rows.filter((_, i) => i !== index))
+  }
+
+  const updateReplacement = (index: number, patch: Partial<ReplacementRow>) => {
+    setReplacements((rows) => {
+      const next = [...rows]
+      next[index] = { ...next[index], ...patch }
+      return next
+    })
+  }
+
+  const onReplacementProduct = (index: number, product_id: string) => {
+    const p = productById(product_id)
+    // Precio por defecto = precio de venta del producto (editable).
+    updateReplacement(index, { product_id, unit_price: Number(p?.price ?? 0) })
+  }
+
+  const replacementTotal = replacements.reduce(
+    (total, r) => total + r.qty * r.unit_price, 0
+  )
+  const priceDifference = replacementTotal - calculateTotalRefund()
+
   const selectAllProducts = () => {
     setReturnItems(items =>
       items.map(item => ({ ...item, qty_returned: item.original_qty }))
@@ -155,15 +201,42 @@ const NewReturn = () => {
     if (!generalReason.trim()) {
       toast({
         title: 'Error',
-        description: 'Debes especificar una razón para la devolución',
+        description: `Debes especificar una razón para ${isExchange ? 'el cambio' : 'la devolución'}`,
         variant: 'destructive'
       })
       return
     }
 
+    // Validación de reemplazos (solo cambios)
+    const validReplacements = replacements.filter((r) => r.product_id && r.qty > 0)
+    if (isExchange) {
+      if (validReplacements.length === 0) {
+        toast({
+          title: 'Error',
+          description: 'Un cambio requiere al menos un producto de reemplazo',
+          variant: 'destructive'
+        })
+        return
+      }
+      // Validar stock disponible por producto de reemplazo
+      for (const r of validReplacements) {
+        const p = productById(r.product_id)
+        const available = Number(p?.stock ?? 0)
+        if (r.qty > available) {
+          toast({
+            title: 'Stock insuficiente',
+            description: `${p?.name ?? 'Producto'}: disponible ${available}, solicitado ${r.qty}`,
+            variant: 'destructive'
+          })
+          return
+        }
+      }
+    }
+
     try {
       await createReturnMutation.mutateAsync({
         sale_id: saleId!,
+        type: isExchange ? 'EXCHANGE' : 'REFUND',
         reason: generalReason,
         notes: notes || undefined,
         items: itemsToReturn.map(item => ({
@@ -171,19 +244,26 @@ const NewReturn = () => {
           product_id: item.product_id,
           qty_returned: item.qty_returned,
           reason: item.reason || undefined
-        }))
+        })),
+        ...(isExchange ? {
+          replacements: validReplacements.map((r) => ({
+            product_id: r.product_id,
+            qty: r.qty,
+            unit_price: r.unit_price,
+          }))
+        } : {})
       })
 
       toast({
-        title: 'Devolución creada',
-        description: 'La devolución ha sido registrada exitosamente',
+        title: isExchange ? 'Cambio creado' : 'Devolución creada',
+        description: `${isExchange ? 'El cambio' : 'La devolución'} ha sido registrado exitosamente`,
         variant: 'default'
       })
 
-      navigate('/')
+      navigate('/devoluciones')
     } catch (error) {
       toast({
-        title: 'Error al crear devolución',
+        title: `Error al crear ${isExchange ? 'el cambio' : 'la devolución'}`,
         description: (error as Error).message,
         variant: 'destructive'
       })
@@ -215,7 +295,7 @@ const NewReturn = () => {
           Volver a Ventas
         </Button>
         <div>
-          <h2 className="text-2xl font-bold">Procesar Devolución</h2>
+          <h2 className="text-2xl font-bold">{isExchange ? 'Procesar Cambio' : 'Procesar Devolución'}</h2>
           <p className="text-muted-foreground">Venta: {sale.reference ?? sale.id}</p>
         </div>
       </div>
@@ -250,7 +330,7 @@ const NewReturn = () => {
       {/* Return Items */}
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle>Seleccionar Productos a Devolver</CardTitle>
+          <CardTitle>{isExchange ? 'Productos que Entrega el Cliente' : 'Seleccionar Productos a Devolver'}</CardTitle>
           <div className="flex gap-2">
             <Button
               variant="outline"
@@ -349,14 +429,94 @@ const NewReturn = () => {
         </CardContent>
       </Card>
 
-      {/* Return Details */}
+      {/* Replacement Items (solo cambio) */}
+      {isExchange && (
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle>Productos de Reemplazo (se lleva el cliente)</CardTitle>
+            <Button variant="outline" size="sm" onClick={addReplacement} className="text-xs">
+              <Plus className="w-4 h-4 mr-1" /> Agregar producto
+            </Button>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {replacements.map((row, index) => {
+              const p = productById(row.product_id)
+              const available = Number(p?.stock ?? 0)
+              const overStock = !!row.product_id && row.qty > available
+              return (
+                <div key={index} className="border rounded-lg p-4 space-y-3">
+                  <div className="flex items-start gap-3">
+                    <div className="flex-1">
+                      <ProductCombobox
+                        value={row.product_id}
+                        onChange={(id) => onReplacementProduct(index, id)}
+                        placeholder="Seleccionar producto de reemplazo..."
+                      />
+                      {row.product_id && (
+                        <div className={`text-xs mt-1 ${overStock ? 'text-destructive' : 'text-muted-foreground'}`}>
+                          Stock disponible: {available}
+                        </div>
+                      )}
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="text-destructive"
+                      onClick={() => removeReplacement(index)}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </div>
+
+                  <div className="flex items-end gap-4">
+                    <div>
+                      <Label className="text-xs text-muted-foreground">Cantidad</Label>
+                      <Input
+                        type="number"
+                        min="1"
+                        value={row.qty}
+                        onChange={(e) => updateReplacement(index, { qty: Math.max(1, parseInt(e.target.value) || 1) })}
+                        className="w-24 text-center"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-xs text-muted-foreground">Precio unitario</Label>
+                      <Input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={row.unit_price}
+                        onChange={(e) => updateReplacement(index, { unit_price: Math.max(0, parseFloat(e.target.value) || 0) })}
+                        className="w-32 text-right"
+                      />
+                    </div>
+                    <div className="flex-1 text-right font-medium">
+                      {formatMoney(row.qty * row.unit_price)}
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
+
+            {replacements.length === 0 && (
+              <div className="text-center py-8 text-muted-foreground bg-muted/50 rounded-lg">
+                <RefreshCw className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                <p className="font-medium">Sin productos de reemplazo</p>
+                <p className="text-sm mt-1">Agrega los productos que el cliente se lleva a cambio</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Details */}
       <Card>
         <CardHeader>
-          <CardTitle>Detalles de la Devolución</CardTitle>
+          <CardTitle>{isExchange ? 'Detalles del Cambio' : 'Detalles de la Devolución'}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div>
-            <Label>Razón General de la Devolución *</Label>
+            <Label>Razón General *</Label>
             <Textarea
               placeholder="Ej: Producto defectuoso, cliente insatisfecho, error en el pedido..."
               value={generalReason}
@@ -375,15 +535,42 @@ const NewReturn = () => {
             />
           </div>
 
-          <div className="bg-muted/50 p-4 rounded-lg">
-            <div className="flex justify-between items-center text-lg font-bold">
-              <span>Total a Reembolsar:</span>
-              <span className="text-2xl">{formatMoney(totalRefund)}</span>
-            </div>
-            {hasItemsToReturn && (
-              <div className="text-sm text-muted-foreground mt-2">
-                {returnItems.filter(i => i.qty_returned > 0).length} producto(s) seleccionado(s)
-              </div>
+          <div className="bg-muted/50 p-4 rounded-lg space-y-2">
+            {isExchange ? (
+              <>
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Valor devuelto:</span>
+                  <span>{formatMoney(totalRefund)}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Valor reemplazo:</span>
+                  <span>{formatMoney(replacementTotal)}</span>
+                </div>
+                <div className="flex justify-between items-center text-lg font-bold border-t pt-2">
+                  <span>
+                    {priceDifference > 0
+                      ? 'A cobrar al cliente:'
+                      : priceDifference < 0
+                        ? 'A devolver al cliente:'
+                        : 'Sin diferencia:'}
+                  </span>
+                  <span className={`text-2xl ${priceDifference > 0 ? 'text-red-600' : priceDifference < 0 ? 'text-green-600' : ''}`}>
+                    {formatMoney(Math.abs(priceDifference))}
+                  </span>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="flex justify-between items-center text-lg font-bold">
+                  <span>Total a Reembolsar:</span>
+                  <span className="text-2xl">{formatMoney(totalRefund)}</span>
+                </div>
+                {hasItemsToReturn && (
+                  <div className="text-sm text-muted-foreground">
+                    {returnItems.filter(i => i.qty_returned > 0).length} producto(s) seleccionado(s)
+                  </div>
+                )}
+              </>
             )}
           </div>
         </CardContent>
@@ -391,16 +578,18 @@ const NewReturn = () => {
 
       {/* Actions */}
       <div className="flex gap-4 justify-end">
-        <Button variant="outline" onClick={() => navigate('/sales')}>
+        <Button variant="outline" onClick={() => navigate('/devoluciones')}>
           Cancelar
         </Button>
         <Button
           onClick={handleSubmit}
           disabled={!hasItemsToReturn || !generalReason.trim() || createReturnMutation.isPending}
-          className="bg-orange-600 hover:bg-orange-700"
+          className={isExchange ? 'bg-blue-600 hover:bg-blue-700' : 'bg-orange-600 hover:bg-orange-700'}
         >
-          <RotateCcw className="w-4 h-4 mr-2" />
-          {createReturnMutation.isPending ? 'Procesando...' : 'Crear Devolución'}
+          {isExchange ? <RefreshCw className="w-4 h-4 mr-2" /> : <RotateCcw className="w-4 h-4 mr-2" />}
+          {createReturnMutation.isPending
+            ? 'Procesando...'
+            : isExchange ? 'Crear Cambio' : 'Crear Devolución'}
         </Button>
       </div>
     </div>
