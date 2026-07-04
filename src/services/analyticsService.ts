@@ -8,7 +8,7 @@
  * For licensing inquiries: GitHub @dpatzan2
  */
 
-import { getApiBaseUrl } from '@/services/api'
+import { apiFetch } from '@/services/api'
 
 export type AnalyticsResponse = {
   year: number;
@@ -53,13 +53,9 @@ export type AnalyticsResponse = {
 }
 
 export async function getAnalytics(year: number | 'all'): Promise<AnalyticsResponse> {
-  const res = await fetch(`${getApiBaseUrl()}/analytics/summary?year=${year}`)
-  if (!res.ok) throw new Error('No se pudo obtener el resumen de análisis')
-  return res.json()
+  return apiFetch<AnalyticsResponse>(`/analytics/summary?year=${year}`)
 }
 
 export async function getAnalyticsFirstSaleYear(): Promise<{ firstSaleYear: number }> {
-  const res = await fetch(`${getApiBaseUrl()}/analytics/first-sale-year`)
-  if (!res.ok) throw new Error('No se pudo obtener el año de la primera venta')
-  return res.json()
+  return apiFetch<{ firstSaleYear: number }>(`/analytics/first-sale-year`)
 }

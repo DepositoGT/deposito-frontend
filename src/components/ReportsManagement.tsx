@@ -336,7 +336,10 @@ const ReportsManagement = () => {
                           setGeneratingReportId(report.id);
                           try {
                             toast({ title: 'Generando...', description: report.name })
-                            const res = await fetch(`${getApiBaseUrl()}/products/report.pdf`)
+                            const pdfToken = getAuthToken()
+                            const res = await fetch(`${getApiBaseUrl()}/products/report.pdf`, {
+                              headers: pdfToken ? { Authorization: `Bearer ${pdfToken}` } : {},
+                            })
                             if (!res.ok) throw new Error('Error al generar el reporte de inventario')
                             const blob = await res.blob()
                             const url = window.URL.createObjectURL(blob)
