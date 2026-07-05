@@ -24,6 +24,9 @@ export interface User {
   phone?: string | null;
   address?: string | null;
   hire_date?: string | null;
+  /** Caja POS asignada (null = usa la predeterminada) */
+  cash_register_id?: string | null;
+  cash_register?: { id: string; name: string; code: string; active: boolean } | null;
   created_at?: string;
   updated_at?: string;
 }
@@ -63,6 +66,7 @@ export interface UpdateUserPayload {
   phone?: string | null;
   address?: string | null;
   hire_date?: string | null;
+  cash_register_id?: string | null;
 }
 
 export interface UsersQueryParams {

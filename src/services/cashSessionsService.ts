@@ -42,6 +42,52 @@ export interface CashRegisterDto {
   code: string
   is_default: boolean
   active: boolean
+  /** Solo en listados de gestión */
+  assigned_users?: Array<{ id: string; name: string }>
+  has_open_session?: boolean
+}
+
+/** Lista cajas; con includeInactive=true (gestores) trae también las desactivadas. */
+export async function listCashRegisters(includeInactive = false): Promise<CashRegisterDto[]> {
+  const q = includeInactive ? '?include_inactive=1' : ''
+  const res = await fetch(`${API_URL}/cash-sessions/registers${q}`, {
+    headers: authHeaders(),
+    signal: AbortSignal.timeout(12_000),
+  })
+  const data = await res.json().catch(() => ({}))
+  if (!res.ok) {
+    throw new Error((data as { message?: string }).message || `Error ${res.status}`)
+  }
+  return data as CashRegisterDto[]
+}
+
+export async function createCashRegister(body: { name: string; code?: string }): Promise<CashRegisterDto> {
+  const res = await fetch(`${API_URL}/cash-sessions/registers`, {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify(body),
+  })
+  const data = await res.json().catch(() => ({}))
+  if (!res.ok) {
+    throw new Error((data as { message?: string }).message || `Error ${res.status}`)
+  }
+  return data as CashRegisterDto
+}
+
+export async function updateCashRegister(
+  id: string,
+  body: { name?: string; active?: boolean; is_default?: boolean }
+): Promise<CashRegisterDto> {
+  const res = await fetch(`${API_URL}/cash-sessions/registers/${id}`, {
+    method: 'PATCH',
+    headers: authHeaders(),
+    body: JSON.stringify(body),
+  })
+  const data = await res.json().catch(() => ({}))
+  if (!res.ok) {
+    throw new Error((data as { message?: string }).message || `Error ${res.status}`)
+  }
+  return data as CashRegisterDto
 }
 
 export interface CashSessionUserDto {

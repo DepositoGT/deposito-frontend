@@ -61,6 +61,7 @@ import {
 import { Pencil, Trash2, Plus, RotateCcw, Loader2, FileUp, ImageIcon } from 'lucide-react'
 import { CatalogImportDialog } from './catalogs/CatalogImportDialog'
 import { PaymentMethodsTab } from './catalogs/PaymentMethodsTab'
+import { CashRegistersTab } from './catalogs/CashRegistersTab'
 import { Pagination } from './shared/Pagination'
 import { useAuthPermissions } from '../hooks/useAuthPermissions'
 import { usePersistedListUiState, useResetPageOnFilterChange } from '../hooks/usePersistedListUiState'
@@ -115,13 +116,13 @@ export function CatalogsManagement() {
       <div>
         <h1 className="text-xl sm:text-2xl md:text-3xl font-bold tracking-tight">Datos maestros</h1>
         <p className="text-xs sm:text-sm text-muted-foreground">
-          Listas compartidas: métodos de cobro (ventas), términos con proveedores y categorías de producto
+          Listas compartidas: métodos de cobro (ventas), términos con proveedores, categorías de producto y cajas del POS
         </p>
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <div className="overflow-x-auto -mx-3 px-3 sm:mx-0 sm:px-0">
-          <TabsList className="inline-flex w-auto min-w-full sm:grid sm:grid-cols-3 h-auto">
+          <TabsList className="inline-flex w-auto min-w-full sm:grid sm:grid-cols-4 h-auto">
             <TabsTrigger value="payment-methods" className="text-xs sm:text-sm whitespace-nowrap">
               Métodos de pago
             </TabsTrigger>
@@ -130,6 +131,9 @@ export function CatalogsManagement() {
             </TabsTrigger>
             <TabsTrigger value="categories" className="text-xs sm:text-sm whitespace-nowrap">
               Categorías
+            </TabsTrigger>
+            <TabsTrigger value="cash-registers" className="text-xs sm:text-sm whitespace-nowrap">
+              Cajas
             </TabsTrigger>
           </TabsList>
         </div>
@@ -162,6 +166,10 @@ export function CatalogsManagement() {
               setIsImportDialogOpen(true)
             }}
           />
+        </TabsContent>
+
+        <TabsContent value="cash-registers" className="space-y-4 mt-4">
+          <CashRegistersTab />
         </TabsContent>
       </Tabs>
 
