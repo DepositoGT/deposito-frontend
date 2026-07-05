@@ -660,9 +660,9 @@ export const RegisterIncomingMerchandise = () => {
                         {item.product_id && (
                           <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div>
-                              <Label>Nº de lote {item.tracks_expiry ? '' : '(opcional)'}</Label>
+                              <Label>Nº de lote (opcional)</Label>
                               <Input
-                                placeholder="Ej. L-2405A"
+                                placeholder="Se genera automático si se deja vacío"
                                 maxLength={60}
                                 className="mt-1"
                                 value={item.lot_code}

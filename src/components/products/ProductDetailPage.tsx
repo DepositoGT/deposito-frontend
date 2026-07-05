@@ -39,6 +39,7 @@ import {
 } from '@/components/ui/alert-dialog'
 import { useDeleteProduct } from '@/hooks/useDeleteProduct'
 import { ProductKitSection } from './ProductKitSection'
+import { ProductLotsSection } from './ProductLotsSection'
 
 type CategoryItem = { id: number | string; name: string }
 
@@ -667,6 +668,10 @@ export default function ProductDetailPage() {
           canEdit={canEdit}
           onUpdated={() => void reloadProduct()}
         />
+      )}
+
+      {product && id && product.kind !== 'KIT' && (
+        <ProductLotsSection productId={id} tracksExpiry={product.tracksExpiry === true} />
       )}
     </div>
   )
