@@ -111,6 +111,7 @@ export const adaptApiProduct = (p: ApiProduct): Product => {
     deleted: p.deleted === true || p.deleted === 1 || (p as { deleted?: boolean }).deleted === true,
     deleted_at: (p as { deleted_at?: string | null }).deleted_at || null,
     availableForSale: (p as { available_for_sale?: boolean }).available_for_sale !== false,
+    tracksExpiry: (p as { tracks_expiry?: boolean }).tracks_expiry === true,
     kind: (p.kind === "KIT" ? "KIT" : "STANDARD") as import("@/types/product").ProductKind,
     kitComponents: Array.isArray(p.kit_components) ? p.kit_components : undefined,
   };

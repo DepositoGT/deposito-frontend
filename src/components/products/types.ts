@@ -31,6 +31,8 @@ export interface ProductFormData {
     imageUrl: string
     /** Si es false, no se muestra en el punto de venta. */
     availableForSale: boolean
+    /** Si es true, cada ingreso de mercancía exige fecha de caducidad (lotes). */
+    tracksExpiry: boolean
     /** STANDARD = producto normal; KIT = combo armado con componentes. */
     productKind: 'STANDARD' | 'KIT'
     kitComponents: import('@/types/product').ProductBomComponentDraft[]
@@ -66,6 +68,7 @@ export const EMPTY_PRODUCT_FORM: ProductFormData = {
     description: '',
     imageUrl: '',
     availableForSale: true,
+    tracksExpiry: false,
     productKind: 'STANDARD',
     kitComponents: [],
 }

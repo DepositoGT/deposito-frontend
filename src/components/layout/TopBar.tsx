@@ -27,7 +27,7 @@ import { AppLauncher } from './AppLauncher'
 import { CompanyLogo } from '@/components/branding/CompanyLogo'
 import { appModules, getUserRole } from '@/config/appModules'
 import { useAuthPermissions } from '@/hooks/useAuthPermissions'
-import { useCriticalProducts } from '@/hooks/useCriticalProducts'
+import { useActiveAlertsCount } from '@/hooks/useActiveAlertsCount'
 import { useSystemSettings } from '@/hooks/useSystemSettings'
 import { useAuth } from '@/context/useAuth'
 import type { User as UserType } from '@/services/userService'
@@ -71,8 +71,8 @@ export const TopBar = () => {
         setImageError(false)
     }, [currentUser?.id, photoUrl])
 
-    // Get critical products for notification badge
-    const { data: criticalProducts = [] } = useCriticalProducts()
+    // Cantidad de alertas activas para la burbuja de notificación de la campana
+    const { data: activeAlertsCount = 0 } = useActiveAlertsCount()
 
     // Find current module based on path
     const currentModule = appModules.find(
@@ -138,15 +138,15 @@ export const TopBar = () => {
                             className='relative h-10 w-10 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/80'
                             onClick={() => navigate('/alertas')}
                             aria-label={
-                                criticalProducts.length > 0
-                                    ? `Alertas: ${criticalProducts.length} productos críticos`
+                                activeAlertsCount > 0
+                                    ? `Alertas: ${activeAlertsCount} activas`
                                     : 'Ver alertas'
                             }
                         >
                             <Bell className='h-5 w-5' strokeWidth={2} />
-                            {criticalProducts.length > 0 && (
-                                <span className='absolute -top-0.5 -right-0.5 flex h-[1.125rem] min-w-[1.125rem] items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold leading-none text-primary-foreground shadow-sm ring-2 ring-card'>
-                                    {criticalProducts.length > 9 ? '9+' : criticalProducts.length}
+                            {activeAlertsCount > 0 && (
+                                <span className='absolute -top-0.5 -right-0.5 flex h-[1.125rem] min-w-[1.125rem] items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-semibold leading-none text-destructive-foreground shadow-sm ring-2 ring-card'>
+                                    {activeAlertsCount > 9 ? '9+' : activeAlertsCount}
                                 </span>
                             )}
                         </Button>
