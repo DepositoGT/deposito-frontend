@@ -21,6 +21,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Loader2, Landmark, Star, User as UserIcon, AlertCircle } from 'lucide-react'
 import { useAuth } from '@/context/useAuth'
+import { useAuthPermissions } from '@/hooks/useAuthPermissions'
 import { useSystemSettings } from '@/hooks/useSystemSettings'
 import { formatMoney } from '@/utils/formatters'
 import { listCashRegisters, type CashRegisterDto } from '@/services/cashSessionsService'
@@ -32,7 +33,11 @@ export interface CashRegisterPickerProps {
 
 export function CashRegisterPicker({ onSelect, onBack }: CashRegisterPickerProps) {
   const { user } = useAuth()
+  const { hasPermission } = useAuthPermissions()
   const { locale, currencyCode } = useSystemSettings()
+  // Solo admin/supervisores (pueden cerrar turnos ajenos) ven todas las cajas;
+  // un vendedor normal solo ve la suya asignada, o la predeterminada si no tiene.
+  const canSeeAllRegisters = hasPermission('cashclosure.create', 'cashclosure.create_day')
   const [registers, setRegisters] = useState<CashRegisterDto[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -63,6 +68,13 @@ export function CashRegisterPicker({ onSelect, onBack }: CashRegisterPickerProps
     })
   }, [registers, user?.cash_register_id])
 
+  const visible = useMemo(() => {
+    if (canSeeAllRegisters) return sorted
+    const mine = sorted.filter((r) => r.id === user?.cash_register_id)
+    if (mine.length > 0) return mine
+    return sorted.filter((r) => r.is_default)
+  }, [sorted, canSeeAllRegisters, user?.cash_register_id])
+
   return (
     <div className="px-4 sm:px-8 lg:px-14 py-8 w-full max-w-4xl mx-auto space-y-6">
       <div>
@@ -89,15 +101,19 @@ export function CashRegisterPicker({ onSelect, onBack }: CashRegisterPickerProps
             <Button variant="outline" onClick={onBack}>Volver a ventas</Button>
           </div>
         </div>
-      ) : sorted.length === 0 ? (
+      ) : visible.length === 0 ? (
         <div className="space-y-4 py-8 text-center text-muted-foreground">
-          <p>No hay cajas activas configuradas.</p>
+          <p>
+            {sorted.length === 0
+              ? 'No hay cajas activas configuradas.'
+              : 'No tienes una caja asignada y no hay una caja predeterminada activa. Contacta a un administrador.'}
+          </p>
           <Button variant="outline" onClick={onBack}>Volver a ventas</Button>
         </div>
       ) : (
         <>
           <div className="grid gap-4 sm:grid-cols-2">
-            {sorted.map((reg) => {
+            {visible.map((reg) => {
               const isMine = reg.id === user?.cash_register_id
               const isOpen = Boolean(reg.open_session)
               return (
