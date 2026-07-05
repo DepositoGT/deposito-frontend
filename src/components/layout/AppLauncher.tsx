@@ -20,6 +20,7 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { getVisibleModules, AppModule } from '@/config/appModules'
+import { useActiveAlertsCount } from '@/hooks/useActiveAlertsCount'
 
 interface AppLauncherProps {
     open: boolean
@@ -29,10 +30,12 @@ interface AppLauncherProps {
 const AppCard = ({
     module,
     isActive,
+    badgeCount,
     onClick
 }: {
     module: AppModule
     isActive: boolean
+    badgeCount?: number
     onClick: () => void
 }) => {
     const Icon = module.icon
@@ -47,13 +50,20 @@ const AppCard = ({
                 isActive && 'border-primary/40 ring-2 ring-primary/30 shadow-md'
             )}
         >
-            <div
-                className={cn(
-                    'flex h-12 w-12 items-center justify-center rounded-xl',
-                    module.color
+            <div className='relative'>
+                <div
+                    className={cn(
+                        'flex h-12 w-12 items-center justify-center rounded-xl',
+                        module.color
+                    )}
+                >
+                    <Icon className={cn('h-7 w-7', module.iconColor)} />
+                </div>
+                {!!badgeCount && badgeCount > 0 && (
+                    <span className='absolute -top-1 -right-1 flex h-[1.125rem] min-w-[1.125rem] items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-semibold leading-none text-destructive-foreground shadow-sm ring-2 ring-card'>
+                        {badgeCount > 9 ? '9+' : badgeCount}
+                    </span>
                 )}
-            >
-                <Icon className={cn('h-7 w-7', module.iconColor)} />
             </div>
             <span className='line-clamp-2 text-center text-xs font-medium leading-tight text-foreground'>
                 {module.label}
@@ -66,6 +76,7 @@ export const AppLauncher = ({ open, onOpenChange }: AppLauncherProps) => {
     const [search, setSearch] = useState('')
     const navigate = useNavigate()
     const location = useLocation()
+    const { data: activeAlertsCount = 0 } = useActiveAlertsCount()
 
     const modules = useMemo(() => getVisibleModules(), [])
 
@@ -124,6 +135,7 @@ export const AppLauncher = ({ open, onOpenChange }: AppLauncherProps) => {
                                     key={module.id}
                                     module={module}
                                     isActive={location.pathname === module.path}
+                                    badgeCount={module.id === 'alerts' ? activeAlertsCount : undefined}
                                     onClick={() => handleNavigate(module)}
                                 />
                             ))}
