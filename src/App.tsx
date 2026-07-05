@@ -26,6 +26,7 @@ import SupplierImportPage from "./pages/SupplierImportPage";
 import CatalogImportPage from "./pages/CatalogImportPage";
 import UserImportPage from "./pages/UserImportPage";
 import { RegisterIncomingMerchandise } from "./pages/RegisterIncomingMerchandise";
+import LotsExpiryPage from "./pages/LotsExpiryPage";
 import AuthProvider from "@/context/AuthProvider";
 
 // Layout
@@ -241,6 +242,14 @@ const App = () => (
                       any={["inventory_count.view", "inventory_count.create", "inventory_count.count"]}
                     >
                       <InventoryCountListPage />
+                    </PermissionRoute>
+                  }
+                />
+                <Route
+                  path="/inventario/lotes"
+                  element={
+                    <PermissionRoute any={["products.view"]}>
+                      <LotsExpiryPage />
                     </PermissionRoute>
                   }
                 />

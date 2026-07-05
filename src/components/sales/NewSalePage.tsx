@@ -84,6 +84,7 @@ import {
   SavedCustomerMany2One,
 } from './components'
 import { OpenCashRegisterPrompt } from './OpenCashRegisterPrompt'
+import { CashRegisterPicker } from './CashRegisterPicker'
 import { closeCashSession, fetchCashSessionCurrent } from '@/services/cashSessionsService'
 import { CASH_SESSION_CURRENT_QUERY_KEY } from '@/components/cash-closure/hooks/useMineClosureGate'
 import type { CashRegisterSessionDto } from '@/services/cashSessionsService'
@@ -422,6 +423,8 @@ export default function NewSalePage() {
 
   const canCreate = hasPermission('sales.create')
 
+  // Caja elegida en el selector previo; null = aún no se ha elegido (se muestra el picker)
+  const [selectedRegisterId, setSelectedRegisterId] = useState<string | null>(null)
   const [cashCheckDone, setCashCheckDone] = useState(false)
   const [cashCheckError, setCashCheckError] = useState<string | null>(null)
   const [cashSessionOpen, setCashSessionOpen] = useState(false)
@@ -430,10 +433,10 @@ export default function NewSalePage() {
   const [showCloseCashDialog, setShowCloseCashDialog] = useState(false)
   const [isClosingCashSession, setIsClosingCashSession] = useState(false)
 
-  const runCashCheck = useCallback(async () => {
+  const runCashCheck = useCallback(async (registerId: string) => {
     setCashCheckError(null)
     setCashCheckDone(false)
-    const r = await fetchCashSessionCurrent()
+    const r = await fetchCashSessionCurrent(registerId)
     setCashCheckDone(true)
     if (!r.ok) {
       setCashCheckError(r.message)
@@ -450,11 +453,11 @@ export default function NewSalePage() {
   }, [])
 
   useEffect(() => {
-    void runCashCheck()
-  }, [runCashCheck])
+    if (selectedRegisterId) void runCashCheck(selectedRegisterId)
+  }, [selectedRegisterId, runCashCheck])
 
   const handleCashSessionOpened = useCallback(async () => {
-    const r = await fetchCashSessionCurrent()
+    const r = await fetchCashSessionCurrent(selectedRegisterId ?? undefined)
     setCashCheckDone(true)
     setCashCheckError(null)
     if (!r.ok) {
@@ -967,14 +970,23 @@ export default function NewSalePage() {
     }
   }
 
+  if (!selectedRegisterId) {
+    return (
+      <CashRegisterPicker
+        onSelect={(id) => setSelectedRegisterId(id)}
+        onBack={() => navigate('/ventas')}
+      />
+    )
+  }
+
   if (!cashCheckDone) {
     return (
       <div className="px-4 sm:px-8 lg:px-14 py-16 w-full flex flex-col items-center justify-center gap-4 min-h-[50vh]">
         <Loader2 className="h-10 w-10 animate-spin text-muted-foreground" aria-hidden />
         <p className="text-sm text-muted-foreground">Comprobando turno de caja…</p>
-        <Button variant="outline" size="sm" onClick={() => navigate('/ventas')}>
+        <Button variant="outline" size="sm" onClick={() => setSelectedRegisterId(null)}>
           <ArrowLeft className="w-4 h-4 mr-2" />
-          Volver a ventas
+          Cambiar de caja
         </Button>
       </div>
     )
@@ -984,7 +996,7 @@ export default function NewSalePage() {
     return (
       <div className="px-4 sm:px-8 lg:px-14 py-8 w-full max-w-lg mx-auto space-y-4">
         <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={() => navigate('/ventas')}>
+          <Button variant="ghost" size="icon" onClick={() => setSelectedRegisterId(null)}>
             <ArrowLeft className="w-5 h-5" />
           </Button>
           <h1 className="text-xl font-bold">Nueva venta</h1>
@@ -994,11 +1006,11 @@ export default function NewSalePage() {
           <AlertDescription className="mt-2">{cashCheckError}</AlertDescription>
         </Alert>
         <div className="flex flex-wrap gap-2">
-          <Button type="button" onClick={() => void runCashCheck()}>
+          <Button type="button" onClick={() => void runCashCheck(selectedRegisterId)}>
             Reintentar
           </Button>
-          <Button type="button" variant="outline" onClick={() => navigate('/ventas')}>
-            Volver a ventas
+          <Button type="button" variant="outline" onClick={() => setSelectedRegisterId(null)}>
+            Cambiar de caja
           </Button>
         </div>
       </div>
@@ -1010,7 +1022,7 @@ export default function NewSalePage() {
       <>
         <div className="px-4 sm:px-8 lg:px-14 py-4 w-full">
           <div className="flex items-center gap-3 mb-2">
-            <Button variant="ghost" size="icon" onClick={() => navigate('/ventas')}>
+            <Button variant="ghost" size="icon" onClick={() => setSelectedRegisterId(null)}>
               <ArrowLeft className="w-5 h-5" />
             </Button>
             <h1 className="text-xl font-bold text-muted-foreground">Nueva venta</h1>
@@ -1020,7 +1032,7 @@ export default function NewSalePage() {
           registerName={cashRegisterMeta?.name}
           registerId={cashRegisterMeta?.id}
           onOpened={handleCashSessionOpened}
-          onBack={() => navigate('/ventas')}
+          onBack={() => setSelectedRegisterId(null)}
         />
       </>
     )
