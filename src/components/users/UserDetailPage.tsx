@@ -22,7 +22,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
-import { ArrowLeft, Edit, Mail, Phone, MapPin, Calendar, Briefcase, Loader2, Trash2 } from 'lucide-react'
+import { ArrowLeft, Edit, Mail, Phone, MapPin, Calendar, Briefcase, Loader2, Trash2, Monitor } from 'lucide-react'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { useToast } from '@/hooks/use-toast'
@@ -38,6 +38,7 @@ import {
   type UpdateUserPayload,
 } from '@/services/userService'
 import { useDeleteUser } from '@/hooks/useDeleteUser'
+import { listCashRegisters, type CashRegisterDto } from '@/services/cashSessionsService'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -80,6 +81,9 @@ export default function UserDetailPage() {
   const [editHireDate, setEditHireDate] = useState('')
   const [editPassword, setEditPassword] = useState('')
   const [editRoleId, setEditRoleId] = useState('')
+  // '' = sin caja asignada (usa la predeterminada)
+  const [editCashRegisterId, setEditCashRegisterId] = useState('')
+  const [cashRegisters, setCashRegisters] = useState<CashRegisterDto[]>([])
 
   useEffect(() => {
     const load = async () => {
@@ -117,6 +121,13 @@ export default function UserDetailPage() {
   }, [])
 
   useEffect(() => {
+    // Cajas activas para el selector; si el endpoint falla (sin permiso), se oculta el campo.
+    listCashRegisters()
+      .then(setCashRegisters)
+      .catch(() => setCashRegisters([]))
+  }, [])
+
+  useEffect(() => {
     if (!user) return
     setEditName(user.name)
     setEditEmail(user.email)
@@ -126,6 +137,7 @@ export default function UserDetailPage() {
     setEditHireDate(user.hire_date ? format(new Date(user.hire_date), 'yyyy-MM-dd') : '')
     setEditPassword('')
     setEditRoleId(String(user.role_id))
+    setEditCashRegisterId(user.cash_register_id ?? '')
   }, [user])
 
   const resetEditState = () => {
@@ -138,6 +150,7 @@ export default function UserDetailPage() {
     setEditHireDate(user.hire_date ? format(new Date(user.hire_date), 'yyyy-MM-dd') : '')
     setEditPassword('')
     setEditRoleId(String(user.role_id))
+    setEditCashRegisterId(user.cash_register_id ?? '')
   }
 
   const handleDeleteUser = async () => {
@@ -198,6 +211,7 @@ export default function UserDetailPage() {
         phone: editPhone.trim() || null,
         address: editAddress.trim() || null,
         hire_date: editHireDate || null,
+        cash_register_id: editCashRegisterId || null,
         ...(editPassword.trim() ? { password: editPassword } : {}),
       }
       const updated = await updateUser(user.id, payload)
@@ -467,6 +481,36 @@ export default function UserDetailPage() {
                     </p>
                   )}
                 </div>
+
+                {(cashRegisters.length > 0 || user.cash_register) && (
+                  <div className="mt-4">
+                    <Label className="text-muted-foreground flex items-center gap-2">
+                      <Monitor className="w-4 h-4" /> Caja asignada (POS)
+                    </Label>
+                    {isEditing && canEdit && cashRegisters.length > 0 ? (
+                      <Select
+                        value={editCashRegisterId || 'none'}
+                        onValueChange={(v) => setEditCashRegisterId(v === 'none' ? '' : v)}
+                      >
+                        <SelectTrigger className="mt-1">
+                          <SelectValue placeholder="Seleccionar caja" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">Sin asignar (usa la predeterminada)</SelectItem>
+                          {cashRegisters.map((reg) => (
+                            <SelectItem key={reg.id} value={reg.id}>
+                              {reg.name}{reg.is_default ? ' (predeterminada)' : ''}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <p className="text-foreground mt-1">
+                        {user.cash_register?.name ?? 'Sin asignar (usa la predeterminada)'}
+                      </p>
+                    )}
+                  </div>
+                )}
 
                 {isEditing && canEdit && (
                   <div className="mt-4">

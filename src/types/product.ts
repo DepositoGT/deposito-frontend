@@ -57,6 +57,8 @@ export interface Product extends BaseEntity {
   deleted_at?: string | null; // Fecha de eliminación
   /** Si es false, no aparece en ventas (POS) y la API rechaza incluirlo en una venta. */
   availableForSale?: boolean;
+  /** Si es true, cada ingreso de mercancía exige fecha de caducidad (lotes). */
+  tracksExpiry?: boolean;
   kind?: ProductKind;
   kitComponents?: ProductBomLineApi[];
 }
@@ -133,6 +135,7 @@ export interface ApiProduct {
   status?: string | { id: string | number; name: string };
   status_id?: number | string;
   available_for_sale?: boolean;
+  tracks_expiry?: boolean;
   kind?: ProductKind;
   kit_components?: ProductBomLineApi[];
   [key: string]: unknown;
@@ -157,6 +160,7 @@ export interface CreateProductPayload {
   description?: string;
   status_id?: number;
   available_for_sale?: boolean;
+  tracks_expiry?: boolean;
   kind?: ProductKind;
   bom_components?: ProductBomComponentDraft[];
 }

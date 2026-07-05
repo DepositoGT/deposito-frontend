@@ -171,6 +171,7 @@ export const useProductForm = (): UseProductFormReturn => {
             description: product.description || '',
             imageUrl: product.imageUrl || '',
             availableForSale: product.availableForSale !== false,
+            tracksExpiry: product.tracksExpiry === true,
             productKind: product.kind === 'KIT' ? 'KIT' : 'STANDARD',
             kitComponents: (product.kitComponents ?? []).map((line) => ({
                 component_product_id: line.component_product_id,

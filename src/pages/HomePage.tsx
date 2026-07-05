@@ -22,12 +22,15 @@ import { cn } from '@/lib/utils'
 import { getVisibleModules, AppModule, getUserRole } from '@/config/appModules'
 import type { AuthUser } from '@/context/AuthContext'
 import { useSystemSettings } from '@/hooks/useSystemSettings'
+import { useActiveAlertsCount } from '@/hooks/useActiveAlertsCount'
 
 const ModuleTile = ({
     module,
+    badgeCount,
     onClick,
 }: {
     module: AppModule
+    badgeCount?: number
     onClick: () => void
 }) => {
     const Icon = module.icon
@@ -44,18 +47,25 @@ const ModuleTile = ({
                 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background'
             )}
         >
-            <div
-                className={cn(
-                    'mb-2 flex h-11 w-11 shrink-0 items-center justify-center rounded-full sm:mb-3 sm:h-14 sm:w-14 md:h-16 md:w-16',
-                    module.color
-                )}
-            >
-                <Icon
+            <div className="relative mb-2 sm:mb-3">
+                <div
                     className={cn(
-                        'h-7 w-7 sm:h-8 sm:w-8 md:h-10 md:w-10 transition-transform duration-300 group-hover:scale-105',
-                        module.iconColor
+                        'flex h-11 w-11 shrink-0 items-center justify-center rounded-full sm:h-14 sm:w-14 md:h-16 md:w-16',
+                        module.color
                     )}
-                />
+                >
+                    <Icon
+                        className={cn(
+                            'h-7 w-7 sm:h-8 sm:w-8 md:h-10 md:w-10 transition-transform duration-300 group-hover:scale-105',
+                            module.iconColor
+                        )}
+                    />
+                </div>
+                {!!badgeCount && badgeCount > 0 && (
+                    <span className="absolute -top-1 -right-1 flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-destructive px-1 text-[11px] font-semibold leading-none text-destructive-foreground shadow-sm ring-2 ring-card">
+                        {badgeCount > 9 ? '9+' : badgeCount}
+                    </span>
+                )}
             </div>
             <span className="line-clamp-2 text-xs font-semibold leading-tight tracking-tight text-foreground sm:text-sm md:text-base">
                 {module.label}
@@ -70,6 +80,7 @@ export const HomePage = () => {
     const { user: rawUser, isSeller, isAdmin } = getUserRole()
     const user = rawUser as AuthUser | null
     const { companyName } = useSystemSettings()
+    const { data: activeAlertsCount = 0 } = useActiveAlertsCount()
 
     const modules = useMemo(() => getVisibleModules(), [])
 
@@ -167,6 +178,7 @@ export const HomePage = () => {
                                     <ModuleTile
                                         key={module.id}
                                         module={module}
+                                        badgeCount={module.id === 'alerts' ? activeAlertsCount : undefined}
                                         onClick={() => handleNavigate(module)}
                                     />
                                 ))}

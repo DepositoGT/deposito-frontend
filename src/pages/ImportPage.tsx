@@ -67,6 +67,8 @@ const SYSTEM_FIELDS = [
     { id: 'size', label: 'Tamaño', required: false, type: 'string' },
     { id: 'barcode', label: 'Código de Barras', required: false, type: 'string' },
     { id: 'description', label: 'Descripción', required: false, type: 'string' },
+    { id: 'available_for_sale', label: 'Disponible para la venta', required: false, type: 'boolean' },
+    { id: 'tracks_expiry', label: 'Controla lotes y caducidad', required: false, type: 'boolean' },
 ]
 
 interface ColumnMapping {
@@ -190,6 +192,8 @@ export default function ImportPage() {
             else if (lowerCol.includes('tama') || lowerCol === 'size') autoField = 'size'
             else if (lowerCol.includes('codigo') || lowerCol.includes('barcode') || lowerCol.includes('barras')) autoField = 'barcode'
             else if (lowerCol.includes('descr')) autoField = 'description'
+            else if (lowerCol.includes('disponible')) autoField = 'available_for_sale'
+            else if (lowerCol.includes('caduc') || lowerCol.includes('lote')) autoField = 'tracks_expiry'
 
             return {
                 excelColumn: col,

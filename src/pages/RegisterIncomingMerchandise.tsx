@@ -48,6 +48,10 @@ interface IncomingItem {
   product_name: string
   quantity: string
   unit_cost: string
+  /** El producto exige fecha de caducidad (tracks_expiry) */
+  tracks_expiry: boolean
+  lot_code: string
+  expiry_date: string
 }
 
 export const RegisterIncomingMerchandise = () => {
@@ -185,6 +189,9 @@ export const RegisterIncomingMerchandise = () => {
         product_name: availableProduct.name,
         quantity: '',
         unit_cost: availableProduct.cost?.toString() || '0',
+        tracks_expiry: availableProduct.tracksExpiry === true,
+        lot_code: '',
+        expiry_date: '',
       },
     ])
   }
@@ -203,7 +210,16 @@ export const RegisterIncomingMerchandise = () => {
       product_id: productId,
       product_name: product.name,
       unit_cost: product.cost?.toString() || '0',
+      tracks_expiry: product.tracksExpiry === true,
+      lot_code: '',
+      expiry_date: '',
     }
+    setItems(newItems)
+  }
+
+  const handleLotFieldChange = (index: number, field: 'lot_code' | 'expiry_date', value: string) => {
+    const newItems = [...items]
+    newItems[index][field] = value
     setItems(newItems)
   }
 
@@ -285,6 +301,14 @@ export const RegisterIncomingMerchandise = () => {
         })
         return
       }
+      if (item.tracks_expiry && !item.expiry_date) {
+        toast({
+          title: 'Fecha de caducidad requerida',
+          description: `"${item.product_name}" controla caducidad: ingrese la fecha del lote recibido`,
+          variant: 'destructive',
+        })
+        return
+      }
     }
 
     setIsSubmitting(true)
@@ -300,6 +324,8 @@ export const RegisterIncomingMerchandise = () => {
           product_id: item.product_id,
           quantity: Number(item.quantity),
           unit_cost: Number(item.unit_cost),
+          lot_code: item.lot_code.trim() || undefined,
+          expiry_date: item.expiry_date || undefined,
         })),
         notes: notes.trim() || undefined,
         payment_term_id: Number(paymentTermId),
@@ -631,6 +657,36 @@ export const RegisterIncomingMerchandise = () => {
                             </Button>
                           </div>
                         </div>
+                        {item.product_id && (
+                          <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div>
+                              <Label>Nº de lote (opcional)</Label>
+                              <Input
+                                placeholder="Se genera automático si se deja vacío"
+                                maxLength={60}
+                                className="mt-1"
+                                value={item.lot_code}
+                                onChange={(e) => handleLotFieldChange(index, 'lot_code', e.target.value)}
+                              />
+                            </div>
+                            <div>
+                              <Label>
+                                Fecha de caducidad {item.tracks_expiry ? '*' : '(opcional)'}
+                              </Label>
+                              <Input
+                                type="date"
+                                className="mt-1"
+                                value={item.expiry_date}
+                                onChange={(e) => handleLotFieldChange(index, 'expiry_date', e.target.value)}
+                              />
+                              {item.tracks_expiry && !item.expiry_date && (
+                                <p className="text-xs text-destructive mt-1">
+                                  Este producto controla caducidad: la fecha es obligatoria.
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        )}
                         {item.product_id && (
                           <div className="mt-2 flex items-center gap-2">
                             <Badge variant="outline">

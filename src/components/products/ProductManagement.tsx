@@ -23,7 +23,7 @@ import { Label } from '@/components/ui/label'
 import {
     Plus, Search, Filter, ScanLine, Download,
     QrCode, Upload, LayoutGrid, List, Package,
-    ClipboardList, ChevronDown, RotateCcw,
+    ClipboardList, ChevronDown, RotateCcw, CalendarClock,
 } from 'lucide-react'
 import {
     DropdownMenu,
@@ -298,6 +298,10 @@ const ProductManagement = () => {
                                 </>
                             )}
                             {(hasFileActions || hasStockActions || canDelete) && <DropdownMenuSeparator />}
+                            <DropdownMenuItem onClick={() => navigate('/inventario/lotes')}>
+                                <CalendarClock className="mr-2 h-4 w-4" />
+                                Lotes y caducidades
+                            </DropdownMenuItem>
                             <DropdownMenuItem onClick={() => setIsScannerOpen(true)}>
                                 <ScanLine className="mr-2 h-4 w-4" />
                                 Escanear código

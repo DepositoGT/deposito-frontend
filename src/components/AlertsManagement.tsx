@@ -89,7 +89,11 @@ const AlertsManagement = () => {
           }
           return {
             id: String(a.id ?? ''),
-            type: (a.type?.name === 'Sin Stock') ? 'stock_out' : 'stock_low',
+            type: a.type?.name === 'Sin Stock'
+              ? 'stock_out'
+              : a.type?.name === 'Vencimiento'
+                ? 'expiry_soon'
+                : 'stock_low',
             priority: mapPriority(a.priority?.name),
             title: a.title || 'Alerta',
             message: a.message || '',
@@ -361,10 +365,12 @@ const AlertsManagement = () => {
                         <span className="text-muted-foreground">Categoría:</span>
                         <p className="font-medium text-foreground">{alert.category}</p>
                       </div>
-                      <div>
-                        <span className="text-muted-foreground">Stock Actual:</span>
-                        <p className="font-medium text-foreground">{alert.currentStock}</p>
-                      </div>
+                      {alert.type !== "expiry_soon" && (
+                        <div>
+                          <span className="text-muted-foreground">Stock Actual:</span>
+                          <p className="font-medium text-foreground">{alert.currentStock}</p>
+                        </div>
+                      )}
                       <div>
                         <span className="text-muted-foreground">Asignado a:</span>
                         <div className="font-medium text-foreground">
