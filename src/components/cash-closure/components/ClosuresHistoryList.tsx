@@ -16,7 +16,7 @@ import { Badge } from '@/components/ui/badge'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { useSystemSettings } from '@/hooks/useSystemSettings'
 import type { CashClosure } from '../types'
-import { formatCurrency, formatDateTime, toNumber } from '../types'
+import { formatCurrency, formatDateTime, toNumber, closureRegisterName } from '../types'
 
 interface ClosuresHistoryListProps {
     closures: CashClosure[]
@@ -81,7 +81,7 @@ export const ClosuresHistoryList = ({
                             </div>
                             <div className="text-sm text-muted-foreground">
                                 <p>{formatDateTime(closure.start_date)} - {formatDateTime(closure.end_date)}</p>
-                                <p>Cajero: {closure.cashier_name}</p>
+                                <p>Cajero: {closure.cashier_name} · Caja: {closureRegisterName(closure)}</p>
                             </div>
                         </div>
                         <div className="flex items-center gap-4 shrink-0">
