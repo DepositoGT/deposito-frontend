@@ -5,29 +5,25 @@
  */
 
 import { useState, useEffect, useRef } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { FileText, Plus, Calculator } from 'lucide-react'
-import { useToast } from '@/hooks/use-toast'
 import { useAuth } from '@/context/useAuth'
 import { useAuthPermissions } from '@/hooks/useAuthPermissions'
-import { resolvePdfLogoDataUrl } from '@/utils/pdfBranding'
 import { useSystemSettings } from '@/hooks/useSystemSettings'
 import { useCashClosureForm, useCashClosureAPI, useMineClosureGate, canRegisterMineClosure, mineClosureBlockedHint } from './hooks'
-import { ClosuresHistoryList, ClosureDetailDialog, RejectClosureDialog } from './components'
-import { generateClosurePDF } from './generatePDF'
+import { ClosuresHistoryList } from './components'
 import { CASH_CLOSURE_CREATE_PATH } from './CashClosureCreatePage'
-import type { CashClosure } from './types'
 import { readListUiPersisted } from '@/hooks/usePersistedListUiState'
 
 const CashClosureManagement = () => {
-  const { toast } = useToast()
+  const navigate = useNavigate()
   const { user } = useAuth()
   const { hasPermission } = useAuthPermissions()
-  const { companyName, companyLogoUrl, currencyCode, locale, timezone } = useSystemSettings()
+  const { timezone } = useSystemSettings()
 
   const form = useCashClosureForm()
   const api = useCashClosureAPI()
@@ -50,12 +46,6 @@ const CashClosureManagement = () => {
   const [historyStatus, setHistoryStatus] = useState('')
   const [historyStartDate, setHistoryStartDate] = useState('')
   const [historyEndDate, setHistoryEndDate] = useState('')
-
-  const [selectedClosure, setSelectedClosure] = useState<CashClosure | null>(null)
-  const [isViewDialogOpen, setIsViewDialogOpen] = useState(false)
-  const [isRejectDialogOpen, setIsRejectDialogOpen] = useState(false)
-  const [rejectionReason, setRejectionReason] = useState('')
-  const [supervisorName] = useState(user?.name || user?.email || '')
 
   const historyFilterSigRef = useRef<string | null>(null)
   const historyFirstLoadRef = useRef(true)
@@ -89,59 +79,8 @@ const CashClosureManagement = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [historyStatus, historyStartDate, historyEndDate])
 
-  const handleViewClosure = async (closureId: string) => {
-    const closure = await api.fetchClosureDetail(closureId)
-    if (closure) {
-      setSelectedClosure(closure)
-      setIsViewDialogOpen(true)
-    }
-  }
-
-  const handleApproveClosure = async () => {
-    if (!selectedClosure) return
-    const updated = await api.approveClosure(selectedClosure.id, supervisorName)
-    if (updated) {
-      setSelectedClosure(updated)
-      const f =
-        historyStatus || historyStartDate || historyEndDate
-          ? {
-              status: historyStatus || undefined,
-              startDate: historyStartDate || undefined,
-              endDate: historyEndDate || undefined,
-            }
-          : undefined
-      api.fetchClosures(api.currentPage, form.isSeller, undefined, f)
-    }
-  }
-
-  const handleRejectClosure = async () => {
-    if (!selectedClosure || !rejectionReason.trim()) {
-      toast({ title: 'Error', description: 'Debes proporcionar una razón', variant: 'destructive' })
-      return
-    }
-    const updated = await api.rejectClosure(selectedClosure.id, rejectionReason)
-    if (updated) {
-      setSelectedClosure(updated)
-      setIsRejectDialogOpen(false)
-      setRejectionReason('')
-      const f =
-        historyStatus || historyStartDate || historyEndDate
-          ? {
-              status: historyStatus || undefined,
-              startDate: historyStartDate || undefined,
-              endDate: historyEndDate || undefined,
-            }
-          : undefined
-      api.fetchClosures(api.currentPage, form.isSeller, undefined, f)
-    }
-  }
-
-  const handleDownloadPDF = async () => {
-    if (selectedClosure) {
-      const logoDataUrl = await resolvePdfLogoDataUrl(companyLogoUrl)
-      generateClosurePDF(selectedClosure, companyName, currencyCode, locale, logoDataUrl)
-      toast({ title: 'PDF generado', description: `Cierre #${selectedClosure.closure_number} descargado` })
-    }
+  const handleViewClosure = (closureId: string) => {
+    navigate(`/cierre-caja/${closureId}`)
   }
 
   const canViewHistory = hasPermission('cashclosure.view')
@@ -316,24 +255,6 @@ const CashClosureManagement = () => {
           </CardContent>
         </Card>
       )}
-
-      <ClosureDetailDialog
-        open={isViewDialogOpen}
-        onOpenChange={setIsViewDialogOpen}
-        closure={selectedClosure}
-        isSeller={form.isSeller}
-        onApprove={handleApproveClosure}
-        onReject={() => setIsRejectDialogOpen(true)}
-        onDownloadPDF={handleDownloadPDF}
-      />
-
-      <RejectClosureDialog
-        open={isRejectDialogOpen}
-        onOpenChange={setIsRejectDialogOpen}
-        reason={rejectionReason}
-        onReasonChange={setRejectionReason}
-        onConfirm={handleRejectClosure}
-      />
     </div>
   )
 }
