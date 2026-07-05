@@ -27,7 +27,7 @@ import { useCashClosureAPI, useCashClosureForm } from './hooks'
 import { RejectClosureDialog } from './components'
 import { generateClosurePDF } from './generatePDF'
 import type { CashClosure } from './types'
-import { formatCurrency, formatDateTime, toNumber, closureOpeningFloat, isCashPaymentMethodName } from './types'
+import { formatCurrency, formatDateTime, toNumber, closureOpeningFloat, closureRegisterName, isCashPaymentMethodName } from './types'
 
 export const CASH_CLOSURE_DETAIL_PATH = '/cierre-caja/:id'
 
@@ -159,7 +159,7 @@ export const ClosureDetailPage = () => {
 
       {/* Período */}
       <Section title="Período y estado">
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 text-sm">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
           <div>
             <p className="text-muted-foreground">Inicio</p>
             <p className="font-medium">{formatDateTime(closure.start_date)}</p>
@@ -167,6 +167,10 @@ export const ClosureDetailPage = () => {
           <div>
             <p className="text-muted-foreground">Fin</p>
             <p className="font-medium">{formatDateTime(closure.end_date)}</p>
+          </div>
+          <div>
+            <p className="text-muted-foreground">Caja</p>
+            <p className="font-medium">{closureRegisterName(closure)}</p>
           </div>
           <div>
             <p className="text-muted-foreground">Estado</p>

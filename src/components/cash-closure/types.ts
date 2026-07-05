@@ -75,6 +75,7 @@ export interface CashClosure {
         opening_float: number | string
         opened_at: string
         closed_at: string | null
+        cashRegister?: { id: string; name: string; code: string } | null
     } | null
     cashier_name: string
     cashier_signature: string | null
@@ -119,6 +120,11 @@ export const GUATEMALAN_DENOMINATIONS: Denomination[] = [
 export function isCashPaymentMethodName(name?: string | null): boolean {
     const n = String(name || '').toLowerCase()
     return n.includes('efectivo') || n.includes('cash')
+}
+
+/** Nombre de la caja donde se hizo el turno, o '—' si no está ligado a una sesión */
+export function closureRegisterName(closure: CashClosure): string {
+    return closure.cash_register_session?.cashRegister?.name || '—'
 }
 
 /** Fondo inicial del cierre (columna o sesión ligada) */
