@@ -25,6 +25,9 @@ export interface AuthUser {
   phone?: string | null;
   address?: string | null;
   hire_date?: string | null;
+  // Caja POS asignada (null = usa la predeterminada)
+  cash_register_id?: string | null;
+  cash_register?: { id: string; name: string; code: string; active: boolean } | null;
   // Códigos de permisos asignados al usuario (derivados de su rol)
   permissions?: string[];
 }

@@ -36,6 +36,14 @@ function authHeaders(): HeadersInit {
   }
 }
 
+export interface CashRegisterOpenSessionDto {
+  id: string
+  opened_at: string
+  opening_float: number
+  opened_by_id: string
+  opened_by_name: string | null
+}
+
 export interface CashRegisterDto {
   id: string
   name: string
@@ -45,6 +53,7 @@ export interface CashRegisterDto {
   /** Solo en listados de gestión */
   assigned_users?: Array<{ id: string; name: string }>
   has_open_session?: boolean
+  open_session?: CashRegisterOpenSessionDto | null
 }
 
 /** Lista cajas; con includeInactive=true (gestores) trae también las desactivadas. */
