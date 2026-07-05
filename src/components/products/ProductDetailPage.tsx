@@ -132,6 +132,7 @@ export default function ProductDetailPage() {
   const [editSupplierId, setEditSupplierId] = useState<string | undefined>(undefined)
   const [editImageUrl, setEditImageUrl] = useState<string | undefined>(undefined)
   const [editAvailableForSale, setEditAvailableForSale] = useState(true)
+  const [editTracksExpiry, setEditTracksExpiry] = useState(false)
   const [isUploadingImage, setIsUploadingImage] = useState(false)
 
   useEffect(() => {
@@ -160,6 +161,7 @@ export default function ProductDetailPage() {
     const rawSupplierId = (rawProduct as { supplier_id?: string | number } | null)?.supplier_id
     setEditSupplierId(rawSupplierId ? String(rawSupplierId) : undefined)
     setEditAvailableForSale(product.availableForSale !== false)
+    setEditTracksExpiry(product.tracksExpiry === true)
   }, [product, rawProduct])
 
   const categoryLabel = useMemo(() => {
@@ -292,6 +294,7 @@ export default function ProductDetailPage() {
     const rawSupplierId = (rawProduct as { supplier_id?: string | number } | null)?.supplier_id
     setEditSupplierId(rawSupplierId ? String(rawSupplierId) : undefined)
     setEditAvailableForSale(product.availableForSale !== false)
+    setEditTracksExpiry(product.tracksExpiry === true)
   }
 
   return (
@@ -388,6 +391,7 @@ export default function ProductDetailPage() {
                         barcode: editBarcode || undefined,
                         description: editDescription || undefined,
                         available_for_sale: editAvailableForSale,
+                        tracks_expiry: editTracksExpiry,
                       },
                     })
                     setRawProduct(updated)
@@ -556,6 +560,27 @@ export default function ProductDetailPage() {
                       ) : (
                         <p className="text-foreground font-medium mt-1">
                           {product.availableForSale !== false ? 'Sí, aparece en ventas' : 'No (solo inventario)'}
+                        </p>
+                      )}
+                    </div>
+                    <div className="md:col-span-2">
+                      <Label htmlFor="edit-tracks-expiry" className="text-muted-foreground">
+                        Controla caducidad (lotes)
+                      </Label>
+                      {isEditing && canEdit ? (
+                        <div className="mt-2 flex items-center gap-3">
+                          <Switch
+                            id="edit-tracks-expiry"
+                            checked={editTracksExpiry}
+                            onCheckedChange={setEditTracksExpiry}
+                          />
+                          <span className="text-sm text-muted-foreground">
+                            Si lo activas, cada ingreso de mercancía exigirá fecha de caducidad.
+                          </span>
+                        </div>
+                      ) : (
+                        <p className="text-foreground font-medium mt-1">
+                          {product.tracksExpiry === true ? 'Sí, exige fecha de caducidad al ingresar' : 'No'}
                         </p>
                       )}
                     </div>

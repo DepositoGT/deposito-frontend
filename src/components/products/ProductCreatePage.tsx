@@ -161,6 +161,7 @@ export default function ProductCreatePage() {
       description: formData.description?.trim() || undefined,
       status_id: 1,
       available_for_sale: formData.availableForSale,
+      tracks_expiry: formData.tracksExpiry,
       kind: formData.productKind,
       ...(isKit
         ? {
@@ -511,6 +512,19 @@ export default function ProductCreatePage() {
                     id="create-available-sale"
                     checked={formData.availableForSale}
                     onCheckedChange={(v) => onFormChange('availableForSale', v)}
+                  />
+                </div>
+                <div className="mt-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-lg border border-border p-4">
+                  <div className="space-y-0.5">
+                    <Label htmlFor="create-tracks-expiry">Controla caducidad</Label>
+                    <p className="text-xs text-muted-foreground max-w-xl">
+                      Si se activa, cada ingreso de mercancía exigirá la fecha de caducidad del lote recibido.
+                    </p>
+                  </div>
+                  <Switch
+                    id="create-tracks-expiry"
+                    checked={formData.tracksExpiry}
+                    onCheckedChange={(v) => onFormChange('tracksExpiry', v)}
                   />
                 </div>
 
