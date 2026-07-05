@@ -27,15 +27,18 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Badge } from '@/components/ui/badge'
+import { Checkbox } from '@/components/ui/checkbox'
 import { useToast } from '@/hooks/use-toast'
 import { useAuthPermissions } from '@/hooks/useAuthPermissions'
 import {
   listCashRegisters,
   createCashRegister,
   updateCashRegister,
+  setCashRegisterUsers,
   type CashRegisterDto,
 } from '@/services/cashSessionsService'
-import { Pencil, Plus, Loader2, Star, Users } from 'lucide-react'
+import { getUsers, type User } from '@/services/userService'
+import { Pencil, Plus, Loader2, Star, Users, Search } from 'lucide-react'
 
 const REGISTERS_QUERY_KEY = ['cash-registers', 'manage'] as const
 
@@ -60,6 +63,63 @@ export function CashRegistersTab() {
   const [formName, setFormName] = useState('')
   const [formCode, setFormCode] = useState('')
   const [saving, setSaving] = useState(false)
+
+  // Diálogo de asignación de usuarios a una caja
+  const [assignTarget, setAssignTarget] = useState<CashRegisterDto | null>(null)
+  const [assignSelected, setAssignSelected] = useState<Set<string>>(new Set())
+  const [assignSearch, setAssignSearch] = useState('')
+  const [assignSaving, setAssignSaving] = useState(false)
+
+  const { data: usersData, isLoading: isLoadingUsers } = useQuery({
+    queryKey: ['users', 'for-register-assign'],
+    queryFn: () => getUsers({ page: 1, pageSize: 100 }),
+    enabled: assignTarget != null,
+  })
+  const allUsers: User[] = usersData?.items ?? []
+
+  const openAssign = (reg: CashRegisterDto) => {
+    setAssignSearch('')
+    setAssignSelected(new Set((reg.assigned_users ?? []).map((u) => u.id)))
+    setAssignTarget(reg)
+  }
+
+  const toggleAssigned = (userId: string, checked: boolean) => {
+    setAssignSelected((prev) => {
+      const next = new Set(prev)
+      if (checked) next.add(userId)
+      else next.delete(userId)
+      return next
+    })
+  }
+
+  const handleAssignSave = async () => {
+    if (!assignTarget) return
+    setAssignSaving(true)
+    try {
+      await setCashRegisterUsers(assignTarget.id, Array.from(assignSelected))
+      invalidate()
+      queryClient.invalidateQueries({ queryKey: ['users'] })
+      toast({
+        title: 'Usuarios asignados',
+        description: `Asignación de la caja "${assignTarget.name}" actualizada`,
+      })
+      setAssignTarget(null)
+    } catch (error) {
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'No se pudo guardar la asignación',
+      })
+    } finally {
+      setAssignSaving(false)
+    }
+  }
+
+  const filteredUsers = assignSearch.trim()
+    ? allUsers.filter((u) =>
+        `${u.name} ${u.email}`.toLowerCase().includes(assignSearch.trim().toLowerCase())
+      )
+    : allUsers
 
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ['cash-registers'] })
@@ -220,6 +280,16 @@ export function CashRegistersTab() {
                       {canManage && (
                         <TableCell className="text-right">
                           <div className="inline-flex items-center gap-1">
+                            {reg.active && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                title="Asignar usuarios a esta caja"
+                                onClick={() => openAssign(reg)}
+                              >
+                                <Users className="w-4 h-4" />
+                              </Button>
+                            )}
                             {!reg.is_default && reg.active && (
                               <Button
                                 variant="ghost"
@@ -313,6 +383,86 @@ export function CashRegistersTab() {
             <Button onClick={handleSave} disabled={saving}>
               {saving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
               {dialog.mode === 'create' ? 'Crear caja' : 'Guardar'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Diálogo de asignación de usuarios */}
+      <Dialog open={assignTarget != null} onOpenChange={(open) => !open && setAssignTarget(null)}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Asignar usuarios — {assignTarget?.name}</DialogTitle>
+            <DialogDescription>
+              Los usuarios marcados usarán esta caja al abrir turno en el POS. Cada usuario solo
+              puede tener una caja: si estaba en otra, se mueve a esta.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                value={assignSearch}
+                onChange={(e) => setAssignSearch(e.target.value)}
+                placeholder="Buscar por nombre o email..."
+                className="pl-9"
+              />
+            </div>
+            <div className="max-h-72 overflow-y-auto rounded-md border divide-y">
+              {isLoadingUsers ? (
+                <div className="flex items-center justify-center py-8 text-muted-foreground text-sm">
+                  <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                  Cargando usuarios...
+                </div>
+              ) : filteredUsers.length === 0 ? (
+                <div className="py-8 text-center text-sm text-muted-foreground">
+                  No se encontraron usuarios
+                </div>
+              ) : (
+                filteredUsers.map((u) => {
+                  const checked = assignSelected.has(u.id)
+                  const otherRegister =
+                    u.cash_register && u.cash_register.id !== assignTarget?.id
+                      ? u.cash_register.name
+                      : null
+                  return (
+                    <label
+                      key={u.id}
+                      className="flex items-center gap-3 px-3 py-2.5 cursor-pointer hover:bg-muted/50"
+                    >
+                      <Checkbox
+                        checked={checked}
+                        onCheckedChange={(c) => toggleAssigned(u.id, c === true)}
+                      />
+                      <span className="min-w-0 flex-1">
+                        <span className="block text-sm font-medium truncate">{u.name}</span>
+                        <span className="block text-xs text-muted-foreground truncate">
+                          {u.email}
+                          {u.role?.name ? ` · ${u.role.name}` : ''}
+                        </span>
+                      </span>
+                      {otherRegister && !checked && (
+                        <Badge variant="outline" className="shrink-0 text-xs">
+                          En {otherRegister}
+                        </Badge>
+                      )}
+                    </label>
+                  )
+                })
+              )}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {assignSelected.size} usuario{assignSelected.size === 1 ? '' : 's'} seleccionado
+              {assignSelected.size === 1 ? '' : 's'}
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAssignTarget(null)} disabled={assignSaving}>
+              Cancelar
+            </Button>
+            <Button onClick={handleAssignSave} disabled={assignSaving || isLoadingUsers}>
+              {assignSaving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              Guardar asignación
             </Button>
           </DialogFooter>
         </DialogContent>

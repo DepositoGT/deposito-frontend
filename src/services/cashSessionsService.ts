@@ -90,6 +90,20 @@ export async function updateCashRegister(
   return data as CashRegisterDto
 }
 
+/** Deja asignados a la caja exactamente estos usuarios (quita a los que no estén en la lista). */
+export async function setCashRegisterUsers(id: string, userIds: string[]): Promise<CashRegisterDto> {
+  const res = await fetch(`${API_URL}/cash-sessions/registers/${id}/users`, {
+    method: 'PUT',
+    headers: authHeaders(),
+    body: JSON.stringify({ user_ids: userIds }),
+  })
+  const data = await res.json().catch(() => ({}))
+  if (!res.ok) {
+    throw new Error((data as { message?: string }).message || `Error ${res.status}`)
+  }
+  return data as CashRegisterDto
+}
+
 export interface CashSessionUserDto {
   id: string
   name: string
