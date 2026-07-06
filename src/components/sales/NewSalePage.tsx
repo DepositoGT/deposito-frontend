@@ -875,6 +875,7 @@ export default function NewSalePage() {
       status_id: 0,
       customer_contact_id: pickedCustomerId !== '__none__' ? pickedCustomerId : undefined,
       sales_channel: salesChannel,
+      cash_register_id: cashRegisterMeta?.id ?? selectedRegisterId ?? undefined,
       items: cart.cartItems.map((item: CartProduct) => ({
         product_id: item.id,
         price: item.price,
@@ -901,6 +902,7 @@ export default function NewSalePage() {
             amount_received: isCash && amountReceived ? Number(amountReceived) : undefined,
             change: isCash ? changeAmount : undefined,
             lines,
+            cash_register_id: cashRegisterMeta?.id ?? selectedRegisterId ?? undefined,
           }),
         ])
         const created = result.sale as { id?: string; reference?: string }
