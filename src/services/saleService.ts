@@ -26,6 +26,8 @@ export interface CreateSalePayload {
   customer_contact_id?: string;
   /** Canal para resolución de precios y auditoría */
   sales_channel?: string;
+  /** Caja seleccionada en el POS; el backend valida el turno abierto contra ella */
+  cash_register_id?: string;
   items: SaleItemPayload[];
 }
 

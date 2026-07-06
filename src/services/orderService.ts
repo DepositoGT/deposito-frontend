@@ -96,6 +96,8 @@ export type ConvertOrderToSalePayload = {
   amount_received?: number;
   change?: number;
   lines?: Array<{ line_id: string; qty: number }>;
+  /** Caja seleccionada en el POS; valida el turno contra ella */
+  cash_register_id?: string;
 };
 
 export function pendingOrderLineQty(line: QuoteLine): number {
