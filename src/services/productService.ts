@@ -113,6 +113,7 @@ export const adaptApiProduct = (p: ApiProduct): Product => {
     availableForSale: (p as { available_for_sale?: boolean }).available_for_sale !== false,
     tracksExpiry: (p as { tracks_expiry?: boolean }).tracks_expiry === true,
     kind: (p.kind === "KIT" ? "KIT" : "STANDARD") as import("@/types/product").ProductKind,
+    stockAssembled: p.stock_assembled === true,
     kitComponents: Array.isArray(p.kit_components) ? p.kit_components : undefined,
   };
 };
@@ -246,6 +247,15 @@ export const updateProductBom = async (
     method: "PUT",
     body: JSON.stringify({ components }),
   });
+};
+
+export const assembleKitStock = async (
+  productId: string
+): Promise<{ qty: number; product: ApiProduct }> => {
+  return apiFetch<{ qty: number; product: ApiProduct }>(
+    `/api/products/${encodeURIComponent(productId)}/kit/assemble`,
+    { method: "POST" }
+  );
 };
 
 export const deleteProduct = async (id: string): Promise<{ ok?: boolean }> => {
