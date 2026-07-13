@@ -671,7 +671,7 @@ export default function ProductDetailPage() {
       )}
 
       {product && id && product.kind !== 'KIT' && (
-        <ProductLotsSection productId={id} tracksExpiry={product.tracksExpiry === true} />
+        <ProductLotsSection productId={id} tracksExpiry={product.tracksExpiry === true} onMutated={() => void reloadProduct()} />
       )}
     </div>
   )
