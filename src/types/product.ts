@@ -60,6 +60,8 @@ export interface Product extends BaseEntity {
   /** Si es true, cada ingreso de mercancía exige fecha de caducidad (lotes). */
   tracksExpiry?: boolean;
   kind?: ProductKind;
+  /** Solo aplica a kits: true si ya se armó stock propio (permanente, ya no se calcula desde componentes). */
+  stockAssembled?: boolean;
   kitComponents?: ProductBomLineApi[];
 }
 
@@ -137,6 +139,7 @@ export interface ApiProduct {
   available_for_sale?: boolean;
   tracks_expiry?: boolean;
   kind?: ProductKind;
+  stock_assembled?: boolean;
   kit_components?: ProductBomLineApi[];
   [key: string]: unknown;
 }
