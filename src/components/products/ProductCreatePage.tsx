@@ -12,7 +12,7 @@
  * Vista para crear un nuevo producto. Mismo estilo que detalle/editar: layout 40/60 (imagen | datos).
  * Conserva todos los atributos del inventario.
  */
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -40,6 +40,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { ProductKitComponentsEditor } from './ProductKitComponentsEditor'
+import { useKitAssemblePrompt } from './hooks/useKitAssemblePrompt'
 import { getApiBaseUrl, getAuthToken } from '@/services/api'
 import type { ApiProduct } from '@/services/productService'
 import type { ProductFormData } from './types'
@@ -66,6 +67,10 @@ export default function ProductCreatePage() {
   const [isUploadingImage, setIsUploadingImage] = useState(false)
   const [categoryPopoverOpen, setCategoryPopoverOpen] = useState(false)
   const [supplierPopoverOpen, setSupplierPopoverOpen] = useState(false)
+
+  const createdIdRef = useRef('')
+  const goToCreatedProduct = () => navigate(createdIdRef.current ? `/inventario/${createdIdRef.current}` : '/inventario')
+  const { promptDialog, offerAssemble } = useKitAssemblePrompt(goToCreatedProduct)
 
   const formData = productForm.formData
   const setFormData = productForm.setFormData
@@ -179,10 +184,13 @@ export default function ProductCreatePage() {
         toast({ title: 'Producto creado', description: 'El producto fue creado correctamente' })
         productForm.resetForm()
         const id = data?.id != null ? String(data.id) : ''
-        if (id) {
-          navigate(`/inventario/${id}`)
+        createdIdRef.current = id
+        if (isKit) {
+          void offerAssemble(id, formData.name.trim()).then((opened) => {
+            if (!opened) goToCreatedProduct()
+          })
         } else {
-          navigate('/inventario')
+          goToCreatedProduct()
         }
       },
       onError: (err: unknown) => {
@@ -556,6 +564,7 @@ export default function ProductCreatePage() {
           </div>
         </CardContent>
       </Card>
+      {promptDialog}
     </div>
   )
 }
