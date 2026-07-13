@@ -10,6 +10,7 @@ import type { Product } from "@/types/product";
 import type { ProductBomComponentDraft } from "@/types/product";
 import { updateProductBom } from "@/services/productService";
 import { ProductKitComponentsEditor } from "./ProductKitComponentsEditor";
+import { useKitAssemblePrompt } from "./hooks/useKitAssemblePrompt";
 
 type Props = {
   product: Product;
@@ -25,6 +26,8 @@ export function ProductKitSection({ product, productId, canEdit, onUpdated }: Pr
   const [draft, setDraft] = useState<ProductBomComponentDraft[]>([]);
 
   const isKit = product.kind === "KIT";
+  const [assembling, setAssembling] = useState(false);
+  const { promptDialog, offerAssemble } = useKitAssemblePrompt(() => onUpdated?.());
 
   useEffect(() => {
     if (!isKit) return;
@@ -43,12 +46,18 @@ export function ProductKitSection({ product, productId, canEdit, onUpdated }: Pr
       toast({ title: "Agrega al menos un componente", variant: "destructive" });
       return;
     }
+    const wasKit = isKit;
     setSaving(true);
     try {
       await updateProductBom(productId, valid);
       toast({ title: "Componentes actualizados" });
       setEditing(false);
-      onUpdated?.();
+      if (!wasKit) {
+        const opened = await offerAssemble(productId, product.name);
+        if (!opened) onUpdated?.();
+      } else {
+        onUpdated?.();
+      }
     } catch (e) {
       toast({
         title: "Error",
@@ -63,6 +72,22 @@ export function ProductKitSection({ product, productId, canEdit, onUpdated }: Pr
   const handleCreateKit = async () => {
     setDraft([{ component_product_id: "", qty_per_unit: 1 }]);
     setEditing(true);
+  };
+
+  const handleAssembleMore = async () => {
+    setAssembling(true);
+    try {
+      const opened = await offerAssemble(productId, product.name);
+      if (!opened) {
+        toast({
+          title: "Sin stock suficiente",
+          description: "No hay suficiente stock de componentes para armar otra unidad.",
+          variant: "destructive",
+        });
+      }
+    } finally {
+      setAssembling(false);
+    }
   };
 
   if (!isKit && !canEdit) return null;
@@ -120,12 +145,25 @@ export function ProductKitSection({ product, productId, canEdit, onUpdated }: Pr
             ))}
           </ul>
         ) : null}
-        {isKit && (
+        {isKit && product.stockAssembled && (
+          <div className="flex items-center justify-between text-sm border-t pt-3">
+            <span>
+              Stock propio (armado): <strong>{product.stock}</strong> unidades
+            </span>
+            {canEdit && (
+              <Button variant="outline" size="sm" onClick={() => void handleAssembleMore()} disabled={assembling}>
+                {assembling ? "Armando…" : "Armar más"}
+              </Button>
+            )}
+          </div>
+        )}
+        {isKit && !product.stockAssembled && (
           <p className="text-xs text-muted-foreground">
             Disponible según componentes. Al vender este SKU se descuenta el inventario de cada componente.
           </p>
         )}
       </CardContent>
+      {promptDialog}
     </Card>
   );
 }
