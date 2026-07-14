@@ -26,7 +26,7 @@ import useUpdateProduct from '@/hooks/useUpdateProduct'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { getApiBaseUrl, getAuthToken } from '@/services/api'
+import { getApiBaseUrl } from '@/services/api'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -233,16 +233,11 @@ export default function ProductDetailPage() {
         toast({ title: 'Error', description: 'Solo se permiten archivos de imagen', variant: 'destructive' })
         return
       }
-      const token = getAuthToken()
-      if (!token) {
-        toast({ title: 'Error de autenticación', description: 'No estás autenticado.', variant: 'destructive' })
-        return
-      }
       const formData = new FormData()
       formData.append('image', file)
       const response = await fetch(`${getApiBaseUrl()}/products/upload-image`, {
         method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
+        credentials: 'include',
         body: formData,
       })
       const data = (await response.json()) as {
