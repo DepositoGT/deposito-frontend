@@ -250,11 +250,12 @@ export const updateProductBom = async (
 };
 
 export const assembleKitStock = async (
-  productId: string
+  productId: string,
+  qty?: number
 ): Promise<{ qty: number; product: ApiProduct }> => {
   return apiFetch<{ qty: number; product: ApiProduct }>(
     `/api/products/${encodeURIComponent(productId)}/kit/assemble`,
-    { method: "POST" }
+    { method: "POST", body: JSON.stringify(qty ? { qty } : {}) }
   );
 };
 

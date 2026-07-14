@@ -66,7 +66,7 @@ import { Pagination } from './shared/Pagination'
 import { useAuthPermissions } from '../hooks/useAuthPermissions'
 import { usePersistedListUiState, useResetPageOnFilterChange } from '../hooks/usePersistedListUiState'
 import { ImageUploadDropzone } from './ui/image-upload-dropzone'
-import { getApiBaseUrl, getAuthToken } from '../services/api'
+import { getApiBaseUrl } from '../services/api'
 
 /** Filas de catálogo: API actual devuelve `_count.supplier_payment_terms`; respuestas antiguas `suppliers`. */
 function paymentTermSupplierUsageCount(term: {
@@ -972,20 +972,11 @@ function ProductCategoryDialog({
   const handleCategoryImageFile = async (file: File) => {
     try {
       setIsUploadingImage(true)
-      const token = getAuthToken()
-      if (!token) {
-        toast({
-          variant: 'destructive',
-          title: 'Error de autenticación',
-          description: 'No estás autenticado.',
-        })
-        return
-      }
       const fd = new FormData()
       fd.append('image', file)
       const response = await fetch(`${getApiBaseUrl()}/catalogs/product-categories/upload-image`, {
         method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
+        credentials: 'include',
         body: fd,
       })
       const data = await response.json()

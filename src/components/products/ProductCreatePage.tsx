@@ -41,7 +41,7 @@ import {
 } from '@/components/ui/select'
 import { ProductKitComponentsEditor } from './ProductKitComponentsEditor'
 import { useKitAssemblePrompt } from './hooks/useKitAssemblePrompt'
-import { getApiBaseUrl, getAuthToken } from '@/services/api'
+import { getApiBaseUrl } from '@/services/api'
 import type { ApiProduct } from '@/services/productService'
 import type { ProductFormData } from './types'
 
@@ -110,16 +110,11 @@ export default function ProductCreatePage() {
         toast({ title: 'Error', description: 'Solo se permiten archivos de imagen', variant: 'destructive' })
         return
       }
-      const token = getAuthToken()
-      if (!token) {
-        toast({ title: 'Error de autenticación', description: 'No estás autenticado.', variant: 'destructive' })
-        return
-      }
       const fd = new FormData()
       fd.append('image', file)
       const response = await fetch(`${getApiBaseUrl()}/products/upload-image`, {
         method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
+        credentials: 'include',
         body: fd,
       })
       const data = await response.json()
