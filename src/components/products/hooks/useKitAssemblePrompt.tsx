@@ -4,16 +4,18 @@
  * en modo virtual (descuenta al vender, comportamiento de siempre).
  */
 import { useState } from "react";
+import { X } from "lucide-react";
 import {
   AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
   AlertDialogContent,
   AlertDialogDescription,
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { fetchProductsAvailability, assembleKitStock } from "@/services/productService";
 
@@ -22,6 +24,7 @@ type PromptState = { productId: string; productName: string; maxQty: number } | 
 export function useKitAssemblePrompt(onResolved: () => void) {
   const { toast } = useToast();
   const [state, setState] = useState<PromptState>(null);
+  const [qtyInput, setQtyInput] = useState("");
   const [busy, setBusy] = useState(false);
 
   const offerAssemble = async (productId: string, productName: string): Promise<boolean> => {
@@ -30,6 +33,7 @@ export function useKitAssemblePrompt(onResolved: () => void) {
       const maxQty = availability[productId]?.available ?? 0;
       if (maxQty > 0) {
         setState({ productId, productName, maxQty });
+        setQtyInput(String(maxQty));
         return true;
       }
       return false;
@@ -44,11 +48,14 @@ export function useKitAssemblePrompt(onResolved: () => void) {
     onResolved();
   };
 
+  const parsedQty = Number(qtyInput);
+  const qtyValid = state != null && Number.isInteger(parsedQty) && parsedQty >= 1 && parsedQty <= state.maxQty;
+
   const confirmAssemble = async () => {
-    if (!state) return;
+    if (!state || !qtyValid) return;
     setBusy(true);
     try {
-      const { qty } = await assembleKitStock(state.productId);
+      const { qty } = await assembleKitStock(state.productId, parsedQty);
       toast({
         title: `${qty} unidades armadas`,
         description: `Se descontaron los materiales de "${state.productName}" de una vez.`,
@@ -69,25 +76,43 @@ export function useKitAssemblePrompt(onResolved: () => void) {
   const promptDialog = (
     <AlertDialog open={state != null} onOpenChange={(o) => !o && dismiss()}>
       <AlertDialogContent>
+        <button
+          type="button"
+          onClick={dismiss}
+          disabled={busy}
+          aria-label="Cerrar"
+          className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none"
+        >
+          <X className="h-4 w-4" />
+        </button>
         <AlertDialogHeader>
           <AlertDialogTitle>¿Armar el kit ahora?</AlertDialogTitle>
           <AlertDialogDescription>
-            Puedes armar {state?.maxQty} unidades de &quot;{state?.productName}&quot; ahora,
-            descontando los materiales de una vez del inventario. Si prefieres, los materiales
-            se descontarán automáticamente cada vez que vendas el kit.
+            Puedes armar hasta {state?.maxQty} unidades de &quot;{state?.productName}&quot; con el
+            stock de componentes disponible. Los materiales se descuentan de una vez del inventario.
+            Si prefieres, cierra este diálogo y se descontarán automáticamente cada vez que vendas el kit.
           </AlertDialogDescription>
         </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel disabled={busy}>Descontar al vender</AlertDialogCancel>
-          <AlertDialogAction
+        <div className="space-y-2">
+          <Label htmlFor="assemble-qty">Cantidad a armar</Label>
+          <Input
+            id="assemble-qty"
+            type="number"
+            min={1}
+            max={state?.maxQty}
+            step={1}
+            value={qtyInput}
+            onChange={(e) => setQtyInput(e.target.value)}
             disabled={busy}
-            onClick={(e) => {
-              e.preventDefault();
-              void confirmAssemble();
-            }}
-          >
-            {busy ? "Armando…" : `Armar ${state?.maxQty ?? ""} ahora`}
-          </AlertDialogAction>
+          />
+          {state != null && !qtyValid && (
+            <p className="text-xs text-destructive">Ingresa un número entre 1 y {state.maxQty}.</p>
+          )}
+        </div>
+        <AlertDialogFooter>
+          <Button disabled={busy || !qtyValid} onClick={() => void confirmAssemble()}>
+            {busy ? "Armando…" : `Armar ${qtyInput || ""} ahora`}
+          </Button>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
