@@ -236,7 +236,8 @@ export default function NewSalePage() {
 
   const paymentMethodsQuery = usePaymentMethods()
   const paymentMethods = useMemo(() => paymentMethodsQuery.data ?? [], [paymentMethodsQuery.data])
-  const productsQuery = useAllProducts({ forSaleOnly: true })
+  // Solo lo que maneja esta sucursal: no se puede vender lo que no está aquí.
+  const productsQuery = useAllProducts({ forSaleOnly: true, inBranchOnly: true })
   const availableProducts = useMemo(() => productsQuery.data ?? [], [productsQuery.data])
   const categoriesQuery = useCategories()
 

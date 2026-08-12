@@ -41,6 +41,7 @@ import {
     type CreateBranchPayload,
 } from '@/services/tenantService'
 import type { Branch } from '@/context/AuthContext'
+import { CompaniesCard } from './CompaniesCard'
 
 const emptyForm: CreateBranchPayload = { name: '', code: '', address: '', phone: '' }
 
@@ -51,6 +52,7 @@ export const BranchesManagement = () => {
     const { refreshUser } = useAuth()
     const { hasPermission } = useAuthPermissions()
     const canManage = hasPermission('branches.manage')
+    const canManageCompanies = hasPermission('companies.manage')
 
     const [dialogOpen, setDialogOpen] = useState(false)
     const [form, setForm] = useState<CreateBranchPayload>(emptyForm)
@@ -99,6 +101,8 @@ export const BranchesManagement = () => {
 
     return (
         <div className='space-y-6 p-4 sm:p-6'>
+            <CompaniesCard canManage={canManageCompanies} />
+
             <div className='flex flex-wrap items-center justify-between gap-3'>
                 <div>
                     <h1 className='text-2xl font-semibold'>Sucursales</h1>

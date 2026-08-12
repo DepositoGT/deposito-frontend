@@ -59,7 +59,7 @@ export default function NewQuotePage() {
   const fmt = (n: number) => formatMoney(n, locale, currencyCode);
 
   const canCreate = hasPermission("quotes.create");
-  const { data: products = [], isLoading: loadingProducts } = useAllProducts({ forSaleOnly: true });
+  const { data: products = [], isLoading: loadingProducts } = useAllProducts({ forSaleOnly: true, inBranchOnly: true });
 
   const [customer, setCustomer] = useState("");
   const [customerNit, setCustomerNit] = useState("");

@@ -23,6 +23,9 @@ if (!VITE_API_URL) {
 // Export for use in other files that need direct access
 export const getApiBaseUrl = () => VITE_API_URL;
 
+// `fetch` sin interceptar: lo usan el propio interceptor y el refresh de sesión.
+const nativeFetch = window.fetch.bind(window);
+
 export class ApiError extends Error {
   status: number;
   data?: unknown;
@@ -71,37 +74,12 @@ export const tenantHeaders = (): Record<string, string> => {
   };
 };
 
-/**
- * Todo request al backend lleva empresa y sucursal, aunque no pase por
- * `apiFetch`: hay ~35 llamadas con `fetch` directo (PDFs, importaciones,
- * subida de imágenes, cierre de caja, cajas) y olvidar los headers en una sola
- * hace que ese módulo muestre datos de otra sucursal. Interceptar una vez es
- * más seguro que recordarlo en cada llamada nueva.
- * ponytail: no toca URLs ajenas (Supabase, CDNs) ni pisa headers ya puestos.
- */
-const installTenantHeaders = () => {
-  const original = window.fetch.bind(window);
-  window.fetch = (input: RequestInfo | URL, init?: RequestInit) => {
-    const url =
-      typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
-    if (!url.startsWith(VITE_API_URL)) return original(input, init);
-
-    const headers = new Headers(init?.headers ?? (input instanceof Request ? input.headers : undefined));
-    for (const [k, v] of Object.entries(tenantHeaders())) {
-      if (!headers.has(k)) headers.set(k, v);
-    }
-    return original(input, { ...init, headers });
-  };
-};
-
-installTenantHeaders();
-
 // El refresh es idempotente por sesión: si varias requests reciben 401 a la vez,
 // comparten un único POST /auth/refresh en lugar de rotar el token N veces.
 let refreshInFlight: Promise<boolean> | null = null;
 const tryRefresh = (): Promise<boolean> => {
   if (!refreshInFlight) {
-    refreshInFlight = fetch(`${VITE_API_URL}/auth/refresh`, {
+    refreshInFlight = nativeFetch(`${VITE_API_URL}/auth/refresh`, {
       method: "POST",
       credentials: "include",
     })
@@ -117,6 +95,43 @@ const tryRefresh = (): Promise<boolean> => {
 // No intentar refrescar sobre las propias rutas de sesión (evita loops).
 const isSessionPath = (p: string) =>
   /\/auth\/(login|refresh|logout)\b/.test(p);
+
+/**
+ * Interceptor único para todo request al backend. Existen ~35 llamadas con
+ * `fetch` directo (PDFs, importaciones, subida de imágenes, cierre de caja,
+ * cajas) que no pasan por `apiFetch`; sin esto les faltaban dos cosas:
+ *
+ *  - empresa y sucursal, así que ese módulo mostraba datos de otra sucursal;
+ *  - el reintento tras refrescar la sesión, que es lo que hacía fallar
+ *    "no se pudo verificar la caja" en la primera carga y funcionar al
+ *    reintentar (para entonces otra llamada ya había refrescado la cookie).
+ *
+ * ponytail: interceptar una vez es más seguro que recordarlo en cada llamada
+ * nueva. No toca URLs ajenas (Supabase, CDNs) ni pisa headers ya puestos.
+ */
+const installApiInterceptor = () => {
+  window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url =
+      typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+    if (!url.startsWith(VITE_API_URL)) return nativeFetch(input, init);
+
+    const headers = new Headers(
+      init?.headers ?? (input instanceof Request ? input.headers : undefined)
+    );
+    for (const [k, v] of Object.entries(tenantHeaders())) {
+      if (!headers.has(k)) headers.set(k, v);
+    }
+    // Las cookies httpOnly son la sesión; sin esto un fetch cross-origin no las manda.
+    const options: RequestInit = { credentials: "include", ...init, headers };
+
+    const res = await nativeFetch(input, options);
+    if (res.status !== 401 || isSessionPath(url)) return res;
+    if (!(await tryRefresh())) return res;
+    return nativeFetch(input, options);
+  };
+};
+
+installApiInterceptor();
 
 export const apiFetch = async <T>(
   path: string,

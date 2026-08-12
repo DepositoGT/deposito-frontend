@@ -67,6 +67,18 @@ export const assignUserBranches = (payload: {
   default_branch_id?: string | null;
 }) => apiFetch<{ ok: boolean }>("/api/branches/assign", { method: "PUT", body: JSON.stringify(payload) });
 
+export const addUserToCompany = (companyId: string, userId: string) =>
+  apiFetch<{ ok: boolean }>(
+    `/api/companies/${encodeURIComponent(companyId)}/users/${encodeURIComponent(userId)}`,
+    { method: "POST" }
+  );
+
+export const removeUserFromCompany = (companyId: string, userId: string) =>
+  apiFetch<{ ok: boolean }>(
+    `/api/companies/${encodeURIComponent(companyId)}/users/${encodeURIComponent(userId)}`,
+    { method: "DELETE" }
+  );
+
 // ---------- Traslados entre sucursales ----------
 
 export type TransferStatus = "EN_TRANSITO" | "RECIBIDA" | "CANCELADA";

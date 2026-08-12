@@ -38,6 +38,7 @@ import {
   type CashRegisterDto,
 } from '@/services/cashSessionsService'
 import { getUsers, type User } from '@/services/userService'
+import { useTenant } from '@/context/useTenant'
 import { Pencil, Plus, Loader2, Star, Users, Search } from 'lucide-react'
 
 const REGISTERS_QUERY_KEY = ['cash-registers', 'manage'] as const
@@ -52,6 +53,7 @@ export function CashRegistersTab() {
   const { toast } = useToast()
   const { hasPermission } = useAuthPermissions()
   const canManage = hasPermission('settings.manage')
+  const { branch } = useTenant()
   const queryClient = useQueryClient()
 
   const { data: registers = [], isLoading } = useQuery({
@@ -208,8 +210,10 @@ export function CashRegistersTab() {
             <div>
               <CardTitle className="text-base sm:text-lg">Cajas registradoras</CardTitle>
               <CardDescription className="text-xs sm:text-sm">
-                Puntos de cobro del POS. Cada usuario puede tener una caja asignada (se configura
-                en la ficha del usuario); si no tiene, usa la predeterminada.
+                Cajas de {branch?.name ?? 'la sucursal activa'}. Cada caja pertenece a una
+                sucursal: para crear una en otra, cámbiate de sucursal en el selector de arriba.
+                Cada usuario puede tener una caja asignada (se configura en la ficha del usuario);
+                si no tiene, usa la predeterminada de su sucursal.
               </CardDescription>
             </div>
             {canManage && (
@@ -237,6 +241,7 @@ export function CashRegistersTab() {
                   <TableRow>
                     <TableHead>Nombre</TableHead>
                     <TableHead>Código</TableHead>
+                    <TableHead>Sucursal</TableHead>
                     <TableHead>Estado</TableHead>
                     <TableHead>Usuarios asignados</TableHead>
                     {canManage && <TableHead className="text-right">Acciones</TableHead>}
@@ -262,6 +267,9 @@ export function CashRegistersTab() {
                         </span>
                       </TableCell>
                       <TableCell className="font-mono text-xs">{reg.code}</TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {reg.branch?.name ?? '—'}
+                      </TableCell>
                       <TableCell>
                         <Badge variant={reg.active ? 'default' : 'secondary'}>
                           {reg.active ? 'Activa' : 'Inactiva'}
@@ -343,7 +351,7 @@ export function CashRegistersTab() {
             <DialogTitle>{dialog.mode === 'create' ? 'Nueva caja' : 'Editar caja'}</DialogTitle>
             <DialogDescription>
               {dialog.mode === 'create'
-                ? 'Crea un nuevo punto de cobro para el POS.'
+                ? `Se creará en la sucursal ${branch?.name ?? 'activa'}.`
                 : 'Cambia el nombre de la caja. El código no se puede modificar.'}
             </DialogDescription>
           </DialogHeader>

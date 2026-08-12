@@ -127,6 +127,8 @@ export interface ProductsQueryParams {
   includeDeleted?: boolean;
   /** Solo productos disponibles para venta (POS). */
   forSaleOnly?: boolean;
+  /** Solo los productos que maneja la sucursal activa (los demás ni aparecen). */
+  inBranchOnly?: boolean;
 }
 
 export interface ProductsResponse {
@@ -148,6 +150,7 @@ export const fetchProducts = async (params?: ProductsQueryParams): Promise<Produ
   if (params?.supplier) search.set("supplier", params.supplier);
   if (params?.includeDeleted) search.set("includeDeleted", "true");
   if (params?.forSaleOnly) search.set("forSale", "true");
+  if (params?.inBranchOnly) search.set("in_branch", "1");
 
   const url = `/api/products${search.toString() ? `?${search.toString()}` : ""}`;
   const data = await apiFetch<ProductsResponse>(url, { method: "GET" });
@@ -155,10 +158,11 @@ export const fetchProducts = async (params?: ProductsQueryParams): Promise<Produ
 };
 
 // Legacy function for backward compatibility (returns all products)
-export const fetchAllProducts = async (options?: { forSaleOnly?: boolean }): Promise<Product[]> => {
+export const fetchAllProducts = async (options?: { forSaleOnly?: boolean; inBranchOnly?: boolean }): Promise<Product[]> => {
   const search = new URLSearchParams();
   search.set("pageSize", "10000");
   if (options?.forSaleOnly) search.set("forSale", "true");
+  if (options?.inBranchOnly) search.set("in_branch", "1");
   const data = await apiFetch<ProductsResponse>(`/api/products?${search.toString()}`, { method: "GET" });
   if (!data || !data.items || !Array.isArray(data.items)) return [];
   return data.items.map(adaptApiProduct);

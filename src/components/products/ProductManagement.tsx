@@ -20,6 +20,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Label } from '@/components/ui/label'
+import { Switch } from '@/components/ui/switch'
 import {
     Plus, Search, Filter, ScanLine, Download,
     QrCode, Upload, LayoutGrid, List, Package,
@@ -101,6 +102,8 @@ const ProductManagement = () => {
     const [selectingAllPages, setSelectingAllPages] = useState(false)
 
     const [scannedCode, setScannedCode] = useState('')
+    // El catálogo es de la empresa; este filtro lo reduce a lo que maneja la sucursal.
+    const [inBranchOnly, setInBranchOnly] = useState(false)
 
     // Data hooks
     const { data: productsData, isLoading, isError } = useProducts({
@@ -108,6 +111,7 @@ const ProductManagement = () => {
         pageSize: pageSize,
         search: searchTerm || undefined,
         category: categoryFilter !== 'all' ? categoryFilter : undefined,
+        inBranchOnly: inBranchOnly || undefined,
     })
     const { data: categoriesData } = useCategories()
     const products = useMemo(() => {
@@ -123,7 +127,7 @@ const ProductManagement = () => {
         return base.concat(['Whisky', 'Vinos', 'Cervezas', 'Rones', 'Vodkas', 'Tequilas', 'Ginebras'])
     }, [categoriesData])
 
-    useResetPageOnFilterChange(setCurrentPage, [searchTerm, categoryFilter, pageSize])
+    useResetPageOnFilterChange(setCurrentPage, [searchTerm, categoryFilter, pageSize, inBranchOnly])
 
     // Products are already filtered and paginated by the backend
     const paginatedProducts = products
@@ -376,6 +380,16 @@ const ProductManagement = () => {
                                 ))}
                             </SelectContent>
                         </Select>
+                        <div className="flex items-center gap-2 whitespace-nowrap">
+                            <Switch
+                                id="in-branch-only"
+                                checked={inBranchOnly}
+                                onCheckedChange={setInBranchOnly}
+                            />
+                            <Label htmlFor="in-branch-only" className="text-sm font-normal">
+                                Solo de esta sucursal
+                            </Label>
+                        </div>
                     </div>
                 </CardContent>
             </Card>

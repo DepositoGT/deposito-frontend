@@ -26,11 +26,12 @@ export const useProducts = (params?: ProductsQueryParams) => {
 };
 
 /** Catálogo completo en memoria (p. ej. POS). Con `forSaleOnly`, excluye productos marcados solo para inventario. */
-export const useAllProducts = (options?: { forSaleOnly?: boolean }) => {
+export const useAllProducts = (options?: { forSaleOnly?: boolean; inBranchOnly?: boolean }) => {
   const forSaleOnly = options?.forSaleOnly === true;
+  const inBranchOnly = options?.inBranchOnly === true;
   return useQuery<Product[], Error>({
-    queryKey: [...PRODUCTS_QUERY_KEY, "all", forSaleOnly],
-    queryFn: async () => fetchAllProducts({ forSaleOnly }),
+    queryKey: [...PRODUCTS_QUERY_KEY, "all", forSaleOnly, inBranchOnly],
+    queryFn: async () => fetchAllProducts({ forSaleOnly, inBranchOnly }),
     staleTime: 60 * 1000, // 1 min
   });
 };
