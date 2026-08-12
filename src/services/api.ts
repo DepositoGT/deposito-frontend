@@ -43,6 +43,34 @@ export const setAuthToken = (token: string | null) => {
   else localStorage.removeItem("auth:token");
 };
 
+/**
+ * Empresa y sucursal activas: viajan como X-Company-Id / X-Branch-Id en cada
+ * request. El backend valida la pertenencia; si no se mandan, usa la sucursal
+ * por defecto del usuario. `all` en la sucursal = vista consolidada (solo GET).
+ */
+const COMPANY_KEY = "tenant:companyId";
+const BRANCH_KEY = "tenant:branchId";
+
+export const getActiveCompanyId = () => localStorage.getItem(COMPANY_KEY);
+export const getActiveBranchId = () => localStorage.getItem(BRANCH_KEY);
+
+export const setActiveTenant = (companyId: string | null, branchId: string | null) => {
+  if (companyId) localStorage.setItem(COMPANY_KEY, companyId);
+  else localStorage.removeItem(COMPANY_KEY);
+  if (branchId) localStorage.setItem(BRANCH_KEY, branchId);
+  else localStorage.removeItem(BRANCH_KEY);
+  window.dispatchEvent(new Event("tenant:changed"));
+};
+
+export const tenantHeaders = (): Record<string, string> => {
+  const companyId = getActiveCompanyId();
+  const branchId = getActiveBranchId();
+  return {
+    ...(companyId ? { "X-Company-Id": companyId } : {}),
+    ...(branchId ? { "X-Branch-Id": branchId } : {}),
+  };
+};
+
 // El refresh es idempotente por sesión: si varias requests reciben 401 a la vez,
 // comparten un único POST /auth/refresh en lugar de rotar el token N veces.
 let refreshInFlight: Promise<boolean> | null = null;
@@ -73,6 +101,7 @@ export const apiFetch = async <T>(
   const token = getAuthToken();
   const headers: HeadersInit = {
     "Content-Type": "application/json",
+    ...tenantHeaders(),
     ...(options.headers || {}),
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
   };

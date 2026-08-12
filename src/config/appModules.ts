@@ -214,6 +214,24 @@ export const appModules: AppModule[] = [
         permissions: ['catalogs.view']
     },
     {
+        id: 'transfers',
+        label: 'Traslados',
+        path: '/traslados',
+        icon: MercanciaIcon,
+        color: 'bg-cyan-100/90',
+        iconColor: 'text-cyan-900',
+        permissions: ['transfers.view', 'transfers.create']
+    },
+    {
+        id: 'branches',
+        label: 'Sucursales',
+        path: '/sucursales',
+        icon: InventarioIcon,
+        color: 'bg-teal-100/90',
+        iconColor: 'text-teal-900',
+        permissions: ['branches.manage', 'companies.manage']
+    },
+    {
         id: 'users',
         label: 'Usuarios',
         path: '/usuarios',
