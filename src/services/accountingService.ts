@@ -165,11 +165,29 @@ export const getLedger = (accountId: number, params: { from?: string; to?: strin
 export const getTrialBalance = (params: { from?: string; to?: string }) =>
   apiFetch<TrialBalanceResponse>(`/accounting/trial-balance${qs(params)}`)
 
-export const getIncomeStatement = (params: { from?: string; to?: string }) =>
+export const getIncomeStatement = (params: { from?: string; to?: string; branch_id?: string }) =>
   apiFetch<IncomeStatementResponse>(`/accounting/income-statement${qs(params)}`)
 
 export const getBalanceSheet = (asOf?: string) =>
   apiFetch<BalanceSheetResponse>(`/accounting/balance-sheet${qs({ asOf })}`)
+
+/** Resultado por sucursal: la sucursal como centro de costo dentro de la empresa. */
+export type BranchResultRow = {
+  branch_id: string | null
+  name: string
+  income: number
+  costs: number
+  expenses: number
+  netIncome: number
+}
+
+export type BranchResultsResponse = {
+  branches: BranchResultRow[]
+  totals: { income: number; costs: number; expenses: number; netIncome: number }
+}
+
+export const getResultsByBranch = (params: { from?: string; to?: string }) =>
+  apiFetch<BranchResultsResponse>(`/accounting/by-branch${qs(params)}`)
 
 export type TaxesMonthRow = {
   month: number

@@ -14,12 +14,17 @@ import { Badge } from '@/components/ui/badge'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Download, FileBarChart2, Landmark } from 'lucide-react'
+import { Download, FileBarChart2, Landmark, Store } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useToast } from '@/hooks/use-toast'
 import {
-  getIncomeStatement, getBalanceSheet,
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/select'
+import { useTenant } from '@/context/useTenant'
+import {
+  getIncomeStatement, getBalanceSheet, getResultsByBranch,
   type IncomeStatementResponse, type BalanceSheetResponse, type StatementRow,
+  type BranchResultsResponse,
 } from '@/services/accountingService'
 import { fmtQ, todayISO } from './format'
 import { exportStatements } from './exportExcel'
@@ -47,6 +52,10 @@ const SubtotalRow = ({ label, value, accent }: { label: string; value: number; a
 
 export const StatementsTab = () => {
   const { toast } = useToast()
+  const { branches } = useTenant()
+  // '' = toda la empresa · 'company' = solo asientos sin sucursal
+  const [branchFilter, setBranchFilter] = useState('')
+  const [byBranch, setByBranch] = useState<BranchResultsResponse | null>(null)
   const [from, setFrom] = useState(firstOfYearISO())
   const [to, setTo] = useState(todayISO())
   const [asOf, setAsOf] = useState(todayISO())
@@ -58,14 +67,22 @@ export const StatementsTab = () => {
   useEffect(() => {
     let active = true
     setLoadingPnl(true)
-    getIncomeStatement({ from: from || undefined, to: to || undefined })
+    getIncomeStatement({ from: from || undefined, to: to || undefined, branch_id: branchFilter || undefined })
       .then((res) => { if (active) setPnl(res) })
       .catch((e) => {
         if (active) toast({ title: 'Error', description: e instanceof Error ? e.message : 'No se pudo cargar el estado de resultados', variant: 'destructive' })
       })
       .finally(() => { if (active) setLoadingPnl(false) })
     return () => { active = false }
-  }, [from, to, toast])
+  }, [from, to, branchFilter, toast])
+
+  useEffect(() => {
+    let active = true
+    getResultsByBranch({ from: from || undefined, to: to || undefined })
+      .then((res) => { if (active) setByBranch(res) })
+      .catch(() => { /* el desglose es complementario: no interrumpe la pantalla */ })
+    return () => { active = false }
+  }, [from, to])
 
   useEffect(() => {
     let active = true
@@ -109,6 +126,21 @@ export const StatementsTab = () => {
               <Label className="text-xs">Hasta</Label>
               <Input type="date" className="h-9 w-[150px]" value={to} onChange={(e) => setTo(e.target.value)} />
             </div>
+            {branches.length > 1 && (
+              <div className="space-y-1">
+                <Label className="text-xs">Sucursal</Label>
+                <Select value={branchFilter || 'all'} onValueChange={(v) => setBranchFilter(v === 'all' ? '' : v)}>
+                  <SelectTrigger className="w-[170px] h-9"><SelectValue placeholder="Toda la empresa" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Toda la empresa</SelectItem>
+                    <SelectItem value="company">Solo empresa</SelectItem>
+                    {branches.map((b) => (
+                      <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
           </div>
           {loadingPnl ? (
             <div className="space-y-2">{[...Array(6)].map((_, i) => <Skeleton key={i} className="h-8 w-full" />)}</div>
@@ -191,6 +223,57 @@ export const StatementsTab = () => {
         </CardContent>
       </Card>
       </div>
+
+      {/* Resultado por sucursal: mismo período que el estado de resultados */}
+      {byBranch && byBranch.branches.length > 1 && (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <Store className="h-5 w-5" />Resultado por sucursal
+            </CardTitle>
+            <CardDescription>
+              Cada sucursal es un centro de costo; la suma es el resultado de la empresa.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b text-xs text-muted-foreground">
+                    <th className="text-left py-2 pr-3 font-medium">Sucursal</th>
+                    <th className="text-right py-2 px-3 font-medium">Ingresos</th>
+                    <th className="text-right py-2 px-3 font-medium">Costos</th>
+                    <th className="text-right py-2 px-3 font-medium">Gastos</th>
+                    <th className="text-right py-2 pl-3 font-medium">Utilidad</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {byBranch.branches.map((b) => (
+                    <tr key={b.branch_id ?? 'company'} className="border-b last:border-0">
+                      <td className="py-2 pr-3">{b.name}</td>
+                      <td className="py-2 px-3 text-right">{fmtQ(b.income)}</td>
+                      <td className="py-2 px-3 text-right">{fmtQ(b.costs)}</td>
+                      <td className="py-2 px-3 text-right">{fmtQ(b.expenses)}</td>
+                      <td className={`py-2 pl-3 text-right font-medium ${b.netIncome >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                        {fmtQ(b.netIncome)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr className="font-semibold">
+                    <td className="py-2 pr-3">Total empresa</td>
+                    <td className="py-2 px-3 text-right">{fmtQ(byBranch.totals.income)}</td>
+                    <td className="py-2 px-3 text-right">{fmtQ(byBranch.totals.costs)}</td>
+                    <td className="py-2 px-3 text-right">{fmtQ(byBranch.totals.expenses)}</td>
+                    <td className="py-2 pl-3 text-right">{fmtQ(byBranch.totals.netIncome)}</td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   )
 }

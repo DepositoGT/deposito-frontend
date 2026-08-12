@@ -71,6 +71,31 @@ export const tenantHeaders = (): Record<string, string> => {
   };
 };
 
+/**
+ * Todo request al backend lleva empresa y sucursal, aunque no pase por
+ * `apiFetch`: hay ~35 llamadas con `fetch` directo (PDFs, importaciones,
+ * subida de imágenes, cierre de caja, cajas) y olvidar los headers en una sola
+ * hace que ese módulo muestre datos de otra sucursal. Interceptar una vez es
+ * más seguro que recordarlo en cada llamada nueva.
+ * ponytail: no toca URLs ajenas (Supabase, CDNs) ni pisa headers ya puestos.
+ */
+const installTenantHeaders = () => {
+  const original = window.fetch.bind(window);
+  window.fetch = (input: RequestInfo | URL, init?: RequestInit) => {
+    const url =
+      typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+    if (!url.startsWith(VITE_API_URL)) return original(input, init);
+
+    const headers = new Headers(init?.headers ?? (input instanceof Request ? input.headers : undefined));
+    for (const [k, v] of Object.entries(tenantHeaders())) {
+      if (!headers.has(k)) headers.set(k, v);
+    }
+    return original(input, { ...init, headers });
+  };
+};
+
+installTenantHeaders();
+
 // El refresh es idempotente por sesión: si varias requests reciben 401 a la vez,
 // comparten un único POST /auth/refresh en lugar de rotar el token N veces.
 let refreshInFlight: Promise<boolean> | null = null;
