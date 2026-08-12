@@ -24,6 +24,7 @@ import {
   getJournal, postPending, reverseJournalEntry,
   type Account, type JournalEntry,
 } from '@/services/accountingService'
+import { useTenant } from '@/context/useTenant'
 import { fmtQ, fmtDate, SOURCE_LABELS } from './format'
 import { exportJournal } from './exportExcel'
 import { NewEntryDialog } from './NewEntryDialog'
@@ -35,6 +36,7 @@ const entryTotal = (entry: JournalEntry) =>
 
 export const JournalTab = ({ accounts, canCreate }: { accounts: Account[]; canCreate: boolean }) => {
   const { toast } = useToast()
+  const { branches } = useTenant()
   const [items, setItems] = useState<JournalEntry[]>([])
   const [loading, setLoading] = useState(true)
   const [page, setPage] = useState(1)
@@ -43,6 +45,8 @@ export const JournalTab = ({ accounts, canCreate }: { accounts: Account[]; canCr
   const [from, setFrom] = useState('')
   const [to, setTo] = useState('')
   const [source, setSource] = useState('')
+  // '' = todas · 'company' = solo asientos de empresa (manuales, cierre, importación)
+  const [branchFilter, setBranchFilter] = useState('')
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [isNewOpen, setIsNewOpen] = useState(false)
   const [isImportOpen, setIsImportOpen] = useState(false)
@@ -53,7 +57,7 @@ export const JournalTab = ({ accounts, canCreate }: { accounts: Account[]; canCr
   const load = useCallback(async (p: number) => {
     setLoading(true)
     try {
-      const res = await getJournal({ from: from || undefined, to: to || undefined, source: source || undefined, page: p, pageSize: 25 })
+      const res = await getJournal({ from: from || undefined, to: to || undefined, source: source || undefined, branch_id: branchFilter || undefined, page: p, pageSize: 25 })
       setItems(res.items)
       setPage(res.page)
       setTotalPages(res.totalPages)
@@ -63,7 +67,7 @@ export const JournalTab = ({ accounts, canCreate }: { accounts: Account[]; canCr
     } finally {
       setLoading(false)
     }
-  }, [from, to, source, toast])
+  }, [from, to, source, branchFilter, toast])
 
   useEffect(() => { void load(1) }, [load])
 
@@ -87,7 +91,7 @@ export const JournalTab = ({ accounts, canCreate }: { accounts: Account[]; canCr
     setExporting(true)
     try {
       // Descarga todas las páginas con los filtros activos (el backend pagina a 100 máx.)
-      const filters = { from: from || undefined, to: to || undefined, source: source || undefined }
+      const filters = { from: from || undefined, to: to || undefined, source: source || undefined, branch_id: branchFilter || undefined }
       const all: JournalEntry[] = []
       let p = 1
       let pages = 1
@@ -184,6 +188,21 @@ export const JournalTab = ({ accounts, canCreate }: { accounts: Account[]; canCr
               </SelectContent>
             </Select>
           </div>
+          {branches.length > 1 && (
+            <div className="space-y-1">
+              <Label className="text-xs">Sucursal</Label>
+              <Select value={branchFilter || 'all'} onValueChange={(v) => setBranchFilter(v === 'all' ? '' : v)}>
+                <SelectTrigger className="w-[170px] h-9"><SelectValue placeholder="Todas" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todas</SelectItem>
+                  <SelectItem value="company">Solo empresa</SelectItem>
+                  {branches.map((b) => (
+                    <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
         </div>
 
         {loading ? (
@@ -194,15 +213,15 @@ export const JournalTab = ({ accounts, canCreate }: { accounts: Account[]; canCr
           <p className="py-10 text-center text-muted-foreground">No hay asientos en el rango seleccionado.</p>
         ) : (
           <div className="rounded-md border divide-y">
-            <div className="hidden md:grid grid-cols-[28px_110px_100px_1fr_110px_130px_auto] gap-2 px-3 py-2 text-xs font-medium text-muted-foreground bg-muted/50">
-              <span /><span>Número</span><span>Fecha</span><span>Descripción</span><span>Origen</span><span className="text-right">Total</span><span />
+            <div className="hidden md:grid grid-cols-[28px_110px_100px_1fr_120px_110px_130px_auto] gap-2 px-3 py-2 text-xs font-medium text-muted-foreground bg-muted/50">
+              <span /><span>Número</span><span>Fecha</span><span>Descripción</span><span>Sucursal</span><span>Origen</span><span className="text-right">Total</span><span />
             </div>
             {items.map((entry) => {
               const expanded = expandedId === entry.id
               return (
                 <div key={entry.id}>
                   <div
-                    className="grid grid-cols-2 md:grid-cols-[28px_110px_100px_1fr_110px_130px_auto] gap-2 px-3 py-2.5 items-center text-sm cursor-pointer hover:bg-muted/40"
+                    className="grid grid-cols-2 md:grid-cols-[28px_110px_100px_1fr_120px_110px_130px_auto] gap-2 px-3 py-2.5 items-center text-sm cursor-pointer hover:bg-muted/40"
                     onClick={() => setExpandedId(expanded ? null : entry.id)}
                   >
                     <span className="hidden md:block text-muted-foreground">
@@ -211,6 +230,9 @@ export const JournalTab = ({ accounts, canCreate }: { accounts: Account[]; canCr
                     <span className="font-medium">{entry.entry_number}</span>
                     <span className="text-muted-foreground">{fmtDate(entry.date)}</span>
                     <span className="truncate col-span-2 md:col-span-1" title={entry.description}>{entry.description}</span>
+                    <span className="truncate text-muted-foreground" title={entry.branch?.name ?? 'Empresa'}>
+                      {entry.branch?.name ?? 'Empresa'}
+                    </span>
                     <span><Badge variant="secondary">{SOURCE_LABELS[entry.source_type]}</Badge></span>
                     <span className="text-right font-medium">{fmtQ(entryTotal(entry))}</span>
                     <span className="flex items-center gap-2 justify-end">

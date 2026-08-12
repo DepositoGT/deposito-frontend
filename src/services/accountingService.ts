@@ -40,6 +40,8 @@ export type JournalEntry = {
   description: string
   source_type: JournalSourceType
   source_id: string | null
+  branch_id: string | null
+  branch?: { id: string; name: string; code: string } | null
   reversal_of_id: string | null
   created_at: string
   lines: JournalLine[]
@@ -139,7 +141,7 @@ export const getAccountingConfig = () => apiFetch<AccountingConfig>('/accounting
 export const updateAccountingConfig = (defaults: Record<string, string>) =>
   apiFetch<AccountingConfig>('/accounting/config', { method: 'PUT', body: JSON.stringify({ defaults }) })
 
-export const getJournal = (params: { from?: string; to?: string; source?: string; page?: number; pageSize?: number }) =>
+export const getJournal = (params: { from?: string; to?: string; source?: string; branch_id?: string; page?: number; pageSize?: number }) =>
   apiFetch<JournalListResponse>(`/accounting/journal${qs(params)}`)
 
 export const createJournalEntry = (data: {

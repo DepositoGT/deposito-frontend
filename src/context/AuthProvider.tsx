@@ -89,6 +89,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           }
         }
       },
+      refreshUser: async () => {
+        const { user: fresh } = await fetchMe();
+        setUser(fresh);
+        localStorage.setItem(USER_KEY, JSON.stringify(fresh));
+      },
       logout: () => {
         void logoutRequest(); // revoca el refresh token en el backend (best-effort)
         localStorage.removeItem(USER_KEY);

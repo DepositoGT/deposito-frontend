@@ -59,6 +59,8 @@ export type AuthContextType = {
   user: AuthUser | null;
   login: () => void;
   logout: () => void;
+  /** Relee /auth/me: empresas y sucursales del usuario pueden haber cambiado. */
+  refreshUser: () => Promise<void>;
 };
 
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);

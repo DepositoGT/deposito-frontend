@@ -66,27 +66,38 @@ export const TenantProvider = ({ children }: { children: React.ReactNode }) => {
     [allBranches, companyId]
   );
 
+  // ponytail: recargar la página es la única forma barata de garantizar que
+  // TODO se refresque; la mitad de los módulos carga con useEffect y no pasa
+  // por la caché de react-query. Cambiar de sucursal es poco frecuente.
+  const reloadForTenant = useCallback(
+    (nextCompanyId: string | null, nextBranchId: string | null) => {
+      setActiveTenant(nextCompanyId, nextBranchId);
+      queryClient.clear();
+      window.location.reload();
+    },
+    [queryClient]
+  );
+
   const setCompany = useCallback(
     (nextCompanyId: string) => {
+      if (nextCompanyId === companyId) return;
       const branchesOfCompany = allBranches.filter((b) => b.company_id === nextCompanyId);
       const nextBranch =
         branchesOfCompany.find((b) => b.is_default) ?? branchesOfCompany[0] ?? null;
       setCompanyIdState(nextCompanyId);
       setBranchIdState(nextBranch?.id ?? null);
-      setActiveTenant(nextCompanyId, nextBranch?.id ?? null);
-      // Todo lo cacheado pertenece a la empresa anterior
-      void queryClient.invalidateQueries();
+      reloadForTenant(nextCompanyId, nextBranch?.id ?? null);
     },
-    [allBranches, queryClient]
+    [allBranches, companyId, reloadForTenant]
   );
 
   const setBranch = useCallback(
     (nextBranchId: string) => {
+      if (nextBranchId === branchId) return;
       setBranchIdState(nextBranchId);
-      setActiveTenant(companyId, nextBranchId);
-      void queryClient.invalidateQueries();
+      reloadForTenant(companyId, nextBranchId);
     },
-    [companyId, queryClient]
+    [companyId, branchId, reloadForTenant]
   );
 
   const value = useMemo(

@@ -33,6 +33,7 @@ import {
 import { useToast } from '@/hooks/use-toast'
 import { useAuthPermissions } from '@/hooks/useAuthPermissions'
 import { useTenant } from '@/context/useTenant'
+import { useAuth } from '@/context/useAuth'
 import {
     createBranch,
     fetchBranches,
@@ -47,6 +48,7 @@ export const BranchesManagement = () => {
     const { toast } = useToast()
     const queryClient = useQueryClient()
     const { company } = useTenant()
+    const { refreshUser } = useAuth()
     const { hasPermission } = useAuthPermissions()
     const canManage = hasPermission('branches.manage')
 
@@ -61,6 +63,8 @@ export const BranchesManagement = () => {
 
     const invalidate = () => {
         void queryClient.invalidateQueries({ queryKey: ['branches'] })
+        // El selector de sucursales sale de /auth/me, no de esta query.
+        void refreshUser()
     }
 
     const createMutation = useMutation({

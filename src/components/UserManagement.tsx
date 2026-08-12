@@ -16,6 +16,7 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { useUsers } from "@/hooks/useUsers";
 import { useUpdateUser } from "@/hooks/useUpdateUser";
@@ -441,6 +442,7 @@ const UserManagement = () => {
                     <th className="text-left p-4 font-medium">Usuario</th>
                     <th className="text-left p-4 font-medium">Email</th>
                     <th className="text-left p-4 font-medium">Rol</th>
+                    <th className="text-left p-4 font-medium">Sucursales</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -478,6 +480,17 @@ const UserManagement = () => {
                       <td className="p-4">
                         {getRoleBadge(user.role?.name || 'Sin rol')}
                       </td>
+                      <td className="p-4">
+                        <div className="flex flex-wrap gap-1">
+                          {(user.branches ?? []).length === 0 ? (
+                            <span className="text-sm text-muted-foreground">Sin sucursal</span>
+                          ) : (
+                            user.branches!.map((b) => (
+                              <Badge key={b.id} variant="outline" className="text-xs">{b.name}</Badge>
+                            ))
+                          )}
+                        </div>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -508,8 +521,11 @@ const UserManagement = () => {
                       )}
                     </div>
                   </div>
-                  <div className="mb-3">
+                  <div className="mb-3 flex flex-wrap items-center gap-1">
                     {getRoleBadge(user.role?.name || 'Sin rol')}
+                    {(user.branches ?? []).map((b) => (
+                      <Badge key={b.id} variant="outline" className="text-xs">{b.name}</Badge>
+                    ))}
                   </div>
                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
                     <Mail className="w-3 h-3 flex-shrink-0" />

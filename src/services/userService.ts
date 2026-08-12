@@ -27,6 +27,9 @@ export interface User {
   /** Caja POS asignada (null = usa la predeterminada) */
   cash_register_id?: string | null;
   cash_register?: { id: string; name: string; code: string; active: boolean } | null;
+  /** Sucursales del usuario dentro de la empresa activa */
+  branches?: { id: string; name: string; code: string; active?: boolean }[];
+  default_branch_id?: string | null;
   created_at?: string;
   updated_at?: string;
 }
