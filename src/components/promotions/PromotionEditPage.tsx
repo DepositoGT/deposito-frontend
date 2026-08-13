@@ -24,6 +24,7 @@ import {
   type ApplicableProductRef,
   type ApplicableCategoryRef
 } from './PromotionApplicableScopeFields'
+import { PromotionBranchesField } from './PromotionBranchesField'
 import {
   ArrowLeft,
   Tag,
@@ -79,6 +80,8 @@ interface Promotion {
     category_id?: number
     category?: { id: number; name: string }
   }>
+  applies_to_all_branches?: boolean
+  branches?: Array<{ branch: { id: string; name: string; code: string } }>
 }
 
 const emptyFormData = {
@@ -132,6 +135,8 @@ export default function PromotionEditPage() {
   const [formData, setFormData] = useState(emptyFormData)
   const [applicableProducts, setApplicableProducts] = useState<ApplicableProductRef[]>([])
   const [applicableCategories, setApplicableCategories] = useState<ApplicableCategoryRef[]>([])
+  const [appliesToAllBranches, setAppliesToAllBranches] = useState(true)
+  const [branchIds, setBranchIds] = useState<string[]>([])
 
   const { data: promotion, isLoading: loadingPromotion, error: errorPromotion } = useQuery({
     queryKey: ['promotion', id],
@@ -165,6 +170,8 @@ export default function PromotionEditPage() {
       .filter((x): x is ApplicableCategoryRef => x !== null)
     setApplicableProducts(prods)
     setApplicableCategories(cats)
+    setAppliesToAllBranches(promotion.applies_to_all_branches !== false)
+    setBranchIds((promotion.branches ?? []).map((pb) => pb.branch.id))
   }, [promotion])
 
   const updateMutation = useMutation({
@@ -199,7 +206,9 @@ export default function PromotionEditPage() {
         : null,
       min_purchase_amount: formData.min_purchase_amount
         ? parseFloat(formData.min_purchase_amount)
-        : null
+        : null,
+      applies_to_all_branches: appliesToAllBranches,
+      branch_ids: appliesToAllBranches ? [] : branchIds
     }
 
     if (selectedType.name === 'PERCENTAGE' || selectedType.name === 'MIN_QTY_DISCOUNT') {
@@ -262,6 +271,15 @@ export default function PromotionEditPage() {
     if (supportsProductCategoryScope(selectedType.name) && !formData.applies_to_all) {
       payload.product_ids = applicableProducts.map((p) => p.id)
       payload.category_ids = applicableCategories.map((c) => c.id)
+    }
+
+    if (!appliesToAllBranches && branchIds.length === 0) {
+      toast({
+        title: 'Sucursales',
+        description: 'Elige al menos una sucursal o marca que aplica en todas.',
+        variant: 'destructive'
+      })
+      return
     }
 
     updateMutation.mutate(payload as Record<string, unknown> & { id: string })
@@ -662,6 +680,14 @@ export default function PromotionEditPage() {
                   onCategoriesChange={setApplicableCategories}
                 />
               )}
+            <div className="border-t pt-4">
+              <PromotionBranchesField
+                appliesToAll={appliesToAllBranches}
+                branchIds={branchIds}
+                onAppliesToAllChange={setAppliesToAllBranches}
+                onBranchIdsChange={setBranchIds}
+              />
+            </div>
           </CardContent>
         </Card>
 

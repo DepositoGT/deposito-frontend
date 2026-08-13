@@ -28,6 +28,8 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { Checkbox } from '@/components/ui/checkbox'
 import { ImageUploadDropzone } from '@/components/ui/image-upload-dropzone'
 import { cn } from '@/lib/utils'
+import { useTenant } from '@/context/useTenant'
+import { assignUserBranches } from '@/services/tenantService'
 
 export default function UserCreatePage() {
   const navigate = useNavigate()
@@ -45,6 +47,10 @@ export default function UserCreatePage() {
   const [roles, setRoles] = useState<Role[]>([])
   const [rolesLoading, setRolesLoading] = useState(true)
   const [rolePopoverOpen, setRolePopoverOpen] = useState(false)
+  const { branches, branch } = useTenant()
+  // El backend ya lo mete en la sucursal activa; esto permite darle más de una
+  // de entrada, en vez de tener que entrar a su ficha después.
+  const [branchIds, setBranchIds] = useState<string[]>(branch?.id ? [branch.id] : [])
   const [photoFile, setPhotoFile] = useState<File | null>(null)
   const [photoPreview, setPhotoPreview] = useState<string | null>(null)
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false)
@@ -132,6 +138,17 @@ export default function UserCreatePage() {
         }),
       })
       const userId = result?.user?.id
+      if (userId && branchIds.length > 0) {
+        try {
+          await assignUserBranches({
+            user_id: userId,
+            branch_ids: branchIds,
+            default_branch_id: branchIds.includes(branch?.id ?? '') ? branch?.id : branchIds[0],
+          })
+        } catch {
+          toast({ title: 'Usuario creado', description: 'No se pudieron asignar las sucursales; hazlo desde su ficha' })
+        }
+      }
       if (photoFile && userId) {
         if (!photoFile.type.startsWith('image/')) {
           toast({ title: 'Solo se permiten imágenes', variant: 'destructive' })
@@ -325,6 +342,32 @@ export default function UserCreatePage() {
                 </PopoverContent>
               </Popover>
             </div>
+            {branches.length > 1 && (
+              <div>
+                <Label>Sucursales</Label>
+                <div className="mt-1 space-y-1 rounded-md border p-3">
+                  {branches.map((b) => (
+                    <div key={b.id} className="flex items-center gap-3 py-1">
+                      <Checkbox
+                        id={`new-user-branch-${b.id}`}
+                        checked={branchIds.includes(b.id)}
+                        onCheckedChange={(v) =>
+                          setBranchIds((prev) =>
+                            v ? [...prev, b.id] : prev.filter((x) => x !== b.id)
+                          )
+                        }
+                      />
+                      <Label htmlFor={`new-user-branch-${b.id}`} className="font-normal">
+                        {b.name}
+                      </Label>
+                    </div>
+                  ))}
+                  <p className="pt-1 text-xs text-muted-foreground">
+                    Dónde trabaja. Se puede cambiar después desde su ficha.
+                  </p>
+                </div>
+              </div>
+            )}
               </div>
 
           <div className="flex flex-wrap items-center justify-end gap-2 pt-4 border-t">

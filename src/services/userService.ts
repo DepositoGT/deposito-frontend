@@ -78,6 +78,7 @@ export interface UsersQueryParams {
   page?: number;
   pageSize?: number;
   role_id?: number;
+  branch_id?: string;
   search?: string;
 }
 
@@ -96,6 +97,7 @@ export const getUsers = async (params?: UsersQueryParams): Promise<UsersResponse
   if (params?.page) search.set("page", String(params.page));
   if (params?.pageSize) search.set("pageSize", String(params.pageSize));
   if (params?.role_id) search.set("role_id", String(params.role_id));
+  if (params?.branch_id) search.set("branch_id", params.branch_id);
   if (params?.search) search.set("search", params.search);
 
   const url = `/api/auth/users${search.toString() ? `?${search.toString()}` : ""}`;

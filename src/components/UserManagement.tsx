@@ -35,6 +35,7 @@ import {
 } from "lucide-react";
 import UserImportDialog from "./users/UserImportDialog";
 import { useAuth } from "@/context/useAuth";
+import { useTenant } from "@/context/useTenant";
 import { useAuthPermissions } from "@/hooks/useAuthPermissions";
 import type { User } from "@/services/userService";
 import { Pagination } from "@/components/shared/Pagination";
@@ -97,6 +98,8 @@ const UserManagement = () => {
   // Búsqueda y filtros
   const [searchTerm, setSearchTerm] = useState("");
   const [filterRole, setFilterRole] = useState<string>("all");
+  const [filterBranch, setFilterBranch] = useState<string>("all");
+  const { branches } = useTenant();
 
   const {
     page: currentPage,
@@ -113,6 +116,7 @@ const UserManagement = () => {
     page: currentPage,
     pageSize,
     role_id: filterRole !== "all" ? Number(filterRole) : undefined,
+    branch_id: filterBranch !== "all" ? filterBranch : undefined,
     search: searchTerm || undefined,
   });
   
@@ -233,7 +237,7 @@ const UserManagement = () => {
     }
   };
 
-  useResetPageOnFilterChange(setCurrentPage, [searchTerm, filterRole, pageSize]);
+  useResetPageOnFilterChange(setCurrentPage, [searchTerm, filterRole, filterBranch, pageSize]);
 
   // Los usuarios ya vienen filtrados del backend
   const filteredUsers = users;
@@ -348,6 +352,21 @@ const UserManagement = () => {
                 ))}
               </SelectContent>
             </Select>
+            {branches.length > 1 && (
+              <Select value={filterBranch} onValueChange={setFilterBranch}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Filtrar por sucursal" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todas las sucursales</SelectItem>
+                  {branches.map((b) => (
+                    <SelectItem key={b.id} value={b.id}>
+                      {b.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
           </div>
         </CardContent>
       </Card>

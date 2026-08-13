@@ -57,6 +57,7 @@ import {
 } from './ui/alert-dialog'
 import { useToast } from '@/hooks/use-toast'
 import { useSystemSettings } from '@/hooks/useSystemSettings'
+import { useTenant } from '@/context/useTenant'
 import { resolvePdfLogoDataUrl } from '@/utils/pdfBranding'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { apiFetch } from '@/services/api'
@@ -121,6 +122,8 @@ interface Promotion {
     max_uses?: number
     min_purchase_amount?: string
     active: boolean
+    applies_to_all_branches?: boolean
+    branches?: { branch: { id: string; name: string; code: string } }[]
 }
 
 interface CodesDialogState {
@@ -146,6 +149,7 @@ const PromotionsManagement = () => {
     const queryClient = useQueryClient()
     const { locale, currencyCode, companyLogoUrl } = useSystemSettings()
     const { hasPermission } = useAuthPermissions()
+    const { branch } = useTenant()
     // Con solo promotions.view se consulta; crear/editar/eliminar/activar requiere promotions.manage
     const canManagePromos = hasPermission('promotions.manage')
     const [searchTerm, setSearchTerm] = useState('')
@@ -242,7 +246,8 @@ const PromotionsManagement = () => {
                                 Promociones
                             </CardTitle>
                             <CardDescription className='text-xs sm:text-sm'>
-                                Administra códigos de descuento
+                                Códigos de descuento que aplican en {branch?.name ?? 'esta sucursal'}. Las
+                                limitadas a otras sucursales se ven cambiándote en el selector de arriba.
                             </CardDescription>
                         </div>
                         {canManagePromos && (
@@ -285,6 +290,7 @@ const PromotionsManagement = () => {
                                         <TableHead>Nombre</TableHead>
                                         <TableHead>Tipo</TableHead>
                                         <TableHead>Valor</TableHead>
+                                        <TableHead>Sucursales</TableHead>
                                         <TableHead>Usos</TableHead>
                                         <TableHead>Estado</TableHead>
                                         <TableHead className='text-right'>Acciones</TableHead>
@@ -322,6 +328,19 @@ const PromotionsManagement = () => {
                                             </TableCell>
                                             <TableCell className='font-semibold text-green-600 dark:text-green-400'>
                                                 {formatPromoValue(promo)}
+                                            </TableCell>
+                                            <TableCell>
+                                                {promo.applies_to_all_branches === false ? (
+                                                    <div className='flex flex-wrap gap-1 max-w-[180px]'>
+                                                        {(promo.branches ?? []).map(pb => (
+                                                            <Badge key={pb.branch.id} variant='outline' className='text-xs'>
+                                                                {pb.branch.name}
+                                                            </Badge>
+                                                        ))}
+                                                    </div>
+                                                ) : (
+                                                    <span className='text-muted-foreground text-xs'>Todas</span>
+                                                )}
                                             </TableCell>
                                             <TableCell>
                                                 <span className='text-muted-foreground'>

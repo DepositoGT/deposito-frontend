@@ -158,6 +158,7 @@ export default function OrdersManagement() {
                   <TableRow>
                     <TableHead>Referencia</TableHead>
                     <TableHead>Cliente</TableHead>
+                    <TableHead>Sucursal</TableHead>
                     <TableHead>Estado</TableHead>
                     <TableHead className="text-right">Total</TableHead>
                     <TableHead>Reserva</TableHead>
@@ -176,6 +177,9 @@ export default function OrdersManagement() {
                       <TableCell className="font-medium">{row.reference ?? row.id.slice(0, 8)}</TableCell>
                       <TableCell className="max-w-[160px] truncate">
                         {row.customer || row.customerContact?.name || "—"}
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {row.branch?.name ?? "—"}
                       </TableCell>
                       <TableCell>
                         <Badge variant={statusBadgeVariant(row.status)}>{orderStatusLabel(row.status)}</Badge>
