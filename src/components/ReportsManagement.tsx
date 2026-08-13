@@ -9,7 +9,9 @@
  */
 
 import { useState } from "react";
-import { getApiBaseUrl, getAuthToken } from '@/services/api';
+import { getApiBaseUrl, getAuthToken, tenantHeaders } from '@/services/api';
+import { useTenant } from '@/context/useTenant';
+import { useAuthPermissions } from '@/hooks/useAuthPermissions';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Download } from "lucide-react";
@@ -54,6 +56,12 @@ const ReportsManagement = () => {
   const [generatingReportId, setGeneratingReportId] = useState<string | null>(null);
   const [fSem, setFSem] = useState<1 | 2>(1);
   const [fFormat, setFFormat] = useState<'pdf' | 'csv'>('pdf');
+  // Alcance del reporte: una sucursal, o 'all' = toda la empresa (consolidado).
+  const { branch, branches } = useTenant();
+  const { hasPermission } = useAuthPermissions();
+  const canViewAll = hasPermission('branches.view_all');
+  const [fBranch, setFBranch] = useState<string>(branch?.id || '');
+  const showBranchPicker = branches.length > 1 || canViewAll;
 
   // Generadores locales (mock) removidos. Toda la generación ocurre en el backend.
 
@@ -152,6 +160,25 @@ const ReportsManagement = () => {
             <DialogDescription>Configura los filtros antes de generar el documento.</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
+            {showBranchPicker && (
+              <div className="space-y-2">
+                <p className="text-sm font-medium">Sucursal</p>
+                <Select value={fBranch || branch?.id || ''} onValueChange={setFBranch}>
+                  <SelectTrigger><SelectValue placeholder="Selecciona sucursal" /></SelectTrigger>
+                  <SelectContent>
+                    {branches.map((b) => (
+                      <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
+                    ))}
+                    {canViewAll && <SelectItem value="all">Toda la empresa (consolidado)</SelectItem>}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  {fBranch === 'all'
+                    ? 'El reporte suma todas las sucursales y las identifica una por una en su propio desglose.'
+                    : 'El reporte incluye solo los datos de esta sucursal.'}
+                </p>
+              </div>
+            )}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <p className="text-sm font-medium">Período</p>
@@ -251,8 +278,16 @@ const ReportsManagement = () => {
                     if (fPeriod === 'semester') params.set('semester', String(fSem))
                     params.set('format', fFormat)
                     const token = getAuthToken()
+                    // El alcance viaja en el header de tenant: un id de sucursal, o
+                    // 'all' para el consolidado de la empresa (solo lectura).
+                    const scopeBranch = fBranch || branch?.id || ''
                     const res = await fetch(`${getApiBaseUrl()}/reports/${pendingReport.id}?${params.toString()}`, {
-                      headers: token ? { Authorization: `Bearer ${token}` } : {},
+                      credentials: 'include',
+                      headers: {
+                        ...tenantHeaders(),
+                        ...(scopeBranch ? { 'X-Branch-Id': scopeBranch } : {}),
+                        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                      },
                     })
                     if (!res.ok) throw new Error('Error al generar el reporte')
                     const blob = await res.blob()
@@ -338,7 +373,11 @@ const ReportsManagement = () => {
                             toast({ title: 'Generando...', description: report.name })
                             const pdfToken = getAuthToken()
                             const res = await fetch(`${getApiBaseUrl()}/products/report.pdf`, {
-                              headers: pdfToken ? { Authorization: `Bearer ${pdfToken}` } : {},
+                              credentials: 'include',
+                              headers: {
+                                ...tenantHeaders(),
+                                ...(pdfToken ? { Authorization: `Bearer ${pdfToken}` } : {}),
+                              },
                             })
                             if (!res.ok) throw new Error('Error al generar el reporte de inventario')
                             const blob = await res.blob()

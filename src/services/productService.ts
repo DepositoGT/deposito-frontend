@@ -270,6 +270,13 @@ export const deleteProduct = async (id: string): Promise<{ ok?: boolean }> => {
   return data;
 };
 
+/** Quita el producto de la sucursal activa; en las demás sigue existiendo. */
+export const removeProductFromBranch = async (id: string): Promise<{ ok?: boolean }> => {
+  return apiFetch<{ ok?: boolean }>(`/api/products/${id}/branch-stock`, {
+    method: "DELETE",
+  });
+};
+
 // Download products PDF report (returns void; triggers browser download)
 // options.fields: optional list of column keys. Omit for full card layout.
 // options.ids: optional list of product IDs to export only those (if empty or omitted, exports all).
