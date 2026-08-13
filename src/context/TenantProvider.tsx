@@ -30,16 +30,17 @@ export const TenantProvider = ({ children }: { children: React.ReactNode }) => {
   const companies = useMemo(() => user?.companies ?? [], [user]);
   const allBranches = useMemo(() => user?.branches ?? [], [user]);
 
-  // Al cargar el usuario, elegir empresa/sucursal si lo guardado ya no aplica
-  // (p.ej. le quitaron el acceso o es el primer ingreso).
-  useEffect(() => {
-    if (!user) return;
+  // Empresa/sucursal que corresponden al usuario cargado. Se recalcula cuando lo
+  // guardado ya no aplica (le quitaron el acceso, primer ingreso, o acaba de
+  // crear una empresa y todavía no tenía sucursal ahí).
+  const resolved = useMemo(() => {
+    if (!user) return null;
     const validCompany = companies.find((c) => c.id === companyId);
     const nextCompany =
       validCompany ??
       companies.find((c) => allBranches.some((b) => b.company_id === c.id)) ??
       companies[0];
-    if (!nextCompany) return;
+    if (!nextCompany) return null;
 
     const branchesOfCompany = allBranches.filter((b) => b.company_id === nextCompany.id);
     const validBranch =
@@ -52,14 +53,19 @@ export const TenantProvider = ({ children }: { children: React.ReactNode }) => {
       branchesOfCompany.find((b) => b.is_default) ??
       branchesOfCompany[0];
 
-    const nextCompanyId = nextCompany.id;
-    const nextBranchId = nextBranch?.id ?? null;
-    if (nextCompanyId !== companyId || nextBranchId !== branchId) {
-      setCompanyIdState(nextCompanyId);
-      setBranchIdState(nextBranchId);
-      setActiveTenant(nextCompanyId, nextBranchId);
-    }
+    return { companyId: nextCompany.id, branchId: nextBranch?.id ?? null };
   }, [user, companies, allBranches, companyId, branchId]);
+
+  const tenantPending = Boolean(
+    resolved && (resolved.companyId !== companyId || resolved.branchId !== branchId)
+  );
+
+  useEffect(() => {
+    if (!tenantPending || !resolved) return;
+    setCompanyIdState(resolved.companyId);
+    setBranchIdState(resolved.branchId);
+    setActiveTenant(resolved.companyId, resolved.branchId);
+  }, [tenantPending, resolved]);
 
   const branches = useMemo(
     () => allBranches.filter((b) => b.company_id === companyId),
@@ -113,7 +119,12 @@ export const TenantProvider = ({ children }: { children: React.ReactNode }) => {
     [companies, branches, companyId, branchId, setCompany, setBranch]
   );
 
-  return <TenantContext.Provider value={value}>{children}</TenantContext.Provider>;
+  // Los efectos de los hijos corren ANTES que los del padre: si se montan con el
+  // tenant a medias, su primer fetch sale sin sucursal (o con la de otra empresa)
+  // y el backend lo resuelve con la sucursal por defecto — datos de otra empresa.
+  return (
+    <TenantContext.Provider value={value}>{tenantPending ? null : children}</TenantContext.Provider>
+  );
 };
 
 export default TenantProvider;
