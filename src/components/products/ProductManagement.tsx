@@ -103,7 +103,8 @@ const ProductManagement = () => {
 
     const [scannedCode, setScannedCode] = useState('')
     // El catálogo es de la empresa; este filtro lo reduce a lo que maneja la sucursal.
-    const [inBranchOnly, setInBranchOnly] = useState(false)
+    // Encendido por defecto: la vista es del inventario de la sucursal, no del catálogo.
+    const [inBranchOnly, setInBranchOnly] = useState(true)
 
     // Data hooks
     const { data: productsData, isLoading, isError } = useProducts({
