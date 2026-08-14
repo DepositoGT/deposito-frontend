@@ -21,7 +21,10 @@ export const useProducts = (params?: ProductsQueryParams) => {
   return useQuery<ProductsResponse, Error>({
     queryKey: [...PRODUCTS_QUERY_KEY, params],
     queryFn: () => fetchProducts(params),
-    staleTime: 60 * 1000, // 1 min
+    // Sin staleTime: al volver al listado (o al cambiar el filtro de sucursal) se
+    // re-consulta. Con caché de 1 min, un producto recién agregado a la sucursal
+    // desde su ficha solo aparecía recargando la página.
+    staleTime: 0,
   });
 };
 
