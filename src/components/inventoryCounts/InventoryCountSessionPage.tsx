@@ -59,6 +59,14 @@ import {
   statusLabel,
 } from "@/services/inventoryCountService";
 import type { InventoryCountScope } from "@/services/inventoryCountService";
+import { fetchWarehouses } from "@/services/warehouseService";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 export default function InventoryCountSessionPage() {
   const { sessionId = "" } = useParams<{ sessionId: string }>();
@@ -73,6 +81,8 @@ export default function InventoryCountSessionPage() {
   const [search, setSearch] = useState("");
   const [debouncedQ, setDebouncedQ] = useState("");
   const [pendingOnly, setPendingOnly] = useState(false);
+  // Se cuenta parado frente a un anaquel: se filtra por ubicación.
+  const [locationId, setLocationId] = useState("all");
   const [page, setPage] = useState(0);
   const pageSize = 30;
   const [cancelOpen, setCancelOpen] = useState(false);
@@ -89,7 +99,7 @@ export default function InventoryCountSessionPage() {
 
   useEffect(() => {
     setPage(0);
-  }, [debouncedQ, pendingOnly]);
+  }, [debouncedQ, pendingOnly, locationId]);
 
   const canCount = hasPermission("inventory_count.count");
   const canSubmit = hasPermission("inventory_count.submit");
@@ -105,16 +115,24 @@ export default function InventoryCountSessionPage() {
   });
 
   const linesQuery = useQuery({
-    queryKey: ["inventory-lines", sessionId, debouncedQ, page, pendingOnly],
+    queryKey: ["inventory-lines", sessionId, debouncedQ, page, pendingOnly, locationId],
     queryFn: () =>
       listInventorySessionLines(sessionId, {
         q: debouncedQ || undefined,
         offset: page * pageSize,
         limit: pageSize,
         pendingOnly: pendingOnly || undefined,
+        locationId: locationId === "all" ? undefined : locationId,
       }),
     enabled: Boolean(sessionId) && sessionQuery.data?.status !== "DRAFT",
   });
+
+  // Solo las ubicaciones del alcance: si la sesión es de un almacén, las suyas.
+  const warehousesQuery = useQuery({ queryKey: ["warehouses"], queryFn: fetchWarehouses });
+  const sessionWarehouseId = sessionQuery.data?.warehouse?.id;
+  const countLocations = (warehousesQuery.data ?? [])
+    .filter((w) => !sessionWarehouseId || w.id === sessionWarehouseId)
+    .flatMap((w) => w.locations.map((l) => ({ id: l.id, label: `${w.name} · ${l.code}` })));
 
   const startMut = useMutation({
     mutationFn: () => startInventorySession(sessionId),
@@ -418,6 +436,21 @@ export default function InventoryCountSessionPage() {
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                 />
+                {countLocations.length > 1 && (
+                  <Select value={locationId} onValueChange={setLocationId}>
+                    <SelectTrigger className="w-full sm:w-56">
+                      <SelectValue placeholder="Ubicación" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todas las ubicaciones</SelectItem>
+                      {countLocations.map((l) => (
+                        <SelectItem key={l.id} value={l.id}>
+                          {l.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
                 {inProgress && doubleCount && (
                   <label className="flex items-center gap-2 text-xs text-muted-foreground whitespace-nowrap cursor-pointer shrink-0">
                     <Checkbox
@@ -468,6 +501,7 @@ export default function InventoryCountSessionPage() {
                     <TableRow>
                       <TableHead>Producto</TableHead>
                       <TableHead>Código</TableHead>
+                      <TableHead>Ubicación</TableHead>
                       <TableHead className="text-right">En sistema</TableHead>
                       <TableHead className="text-right w-28">Contado</TableHead>
                       {doubleCount && <TableHead className="text-right w-28">Comprobación</TableHead>}
@@ -732,6 +766,10 @@ function LineRow({
         {row.product.name}
       </TableCell>
       <TableCell className="text-xs text-muted-foreground">{row.product.barcode || "—"}</TableCell>
+      <TableCell className="text-xs whitespace-nowrap">
+        <span className="text-muted-foreground">{row.location.warehouse.name} · </span>
+        <span className="font-mono">{row.location.code}</span>
+      </TableCell>
       <TableCell className="text-right tabular-nums">{row.stock_snapshot}</TableCell>
       <TableCell className="text-right">
         <div className="flex justify-end gap-1">

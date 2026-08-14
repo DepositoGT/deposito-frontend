@@ -45,6 +45,7 @@ export type InventoryCountSessionSummary = {
   createdBy: { id: string; name: string; email: string };
   approvedBy?: { id: string; name: string; email: string } | null;
   firstApprovedBy?: { id: string; name: string; email: string } | null;
+  warehouse?: { id: string; name: string; code: string } | null;
   _count?: { lines: number };
   progress?: { totalLines: number; countedLines: number; pct: number };
   totals?: { sumStockSnapshot: number; valueDeltaApprox: number };
@@ -69,6 +70,12 @@ export type InventoryCountLineRow = {
     stock: number;
     cost: string | number;
     category: { id: number; name: string };
+  };
+  location: {
+    id: string;
+    code: string;
+    name: string | null;
+    warehouse: { id: string; name: string; code: string };
   };
   countedBy?: { id: string; name: string } | null;
   countedSecondaryBy?: { id: string; name: string } | null;
@@ -98,6 +105,8 @@ export async function getInventorySession(id: string): Promise<InventoryCountSes
 
 export async function createInventorySession(body: {
   name?: string;
+  /** Acota el conteo a un almacén de la sucursal; sin él, cuenta toda la sucursal. */
+  warehouse_id?: string;
   scope?: InventoryCountScope;
   notes?: string;
   dual_approval?: boolean;
@@ -111,13 +120,14 @@ export async function startInventorySession(id: string): Promise<InventoryCountS
 
 export async function listInventorySessionLines(
   sessionId: string,
-  opts?: { q?: string; offset?: number; limit?: number; pendingOnly?: boolean }
+  opts?: { q?: string; offset?: number; limit?: number; pendingOnly?: boolean; locationId?: string }
 ): Promise<{ data: InventoryCountLineRow[]; total: number }> {
   const sp = new URLSearchParams();
   if (opts?.q) sp.set("q", opts.q);
   if (opts?.offset != null) sp.set("offset", String(opts.offset));
   if (opts?.limit != null) sp.set("limit", String(opts.limit));
   if (opts?.pendingOnly) sp.set("pending", "1");
+  if (opts?.locationId) sp.set("location_id", opts.locationId);
   const q = sp.toString();
   return apiFetch(q ? `${path(`/${sessionId}/lines`)}?${q}` : path(`/${sessionId}/lines`));
 }
