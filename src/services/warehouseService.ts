@@ -33,6 +33,8 @@ export interface StockLocation {
   pickable: boolean;
   dispatch_priority: number;
   active: boolean;
+  /** Es la ubicación desde la que despacha el punto de venta de la sucursal. */
+  is_sales?: boolean;
 }
 
 export interface Warehouse {
@@ -92,6 +94,13 @@ export const updateLocation = (id: string, payload: Partial<LocationPayload> & {
     method: "PATCH",
     body: JSON.stringify(payload),
   });
+
+/** Alterna la ubicación de venta de la sucursal: marcarla otra vez la quita. */
+export const setSalesLocation = (id: string) =>
+  apiFetch<{ sales_location_id: string | null }>(
+    `/api/warehouses/locations/${encodeURIComponent(id)}/sales`,
+    { method: "PUT" }
+  );
 
 export const deleteLocation = (id: string) =>
   apiFetch<{ ok: true }>(`/api/warehouses/locations/${encodeURIComponent(id)}`, { method: "DELETE" });

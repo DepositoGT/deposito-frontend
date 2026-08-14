@@ -15,7 +15,7 @@
  */
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Loader2, MapPin, Plus, Trash2, Warehouse as WarehouseIcon } from 'lucide-react'
+import { Loader2, MapPin, Plus, Store, Trash2, Warehouse as WarehouseIcon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -45,6 +45,7 @@ import {
     deleteLocation,
     deleteWarehouse,
     fetchWarehouses,
+    setSalesLocation,
     updateLocation,
     updateWarehouse,
     WAREHOUSE_KIND_LABELS,
@@ -122,6 +123,12 @@ export const WarehousesCard = ({ canManage }: { canManage: boolean }) => {
         onError: fail,
     })
 
+    const salesLocationMutation = useMutation({
+        mutationFn: setSalesLocation,
+        onSuccess: () => void invalidate(),
+        onError: fail,
+    })
+
     const busy =
         createWarehouseMutation.isPending ||
         updateWarehouseMutation.isPending ||
@@ -140,7 +147,7 @@ export const WarehousesCard = ({ canManage }: { canManage: boolean }) => {
                         </CardTitle>
                         <CardDescription>
                             {branch
-                                ? `Espacios dentro de ${branch.name}. Al vender, la mercancía sale primero del de menor prioridad.`
+                                ? `Espacios dentro de ${branch.name}. Las ventas salen de la ubicación marcada como punto de venta; si no hay ninguna, del almacén de menor prioridad.`
                                 : 'Elige una sucursal concreta arriba para administrar sus almacenes.'}
                         </CardDescription>
                     </div>
@@ -215,10 +222,20 @@ export const WarehousesCard = ({ canManage }: { canManage: boolean }) => {
                                             <span className='font-mono'>{l.code}</span>
                                             {l.name && <span className='text-muted-foreground'>{l.name}</span>}
                                             {l.is_default && <Badge variant='outline'>Predeterminada</Badge>}
+                                            {l.is_sales && <Badge>Punto de venta</Badge>}
                                             {!l.pickable && <Badge variant='destructive'>No despacha</Badge>}
                                         </span>
                                         {canManage && (
                                             <span className='flex items-center gap-2'>
+                                                <Button
+                                                    size='sm'
+                                                    variant={l.is_sales ? 'secondary' : 'ghost'}
+                                                    disabled={busy}
+                                                    title='Las ventas de esta sucursal salen de aquí'
+                                                    onClick={() => salesLocationMutation.mutate(l.id)}
+                                                >
+                                                    <Store className='h-4 w-4' />
+                                                </Button>
                                                 <Label className='text-xs text-muted-foreground'>Despacha</Label>
                                                 <Switch
                                                     checked={l.pickable}
