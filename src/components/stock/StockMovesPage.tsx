@@ -15,7 +15,7 @@
  */
 import { useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ArrowRight, Loader2, MoveRight, X } from 'lucide-react'
+import { ArrowRight, Loader2, MoveRight, Scale, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -34,6 +34,7 @@ import { useTenant } from '@/context/useTenant'
 import { fetchProducts } from '@/services/productService'
 import { fetchWarehouses } from '@/services/warehouseService'
 import {
+    createAdjustment,
     createStockMove,
     fetchMovements,
     REASON_LABELS,
@@ -44,6 +45,92 @@ type Draft = { product_id: string; name: string; qty: number }
 
 const formatDate = (iso: string) =>
     new Date(iso).toLocaleString('es-GT', { dateStyle: 'short', timeStyle: 'short' })
+
+/** Buscador + renglones con cantidad. En ajustes la cantidad lleva signo. */
+const LinesEditor = ({
+    id,
+    draft,
+    setDraft,
+    signed = false,
+}: {
+    id: string
+    draft: Draft[]
+    setDraft: React.Dispatch<React.SetStateAction<Draft[]>>
+    signed?: boolean
+}) => {
+    const [search, setSearch] = useState('')
+    const { data } = useQuery({
+        queryKey: ['stock-move-products', search],
+        queryFn: () => fetchProducts({ search, pageSize: 20, inBranchOnly: true }),
+        enabled: search.trim().length > 0,
+    })
+
+    return (
+        <>
+            <div className='space-y-2'>
+                <Label htmlFor={id}>Buscar producto</Label>
+                <Input
+                    id={id}
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    placeholder='Nombre o código de barras'
+                />
+                {search && (
+                    <div className='max-h-40 overflow-y-auto rounded-md border'>
+                        {(data?.items ?? []).map((p) => (
+                            <button
+                                key={p.id}
+                                type='button'
+                                className='flex w-full items-center justify-between px-3 py-2 text-left text-sm hover:bg-muted'
+                                onClick={() =>
+                                    setDraft((d) =>
+                                        d.some((x) => x.product_id === String(p.id))
+                                            ? d
+                                            : [...d, { product_id: String(p.id), name: p.name, qty: 1 }]
+                                    )
+                                }
+                            >
+                                <span>{p.name}</span>
+                                <span className='text-muted-foreground'>en sucursal: {p.stock ?? 0}</span>
+                            </button>
+                        ))}
+                    </div>
+                )}
+            </div>
+
+            {draft.length > 0 && (
+                <div className='space-y-2'>
+                    <Label>{signed ? 'Diferencias (− merma, + sobrante)' : 'Productos a mover'}</Label>
+                    {draft.map((d) => (
+                        <div key={d.product_id} className='flex items-center gap-2'>
+                            <span className='flex-1 truncate text-sm'>{d.name}</span>
+                            <Input
+                                type='number'
+                                min={signed ? undefined : 1}
+                                className='w-24'
+                                value={d.qty}
+                                onChange={(e) =>
+                                    setDraft((rows) =>
+                                        rows.map((r) =>
+                                            r.product_id === d.product_id ? { ...r, qty: Number(e.target.value) } : r
+                                        )
+                                    )
+                                }
+                            />
+                            <Button
+                                size='icon'
+                                variant='ghost'
+                                onClick={() => setDraft((rows) => rows.filter((r) => r.product_id !== d.product_id))}
+                            >
+                                <X className='h-4 w-4' />
+                            </Button>
+                        </div>
+                    ))}
+                </div>
+            )}
+        </>
+    )
+}
 
 export const StockMovesPage = () => {
     const { toast } = useToast()
@@ -56,7 +143,11 @@ export const StockMovesPage = () => {
     const [toId, setToId] = useState('')
     const [notes, setNotes] = useState('')
     const [draft, setDraft] = useState<Draft[]>([])
-    const [productSearch, setProductSearch] = useState('')
+
+    const canAdjust = hasPermission('stock_moves.adjust')
+    const [adjLocationId, setAdjLocationId] = useState('')
+    const [adjNotes, setAdjNotes] = useState('')
+    const [adjDraft, setAdjDraft] = useState<Draft[]>([])
 
     const { data: warehouses = [] } = useQuery({
         queryKey: ['warehouses', branch?.id],
@@ -68,12 +159,6 @@ export const StockMovesPage = () => {
         queryKey: ['stock-moves', branch?.id],
         queryFn: () => fetchMovements({ limit: 100 }),
         enabled: Boolean(branch),
-    })
-
-    const { data: productsData } = useQuery({
-        queryKey: ['stock-move-products', productSearch],
-        queryFn: () => fetchProducts({ search: productSearch, pageSize: 20, inBranchOnly: true }),
-        enabled: productSearch.trim().length > 0,
     })
 
     // Las ubicaciones se eligen en plano: el almacén es solo su apellido.
@@ -95,12 +180,36 @@ export const StockMovesPage = () => {
             toast({ title: 'Mercancía movida', description: 'El total de la sucursal no cambió, solo su ubicación.' })
             setDraft([])
             setNotes('')
-            setProductSearch('')
             void queryClient.invalidateQueries({ queryKey: ['stock-moves'] })
             void queryClient.invalidateQueries({ queryKey: ['products'] })
         },
         onError: (e: Error) => toast({ title: 'No se pudo mover', description: e.message, variant: 'destructive' }),
     })
+
+    const adjustMutation = useMutation({
+        mutationFn: createAdjustment,
+        onSuccess: () => {
+            toast({ title: 'Ajuste aplicado', description: 'El stock de la sucursal quedó con la diferencia.' })
+            setAdjDraft([])
+            setAdjNotes('')
+            void queryClient.invalidateQueries({ queryKey: ['stock-moves'] })
+            void queryClient.invalidateQueries({ queryKey: ['products'] })
+        },
+        onError: (e: Error) => toast({ title: 'No se pudo ajustar', description: e.message, variant: 'destructive' }),
+    })
+
+    const submitAdjust = () => {
+        if (!adjLocationId) {
+            toast({ title: 'Elige la ubicación a ajustar', variant: 'destructive' })
+            return
+        }
+        const lines = adjDraft.filter((d) => d.qty !== 0).map((d) => ({ product_id: d.product_id, qty: d.qty }))
+        if (lines.length === 0) {
+            toast({ title: 'Agrega al menos una diferencia', variant: 'destructive' })
+            return
+        }
+        adjustMutation.mutate({ location_id: adjLocationId, lines, notes: adjNotes.trim() || undefined })
+    }
 
     const submit = () => {
         if (!fromId || !toId) {
@@ -167,67 +276,7 @@ export const StockMovesPage = () => {
                             </div>
                         </div>
 
-                        <div className='space-y-2'>
-                            <Label htmlFor='move-search'>Buscar producto</Label>
-                            <Input
-                                id='move-search'
-                                value={productSearch}
-                                onChange={(e) => setProductSearch(e.target.value)}
-                                placeholder='Nombre o código de barras'
-                            />
-                            {productSearch && (
-                                <div className='max-h-40 overflow-y-auto rounded-md border'>
-                                    {(productsData?.items ?? []).map((p) => (
-                                        <button
-                                            key={p.id}
-                                            type='button'
-                                            className='flex w-full items-center justify-between px-3 py-2 text-left text-sm hover:bg-muted'
-                                            onClick={() =>
-                                                setDraft((d) =>
-                                                    d.some((x) => x.product_id === String(p.id))
-                                                        ? d
-                                                        : [...d, { product_id: String(p.id), name: p.name, qty: 1 }]
-                                                )
-                                            }
-                                        >
-                                            <span>{p.name}</span>
-                                            <span className='text-muted-foreground'>en sucursal: {p.stock ?? 0}</span>
-                                        </button>
-                                    ))}
-                                </div>
-                            )}
-                        </div>
-
-                        {draft.length > 0 && (
-                            <div className='space-y-2'>
-                                <Label>Productos a mover</Label>
-                                {draft.map((d) => (
-                                    <div key={d.product_id} className='flex items-center gap-2'>
-                                        <span className='flex-1 truncate text-sm'>{d.name}</span>
-                                        <Input
-                                            type='number'
-                                            min={1}
-                                            className='w-24'
-                                            value={d.qty}
-                                            onChange={(e) =>
-                                                setDraft((rows) =>
-                                                    rows.map((r) =>
-                                                        r.product_id === d.product_id ? { ...r, qty: Number(e.target.value) } : r
-                                                    )
-                                                )
-                                            }
-                                        />
-                                        <Button
-                                            size='icon'
-                                            variant='ghost'
-                                            onClick={() => setDraft((rows) => rows.filter((r) => r.product_id !== d.product_id))}
-                                        >
-                                            <X className='h-4 w-4' />
-                                        </Button>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
+                        <LinesEditor id='move-search' draft={draft} setDraft={setDraft} />
 
                         <div className='space-y-2'>
                             <Label htmlFor='move-notes'>Nota (opcional)</Label>
@@ -242,6 +291,47 @@ export const StockMovesPage = () => {
                         <Button onClick={submit} disabled={moveMutation.isPending || locations.length < 2}>
                             <MoveRight className='mr-2 h-4 w-4' />
                             {moveMutation.isPending ? 'Moviendo…' : 'Mover'}
+                        </Button>
+                    </CardContent>
+                </Card>
+            )}
+
+            {canAdjust && branch && (
+                <Card>
+                    <CardHeader className='pb-3'>
+                        <CardTitle className='text-base'>Ajustar existencias</CardTitle>
+                        <CardDescription>
+                            Crea o destruye mercancía sin documento: merma en negativo, sobrante encontrado en positivo.
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent className='space-y-4'>
+                        <div className='space-y-2'>
+                            <Label>Ubicación</Label>
+                            <Select value={adjLocationId} onValueChange={setAdjLocationId}>
+                                <SelectTrigger><SelectValue placeholder='¿Dónde está la diferencia?' /></SelectTrigger>
+                                <SelectContent>
+                                    {locations.map((l) => (
+                                        <SelectItem key={l.id} value={l.id}>{l.label}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+
+                        <LinesEditor id='adjust-search' draft={adjDraft} setDraft={setAdjDraft} signed />
+
+                        <div className='space-y-2'>
+                            <Label htmlFor='adjust-notes'>Motivo</Label>
+                            <Input
+                                id='adjust-notes'
+                                value={adjNotes}
+                                onChange={(e) => setAdjNotes(e.target.value)}
+                                placeholder='Botella quebrada'
+                            />
+                        </div>
+
+                        <Button variant='secondary' onClick={submitAdjust} disabled={adjustMutation.isPending || locations.length === 0}>
+                            <Scale className='mr-2 h-4 w-4' />
+                            {adjustMutation.isPending ? 'Ajustando…' : 'Ajustar'}
                         </Button>
                     </CardContent>
                 </Card>
