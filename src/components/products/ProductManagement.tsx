@@ -24,7 +24,7 @@ import { Switch } from '@/components/ui/switch'
 import {
     Plus, Search, Filter, ScanLine, Download,
     QrCode, Upload, LayoutGrid, List, Package,
-    ClipboardList, ChevronDown, RotateCcw, CalendarClock,
+    ClipboardList, ChevronDown, RotateCcw, CalendarClock, MoveRight,
 } from 'lucide-react'
 import {
     DropdownMenu,
@@ -172,6 +172,7 @@ const ProductManagement = () => {
         'inventory_count.count',
         'inventory_count.create'
     )
+    const canSeeStockMoves = hasPermission('stock_moves.view', 'stock_moves.create')
     const hasFileActions = canExport || canImport
     const hasStockActions = canRegisterIncoming || canInventoryCount
 
@@ -307,6 +308,12 @@ const ProductManagement = () => {
                                 <CalendarClock className="mr-2 h-4 w-4" />
                                 Lotes y caducidades
                             </DropdownMenuItem>
+                            {canSeeStockMoves && (
+                                <DropdownMenuItem onClick={() => navigate('/inventario/movimientos')}>
+                                    <MoveRight className="mr-2 h-4 w-4" />
+                                    Movimientos internos
+                                </DropdownMenuItem>
+                            )}
                             <DropdownMenuItem onClick={() => setIsScannerOpen(true)}>
                                 <ScanLine className="mr-2 h-4 w-4" />
                                 Escanear código

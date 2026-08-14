@@ -27,6 +27,7 @@ import CatalogImportPage from "./pages/CatalogImportPage";
 import UserImportPage from "./pages/UserImportPage";
 import { RegisterIncomingMerchandise } from "./pages/RegisterIncomingMerchandise";
 import LotsExpiryPage from "./pages/LotsExpiryPage";
+import StockMovesPage from "@/components/stock/StockMovesPage";
 import AuthProvider from "@/context/AuthProvider";
 import TenantProvider from "@/context/TenantProvider";
 
@@ -254,6 +255,14 @@ const App = () => (
                   element={
                     <PermissionRoute any={["products.view"]}>
                       <LotsExpiryPage />
+                    </PermissionRoute>
+                  }
+                />
+                <Route
+                  path="/inventario/movimientos"
+                  element={
+                    <PermissionRoute any={["stock_moves.view", "stock_moves.create"]}>
+                      <StockMovesPage />
                     </PermissionRoute>
                   }
                 />
