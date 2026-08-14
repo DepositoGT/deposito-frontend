@@ -1,0 +1,97 @@
+/**
+ * Copyright (c) 2026 Diego Patzán. All Rights Reserved.
+ *
+ * This source code is licensed under a Proprietary License.
+ * Unauthorized copying, modification, distribution, or use of this file,
+ * via any medium, is strictly prohibited without express written permission.
+ *
+ * For licensing inquiries: GitHub @dpatzan2
+ */
+
+/**
+ * Almacenes y ubicaciones de la SUCURSAL ACTIVA. La sucursal va en las cabeceras
+ * que agrega apiFetch, así que aquí no se pasa nunca.
+ */
+import { apiFetch } from "./api";
+
+export type WarehouseKind = "BODEGA" | "SALA_VENTAS" | "VITRINA" | "TRANSITO" | "OTRO";
+
+export const WAREHOUSE_KIND_LABELS: Record<WarehouseKind, string> = {
+  BODEGA: "Bodega",
+  SALA_VENTAS: "Sala de ventas",
+  VITRINA: "Vitrina",
+  TRANSITO: "Tránsito",
+  OTRO: "Otro",
+};
+
+export interface StockLocation {
+  id: string;
+  warehouse_id: string;
+  code: string;
+  name: string | null;
+  is_default: boolean;
+  pickable: boolean;
+  dispatch_priority: number;
+  active: boolean;
+}
+
+export interface Warehouse {
+  id: string;
+  branch_id: string;
+  name: string;
+  code: string;
+  kind: WarehouseKind;
+  is_default: boolean;
+  is_receiving: boolean;
+  dispatch_priority: number;
+  active: boolean;
+  notes: string | null;
+  locations: StockLocation[];
+}
+
+export interface WarehousePayload {
+  name: string;
+  code: string;
+  kind?: WarehouseKind;
+  dispatch_priority?: number;
+  is_default?: boolean;
+  is_receiving?: boolean;
+  notes?: string;
+}
+
+export interface LocationPayload {
+  code: string;
+  name?: string;
+  pickable?: boolean;
+  dispatch_priority?: number;
+  is_default?: boolean;
+}
+
+export const fetchWarehouses = () => apiFetch<Warehouse[]>("/api/warehouses", { method: "GET" });
+
+export const createWarehouse = (payload: WarehousePayload) =>
+  apiFetch<Warehouse>("/api/warehouses", { method: "POST", body: JSON.stringify(payload) });
+
+export const updateWarehouse = (id: string, payload: Partial<WarehousePayload> & { active?: boolean }) =>
+  apiFetch<Warehouse>(`/api/warehouses/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+
+export const deleteWarehouse = (id: string) =>
+  apiFetch<{ ok: true }>(`/api/warehouses/${encodeURIComponent(id)}`, { method: "DELETE" });
+
+export const createLocation = (warehouseId: string, payload: LocationPayload) =>
+  apiFetch<StockLocation>(`/api/warehouses/${encodeURIComponent(warehouseId)}/locations`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+
+export const updateLocation = (id: string, payload: Partial<LocationPayload> & { active?: boolean }) =>
+  apiFetch<StockLocation>(`/api/warehouses/locations/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+
+export const deleteLocation = (id: string) =>
+  apiFetch<{ ok: true }>(`/api/warehouses/locations/${encodeURIComponent(id)}`, { method: "DELETE" });
