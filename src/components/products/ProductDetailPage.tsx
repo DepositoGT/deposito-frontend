@@ -339,7 +339,7 @@ export default function ProductDetailPage() {
           {canDelete && !isEditing && (
             <Button variant="destructive" onClick={() => setIsDeleteDialogOpen(true)}>
               <Trash2 className="w-4 h-4 mr-2" />
-              Eliminar
+              {branches.length > 1 ? 'Eliminar de la empresa' : 'Eliminar'}
             </Button>
           )}
         </div>
@@ -372,10 +372,23 @@ export default function ProductDetailPage() {
       <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>¿Eliminar producto?</AlertDialogTitle>
+            <AlertDialogTitle>
+              {branches.length > 1 ? '¿Eliminar el producto de toda la empresa?' : '¿Eliminar producto?'}
+            </AlertDialogTitle>
             <AlertDialogDescription>
-              Se eliminará «{product.name}» del inventario. Si tu sistema usa eliminación lógica, podrás restaurarlo
-              desde Inventario → Acciones → Productos eliminados.
+              {branches.length > 1 ? (
+                <>
+                  El catálogo es de la empresa, así que «{product.name}» dejará de existir en{' '}
+                  <strong>las {branches.length} sucursales</strong>, no solo en {branch?.name || 'esta'}. Para sacarlo
+                  únicamente de aquí usá «Quitar de esta sucursal». Podés restaurarlo desde Inventario → Acciones →
+                  Productos eliminados.
+                </>
+              ) : (
+                <>
+                  Se eliminará «{product.name}» del inventario. Podrás restaurarlo desde Inventario → Acciones →
+                  Productos eliminados.
+                </>
+              )}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -388,7 +401,11 @@ export default function ProductDetailPage() {
                 void handleDeleteProduct()
               }}
             >
-              {deleteIsLoading ? 'Eliminando…' : 'Eliminar'}
+              {deleteIsLoading
+                ? 'Eliminando…'
+                : branches.length > 1
+                  ? `Eliminar de las ${branches.length} sucursales`
+                  : 'Eliminar'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
