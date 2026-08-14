@@ -53,7 +53,6 @@ const ReportsManagement = () => {
   const [fYear, setFYear] = useState<number | 'all'>(initialYear);
   const [fMonth, setFMonth] = useState<number | null>(null);
   const [isGeneratingReport, setIsGeneratingReport] = useState(false);
-  const [generatingReportId, setGeneratingReportId] = useState<string | null>(null);
   const [fSem, setFSem] = useState<1 | 2>(1);
   const [fFormat, setFFormat] = useState<'pdf' | 'csv'>('pdf');
   // Alcance del reporte: una sucursal, o 'all' = toda la empresa (consolidado).
@@ -364,56 +363,13 @@ const ReportsManagement = () => {
                     <Button
                       size="sm"
                       className="flex-1 bg-liquor-amber hover:bg-liquor-amber/90 text-white"
-                      disabled={generatingReportId === report.id}
-                      onClick={async () => {
-                        if (report.id === 'inventory') {
-                          // Descargar directamente el mismo PDF usado en Gestión de Productos
-                          setGeneratingReportId(report.id);
-                          try {
-                            toast({ title: 'Generando...', description: report.name })
-                            const pdfToken = getAuthToken()
-                            const res = await fetch(`${getApiBaseUrl()}/products/report.pdf`, {
-                              credentials: 'include',
-                              headers: {
-                                ...tenantHeaders(),
-                                ...(pdfToken ? { Authorization: `Bearer ${pdfToken}` } : {}),
-                              },
-                            })
-                            if (!res.ok) throw new Error('Error al generar el reporte de inventario')
-                            const blob = await res.blob()
-                            const url = window.URL.createObjectURL(blob)
-                            const a = document.createElement('a')
-                            a.href = url
-                            a.download = `productos_reporte.pdf`
-                            a.click()
-                            window.URL.revokeObjectURL(url)
-                            toast({ title: 'Reporte listo', description: `${report.name} descargado` })
-                          } catch (err) {
-                            const msg = err instanceof Error ? err.message : 'No se pudo generar el reporte'
-                            toast({ title: 'Error', description: msg, variant: 'destructive' })
-                          } finally {
-                            setGeneratingReportId(null);
-                          }
-                          return
-                        }
+                      onClick={() => {
                         setPendingReport(report)
                         setFiltersOpen(true)
                       }}
                     >
-                      {generatingReportId === report.id ? (
-                        <>
-                          <svg className="animate-spin w-3 h-3 mr-1" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
-                          </svg>
-                          Generando...
-                        </>
-                      ) : (
-                        <>
-                          <Download className="w-3 h-3 mr-1" />
-                          Generar
-                        </>
-                      )}
+                      <Download className="w-3 h-3 mr-1" />
+                      Generar
                     </Button>
                     {/* Botón de vista previa removido */}
                   </div>
