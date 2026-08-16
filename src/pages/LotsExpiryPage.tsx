@@ -43,6 +43,7 @@ interface ExpiringLot {
   qty_remaining: number
   days_to_expiry: number
   received_at: string
+  location?: { id: string; code: string; name: string | null } | null
   product: {
     id: string
     name: string
@@ -155,6 +156,7 @@ export const LotsExpiryPage = () => {
                   <TableRow>
                     <TableHead>Producto</TableHead>
                     <TableHead>Lote</TableHead>
+                    <TableHead>Ubicación</TableHead>
                     <TableHead>Caducidad</TableHead>
                     <TableHead className="text-right">Días</TableHead>
                     <TableHead className="text-right">Cant. en lote</TableHead>
@@ -178,6 +180,7 @@ export const LotsExpiryPage = () => {
                           </p>
                         </TableCell>
                         <TableCell>{lot.lot_code || '—'}</TableCell>
+                        <TableCell className="text-muted-foreground">{lot.location?.code || '—'}</TableCell>
                         <TableCell>{formatDate(lot.expiry_date)}</TableCell>
                         <TableCell className="text-right">
                           {expired ? `hace ${Math.abs(lot.days_to_expiry)}` : lot.days_to_expiry}

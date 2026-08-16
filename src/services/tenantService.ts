@@ -139,11 +139,16 @@ export const createTransfer = (payload: {
 
 export const receiveTransfer = (
   id: string,
-  lines?: { line_id: string; qty_received: number }[]
+  lines?: { line_id: string; qty_received: number }[],
+  /** Ubicación donde entra la mercancía; sin ella, la de recepción por defecto. */
+  toLocationId?: string
 ) =>
   apiFetch<Transfer>(`/api/transfers/${encodeURIComponent(id)}/receive`, {
     method: "POST",
-    body: JSON.stringify(lines ? { lines } : {}),
+    body: JSON.stringify({
+      ...(lines ? { lines } : {}),
+      ...(toLocationId ? { to_location_id: toLocationId } : {}),
+    }),
   });
 
 export const cancelTransfer = (id: string) =>

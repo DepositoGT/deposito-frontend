@@ -48,6 +48,7 @@ import {
     type TransferStatus,
 } from '@/services/tenantService'
 import { fetchProducts } from '@/services/productService'
+import { fetchWarehouses } from '@/services/warehouseService'
 
 const STATUS_LABEL: Record<TransferStatus, string> = {
     EN_TRANSITO: 'En tránsito',
@@ -80,6 +81,7 @@ export const TransfersManagement = () => {
     const [productSearch, setProductSearch] = useState('')
     const [receiving, setReceiving] = useState<Transfer | null>(null)
     const [receivedQty, setReceivedQty] = useState<Record<string, string>>({})
+    const [receiveLocation, setReceiveLocation] = useState('default')
 
     const { data, isLoading } = useQuery({
         queryKey: ['transfers', direction, branch?.id],
@@ -91,6 +93,17 @@ export const TransfersManagement = () => {
         queryFn: () => fetchProducts({ search: productSearch, pageSize: 20 }),
         enabled: createOpen,
     })
+
+    // Ubicaciones de ESTA sucursal: solo importan al recibir.
+    const { data: warehouses } = useQuery({
+        queryKey: ['warehouses', branch?.id],
+        queryFn: fetchWarehouses,
+        enabled: receiving != null,
+    })
+    const receiveLocations = useMemo(
+        () => (warehouses ?? []).flatMap((w) => w.locations.map((l) => ({ ...l, warehouse: w.name }))),
+        [warehouses]
+    )
 
     const otherBranches = useMemo(
         () => branches.filter((b) => b.id !== branch?.id && b.active !== false),
@@ -116,12 +129,16 @@ export const TransfersManagement = () => {
     })
 
     const receiveMutation = useMutation({
-        mutationFn: ({ id, lines }: { id: string; lines?: { line_id: string; qty_received: number }[] }) =>
-            receiveTransfer(id, lines),
+        mutationFn: ({ id, lines, locationId }: {
+            id: string
+            lines?: { line_id: string; qty_received: number }[]
+            locationId?: string
+        }) => receiveTransfer(id, lines, locationId),
         onSuccess: (t) => {
             toast({ title: `Traslado ${t.reference} recibido` })
             setReceiving(null)
             setReceivedQty({})
+            setReceiveLocation('default')
             invalidate()
         },
         onError: (e: Error) => toast({ title: 'No se pudo recibir', description: e.message, variant: 'destructive' }),
@@ -166,7 +183,11 @@ export const TransfersManagement = () => {
             toast({ title: 'Cantidades inválidas', description: 'Usa enteros mayores o iguales a 0', variant: 'destructive' })
             return
         }
-        receiveMutation.mutate({ id: receiving.id, lines })
+        receiveMutation.mutate({
+            id: receiving.id,
+            lines,
+            locationId: receiveLocation === 'default' ? undefined : receiveLocation,
+        })
     }
 
     const transfers = data?.items ?? []
@@ -394,6 +415,22 @@ export const TransfersManagement = () => {
                         </DialogDescription>
                     </DialogHeader>
                     <div className='space-y-3'>
+                        {receiveLocations.length > 1 && (
+                            <div className='space-y-1'>
+                                <Label>¿Dónde se guarda?</Label>
+                                <Select value={receiveLocation} onValueChange={setReceiveLocation}>
+                                    <SelectTrigger><SelectValue /></SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value='default'>Ubicación de recepción por defecto</SelectItem>
+                                        {receiveLocations.map((l) => (
+                                            <SelectItem key={l.id} value={l.id}>
+                                                {l.warehouse} · {l.code}{l.name ? ` — ${l.name}` : ''}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        )}
                         {receiving?.lines.map((l) => (
                             <div key={l.id} className='flex items-center gap-3'>
                                 <span className='flex-1 truncate text-sm'>
