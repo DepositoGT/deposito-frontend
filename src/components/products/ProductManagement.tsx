@@ -14,7 +14,7 @@
  * This component orchestrates the product management feature.
  * Logic is extracted into custom hooks, UI into sub-components.
  */
-import { useState, useMemo, useEffect } from 'react'
+import { Fragment, useState, useMemo, useEffect } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -43,6 +43,9 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useProducts, PRODUCTS_QUERY_KEY } from '@/hooks/useProducts'
 import { useCategories } from '@/hooks/useCategories'
 import { adaptApiProduct, addProductToBranch, fetchAllProducts } from '@/services/productService'
+import { fetchWarehouses } from '@/services/warehouseService'
+import { fetchStockByLocation } from '@/services/stockMoveService'
+import { useTenant } from '@/context/useTenant'
 import { Pagination } from '@/components/shared/Pagination'
 
 // Feature imports
@@ -53,10 +56,43 @@ import { usePersistedListUiState, useResetPageOnFilterChange } from '@/hooks/use
 import { useNavigate } from 'react-router-dom'
 import { formatMoney } from '@/utils'
 
+/** Dónde está lo que hay de un producto. Se consulta al abrir, no antes. */
+const StockBreakdownRow = ({ productId }: { productId: string }) => {
+    const { data, isLoading } = useQuery({
+        queryKey: ['stock-by-location', productId],
+        queryFn: () => fetchStockByLocation(productId),
+        staleTime: 30_000,
+    })
+    return (
+        <tr className="border-b border-border bg-muted/40">
+            <td colSpan={6} className="px-3 py-2">
+                {isLoading ? (
+                    <span className="text-xs text-muted-foreground">Cargando ubicaciones…</span>
+                ) : !data?.length ? (
+                    <span className="text-xs text-muted-foreground">Sin existencias en ninguna ubicación.</span>
+                ) : (
+                    <div className="space-y-1">
+                        {data.map((r) => (
+                            <div key={r.location.id} className="flex justify-between text-xs">
+                                <span className="text-muted-foreground">
+                                    {r.location.warehouse.branch ? `${r.location.warehouse.branch.name} · ` : ''}
+                                    {r.location.warehouse.name} · <span className="font-mono">{r.location.code}</span>
+                                </span>
+                                <span className="font-medium text-foreground">{r.stock}</span>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </td>
+        </tr>
+    )
+}
+
 const ProductManagement = () => {
     const navigate = useNavigate()
     const { toast } = useToast()
     const queryClient = useQueryClient()
+    const { branches } = useTenant()
     const { hasPermission } = useAuthPermissions()
     const { locale, currencyCode } = useSystemSettings()
     const fmt = (n: number) => formatMoney(n, locale, currencyCode)
@@ -104,8 +140,13 @@ const ProductManagement = () => {
     const [selectingAllPages, setSelectingAllPages] = useState(false)
 
     const [scannedCode, setScannedCode] = useState('')
-    // El catálogo es de la empresa; este filtro lo reduce a lo que maneja la sucursal.
-    // Encendido por defecto: la vista es del inventario de la sucursal, no del catálogo.
+    // Alcance de la pantalla: el inventario es de la empresa y se acota aquí, no
+    // con el selector global (que sigue mandando en ventas, caja y traslados).
+    const [scopeBranch, setScopeBranch] = useState('all')
+    const [scopeWarehouse, setScopeWarehouse] = useState('all')
+    const [scopeLocation, setScopeLocation] = useState('all')
+    const [expandedId, setExpandedId] = useState<string | null>(null)
+    // Con una sucursal elegida: solo lo que esa sucursal maneja, o todo el catálogo.
     const [inBranchOnly, setInBranchOnly] = useState(true)
 
     // Data hooks
@@ -114,7 +155,10 @@ const ProductManagement = () => {
         pageSize: pageSize,
         search: searchTerm || undefined,
         category: categoryFilter !== 'all' ? categoryFilter : undefined,
-        inBranchOnly: inBranchOnly || undefined,
+        branchId: scopeBranch,
+        warehouseId: scopeWarehouse !== 'all' ? scopeWarehouse : undefined,
+        locationId: scopeLocation !== 'all' ? scopeLocation : undefined,
+        inBranchOnly: scopeBranch !== 'all' && inBranchOnly ? true : undefined,
     })
     const { data: categoriesData } = useCategories()
     const products = useMemo(() => {
@@ -130,7 +174,22 @@ const ProductManagement = () => {
         return base.concat(['Whisky', 'Vinos', 'Cervezas', 'Rones', 'Vodkas', 'Tequilas', 'Ginebras'])
     }, [categoriesData])
 
-    useResetPageOnFilterChange(setCurrentPage, [searchTerm, categoryFilter, pageSize, inBranchOnly])
+    useResetPageOnFilterChange(setCurrentPage, [
+        searchTerm, categoryFilter, pageSize, inBranchOnly, scopeBranch, scopeWarehouse, scopeLocation,
+    ])
+
+    // Almacenes del alcance elegido (y sus ubicaciones, ya en plano).
+    const { data: scopeWarehouses = [] } = useQuery({
+        queryKey: ['warehouses', 'scope', scopeBranch],
+        queryFn: () => fetchWarehouses(scopeBranch),
+    })
+    const scopeLocations = useMemo(
+        () =>
+            scopeWarehouses
+                .filter((w) => scopeWarehouse === 'all' || w.id === scopeWarehouse)
+                .flatMap((w) => w.locations.map((l) => ({ ...l, warehouse: w.name }))),
+        [scopeWarehouses, scopeWarehouse]
+    )
 
     // Products are already filtered and paginated by the backend
     const paginatedProducts = products
@@ -405,16 +464,66 @@ const ProductManagement = () => {
                                 ))}
                             </SelectContent>
                         </Select>
-                        <div className="flex items-center gap-2 whitespace-nowrap">
-                            <Switch
-                                id="in-branch-only"
-                                checked={inBranchOnly}
-                                onCheckedChange={setInBranchOnly}
-                            />
-                            <Label htmlFor="in-branch-only" className="text-sm font-normal">
-                                Solo de esta sucursal
-                            </Label>
-                        </div>
+                        <Select
+                            value={scopeBranch}
+                            onValueChange={(v) => { setScopeBranch(v); setScopeWarehouse('all'); setScopeLocation('all') }}
+                        >
+                            <SelectTrigger className="w-48">
+                                <Store className="w-4 h-4 mr-2" />
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">Todas las sucursales</SelectItem>
+                                {branches.map((b) => (
+                                    <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                        {scopeWarehouses.length > 1 && (
+                            <Select
+                                value={scopeWarehouse}
+                                onValueChange={(v) => { setScopeWarehouse(v); setScopeLocation('all') }}
+                            >
+                                <SelectTrigger className="w-48">
+                                    <SelectValue placeholder="Almacén" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">Todos los almacenes</SelectItem>
+                                    {scopeWarehouses.map((w) => (
+                                        <SelectItem key={w.id} value={w.id}>
+                                            {scopeBranch === 'all' && w.branch ? `${w.branch.name} · ` : ''}{w.name}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        )}
+                        {scopeLocations.length > 1 && (
+                            <Select value={scopeLocation} onValueChange={setScopeLocation}>
+                                <SelectTrigger className="w-48">
+                                    <SelectValue placeholder="Ubicación" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">Todas las ubicaciones</SelectItem>
+                                    {scopeLocations.map((l) => (
+                                        <SelectItem key={l.id} value={l.id}>
+                                            {scopeWarehouse === 'all' ? `${l.warehouse} · ` : ''}{l.code}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        )}
+                        {scopeBranch !== 'all' && (
+                            <div className="flex items-center gap-2 whitespace-nowrap">
+                                <Switch
+                                    id="in-branch-only"
+                                    checked={inBranchOnly}
+                                    onCheckedChange={setInBranchOnly}
+                                />
+                                <Label htmlFor="in-branch-only" className="text-sm font-normal">
+                                    Solo lo que maneja
+                                </Label>
+                            </div>
+                        )}
                     </div>
                 </CardContent>
             </Card>
@@ -495,8 +604,8 @@ const ProductManagement = () => {
                                         </thead>
                                         <tbody>
                                             {paginatedProducts.map((product, index) => (
+                                              <Fragment key={product.id}>
                                                 <tr
-                                                    key={product.id}
                                                     role="button"
                                                     tabIndex={0}
                                                     className="border-b border-border hover:bg-muted transition-colors animate-slide-up cursor-pointer"
@@ -553,10 +662,23 @@ const ProductManagement = () => {
                                                                 )}
                                                             </div>
                                                         ) : (
-                                                            <>
-                                                                <div className="font-medium text-foreground">{product.stock}</div>
-                                                                <div className="text-xs text-muted-foreground">Min: {product.minStock}</div>
-                                                            </>
+                                                            <button
+                                                                type="button"
+                                                                className="mx-auto flex items-center gap-1 rounded px-1 hover:bg-muted"
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation()
+                                                                    setExpandedId((id) => (id === product.id ? null : product.id))
+                                                                }}
+                                                                title="Ver en qué ubicaciones está"
+                                                            >
+                                                                <div>
+                                                                    <div className="font-medium text-foreground">{product.stock}</div>
+                                                                    <div className="text-xs text-muted-foreground">Min: {product.minStock}</div>
+                                                                </div>
+                                                                <ChevronDown
+                                                                    className={`h-3 w-3 text-muted-foreground transition-transform ${expandedId === product.id ? 'rotate-180' : ''}`}
+                                                                />
+                                                            </button>
                                                         )}
                                                     </td>
                                                     <td className="p-3 text-right">
@@ -567,6 +689,10 @@ const ProductManagement = () => {
                                                     </td>
                                                     <td className="p-3 text-center">{getStatusBadge(product)}</td>
                                                 </tr>
+                                                {expandedId === product.id && (
+                                                    <StockBreakdownRow productId={product.id} />
+                                                )}
+                                              </Fragment>
                                             ))}
                                         </tbody>
                                     </table>

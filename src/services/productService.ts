@@ -128,8 +128,12 @@ export interface ProductsQueryParams {
   includeDeleted?: boolean;
   /** Solo productos disponibles para venta (POS). */
   forSaleOnly?: boolean;
-  /** Solo los productos que maneja la sucursal activa (los demás ni aparecen). */
+  /** Solo los productos que maneja la sucursal del alcance (los demás ni aparecen). */
   inBranchOnly?: boolean;
+  /** Alcance de la pantalla: manda sobre el selector global. 'all' = toda la empresa. */
+  branchId?: string;
+  warehouseId?: string;
+  locationId?: string;
 }
 
 export interface ProductsResponse {
@@ -152,6 +156,9 @@ export const fetchProducts = async (params?: ProductsQueryParams): Promise<Produ
   if (params?.includeDeleted) search.set("includeDeleted", "true");
   if (params?.forSaleOnly) search.set("forSale", "true");
   if (params?.inBranchOnly) search.set("in_branch", "1");
+  if (params?.branchId) search.set("branch_id", params.branchId);
+  if (params?.warehouseId) search.set("warehouse_id", params.warehouseId);
+  if (params?.locationId) search.set("location_id", params.locationId);
 
   const url = `/api/products${search.toString() ? `?${search.toString()}` : ""}`;
   const data = await apiFetch<ProductsResponse>(url, { method: "GET" });

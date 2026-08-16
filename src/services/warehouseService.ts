@@ -40,6 +40,8 @@ export interface StockLocation {
 export interface Warehouse {
   id: string;
   branch_id: string;
+  /** Viene en el listado: sirve para etiquetar "Sucursal · Almacén". */
+  branch?: { id: string; name: string };
   name: string;
   code: string;
   kind: WarehouseKind;
@@ -71,7 +73,12 @@ export interface LocationPayload {
   is_default?: boolean;
 }
 
-export const fetchWarehouses = () => apiFetch<Warehouse[]>("/api/warehouses", { method: "GET" });
+/** `branchId` acota a otra sucursal sin cambiar el selector global; 'all' = todas las visibles. */
+export const fetchWarehouses = (branchId?: string) =>
+  apiFetch<Warehouse[]>(
+    `/api/warehouses${branchId ? `?branch_id=${encodeURIComponent(branchId)}` : ""}`,
+    { method: "GET" }
+  );
 
 export const createWarehouse = (payload: WarehousePayload) =>
   apiFetch<Warehouse>("/api/warehouses", { method: "POST", body: JSON.stringify(payload) });

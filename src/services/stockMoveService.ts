@@ -108,7 +108,14 @@ export interface LocationStock {
     name: string | null;
     pickable: boolean;
     active: boolean;
-    warehouse: { id: string; name: string; code: string; dispatch_priority: number };
+    warehouse: {
+      id: string;
+      name: string;
+      code: string;
+      dispatch_priority: number;
+      /** Solo en vista consolidada: de qué sucursal es el almacén. */
+      branch?: { id: string; name: string };
+    };
   };
 }
 
