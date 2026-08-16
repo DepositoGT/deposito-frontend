@@ -43,9 +43,19 @@ export const TenantProvider = ({ children }: { children: React.ReactNode }) => {
     if (!nextCompany) return null;
 
     const branchesOfCompany = allBranches.filter((b) => b.company_id === nextCompany.id);
+    // El consolidado solo vale con permiso: sin esto, un usuario al que se lo
+    // quitaron (o que heredó el valor guardado) mandaba X-Branch-Id: all en cada
+    // request y el backend le respondía 403 en TODA la aplicación.
+    const canConsolidate =
+      user.role?.name?.toLowerCase() === "admin" ||
+      (Array.isArray(user.permissions) &&
+        user.permissions.some((p) => {
+          const code = typeof p === "string" ? p : String((p as { code?: unknown } | null)?.code ?? "");
+          return code === "branches.view_all";
+        }));
     const validBranch =
       branchId === CONSOLIDATED
-        ? { id: CONSOLIDATED }
+        ? (canConsolidate ? { id: CONSOLIDATED } : undefined)
         : branchesOfCompany.find((b) => b.id === branchId);
     const nextBranch =
       validBranch ??
