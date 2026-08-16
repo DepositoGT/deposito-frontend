@@ -37,7 +37,7 @@ export default function InventoryCountNewPage() {
   const [name, setName] = useState("");
   const [notes, setNotes] = useState("");
   const [warehouseId, setWarehouseId] = useState("all");
-  const { data: warehousesData } = useQuery({ queryKey: ["warehouses"], queryFn: fetchWarehouses });
+  const { data: warehousesData } = useQuery({ queryKey: ["warehouses"], queryFn: () => fetchWarehouses() });
   const warehouses = (warehousesData ?? []).filter((w) => w.active);
   const [scopeMode, setScopeMode] = useState<ScopeMode>("full");
   const [selCategories, setSelCategories] = useState<Set<number>>(new Set());

@@ -39,7 +39,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Checkbox } from '@/components/ui/checkbox'
 import { useToast } from '@/hooks/use-toast'
 import type { Product } from '@/types'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useProducts, PRODUCTS_QUERY_KEY } from '@/hooks/useProducts'
 import { useCategories } from '@/hooks/useCategories'
 import { adaptApiProduct, addProductToBranch, fetchAllProducts } from '@/services/productService'

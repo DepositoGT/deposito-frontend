@@ -73,7 +73,7 @@ export const RegisterIncomingMerchandise = () => {
   const [locationId, setLocationId] = useState('default')
 
   // Ubicaciones de la sucursal: dónde se guarda lo que llega.
-  const { data: warehouses = [] } = useQuery({ queryKey: ['warehouses'], queryFn: fetchWarehouses })
+  const { data: warehouses = [] } = useQuery({ queryKey: ['warehouses'], queryFn: () => fetchWarehouses() })
   const receiveLocations = useMemo(
     () =>
       warehouses

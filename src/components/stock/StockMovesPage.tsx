@@ -152,7 +152,7 @@ export const StockMovesPage = () => {
 
     const { data: warehouses = [] } = useQuery({
         queryKey: ['warehouses', branch?.id],
-        queryFn: fetchWarehouses,
+        queryFn: () => fetchWarehouses(),
         enabled: Boolean(branch),
     })
 

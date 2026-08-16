@@ -97,7 +97,7 @@ export const TransfersManagement = () => {
     // Ubicaciones de ESTA sucursal: solo importan al recibir.
     const { data: warehouses } = useQuery({
         queryKey: ['warehouses', branch?.id],
-        queryFn: fetchWarehouses,
+        queryFn: () => fetchWarehouses(),
         enabled: receiving != null,
     })
     const receiveLocations = useMemo(

@@ -68,7 +68,7 @@ const ReportsManagement = () => {
   const [fWarehouse, setFWarehouse] = useState<string>('all');
   const { data: warehouses } = useQuery({
     queryKey: ['warehouses', branch?.id],
-    queryFn: fetchWarehouses,
+    queryFn: () => fetchWarehouses(),
     enabled: filtersOpen,
   });
   const showWarehousePicker =

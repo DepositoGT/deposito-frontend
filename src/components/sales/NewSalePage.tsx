@@ -244,7 +244,7 @@ export default function NewSalePage() {
   const categoriesQuery = useCategories()
 
   // Ubicación desde la que despacha este punto de venta (si la sucursal la marcó).
-  const warehousesQuery = useQuery({ queryKey: ['warehouses'], queryFn: fetchWarehouses })
+  const warehousesQuery = useQuery({ queryKey: ['warehouses'], queryFn: () => fetchWarehouses() })
   const posLocationId = useMemo(
     () => warehousesQuery.data?.flatMap((w) => w.locations).find((l) => l.is_sales)?.id ?? null,
     [warehousesQuery.data]

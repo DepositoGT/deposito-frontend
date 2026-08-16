@@ -128,7 +128,7 @@ export default function InventoryCountSessionPage() {
   });
 
   // Solo las ubicaciones del alcance: si la sesión es de un almacén, las suyas.
-  const warehousesQuery = useQuery({ queryKey: ["warehouses"], queryFn: fetchWarehouses });
+  const warehousesQuery = useQuery({ queryKey: ["warehouses"], queryFn: () => fetchWarehouses() });
   const sessionWarehouseId = sessionQuery.data?.warehouse?.id;
   const countLocations = (warehousesQuery.data ?? [])
     .filter((w) => !sessionWarehouseId || w.id === sessionWarehouseId)

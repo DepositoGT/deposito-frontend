@@ -77,7 +77,7 @@ export const WarehousesCard = ({ canManage }: { canManage: boolean }) => {
 
     const { data: warehouses = [], isLoading } = useQuery({
         queryKey: ['warehouses', branch?.id],
-        queryFn: fetchWarehouses,
+        queryFn: () => fetchWarehouses(),
         enabled: Boolean(branch),
     })
 
