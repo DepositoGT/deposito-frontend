@@ -37,6 +37,7 @@ import {
     createAdjustment,
     createStockMove,
     fetchMovements,
+    fetchReplenishment,
     REASON_LABELS,
     type StockMovement,
 } from '@/services/stockMoveService'
@@ -155,6 +156,12 @@ export const StockMovesPage = () => {
         enabled: Boolean(branch),
     })
 
+    const { data: replenishment = [] } = useQuery({
+        queryKey: ['stock-replenishment', branch?.id],
+        queryFn: fetchReplenishment,
+        enabled: Boolean(branch),
+    })
+
     const { data: movements = [], isLoading } = useQuery({
         queryKey: ['stock-moves', branch?.id],
         queryFn: () => fetchMovements({ limit: 100 }),
@@ -182,6 +189,7 @@ export const StockMovesPage = () => {
             setNotes('')
             void queryClient.invalidateQueries({ queryKey: ['stock-moves'] })
             void queryClient.invalidateQueries({ queryKey: ['products'] })
+            void queryClient.invalidateQueries({ queryKey: ['stock-replenishment'] })
         },
         onError: (e: Error) => toast({ title: 'No se pudo mover', description: e.message, variant: 'destructive' }),
     })
@@ -194,6 +202,7 @@ export const StockMovesPage = () => {
             setAdjNotes('')
             void queryClient.invalidateQueries({ queryKey: ['stock-moves'] })
             void queryClient.invalidateQueries({ queryKey: ['products'] })
+            void queryClient.invalidateQueries({ queryKey: ['stock-replenishment'] })
         },
         onError: (e: Error) => toast({ title: 'No se pudo ajustar', description: e.message, variant: 'destructive' }),
     })
@@ -209,6 +218,19 @@ export const StockMovesPage = () => {
             return
         }
         adjustMutation.mutate({ location_id: adjLocationId, lines, notes: adjNotes.trim() || undefined })
+    }
+
+    /** Carga la sugerencia en el formulario de arriba; confirmar sigue siendo del usuario. */
+    const preloadMove = (row: (typeof replenishment)[number]) => {
+        setFromId(row.from_location_id || '')
+        setToId(row.location_id)
+        setDraft((d) =>
+            d.some((x) => x.product_id === row.product_id)
+                ? d
+                : [...d, { product_id: row.product_id, name: row.product_name, qty: row.suggested_qty }]
+        )
+        setNotes('Reposición sugerida')
+        window.scrollTo({ top: 0, behavior: 'smooth' })
     }
 
     const submit = () => {
@@ -333,6 +355,68 @@ export const StockMovesPage = () => {
                             <Scale className='mr-2 h-4 w-4' />
                             {adjustMutation.isPending ? 'Ajustando…' : 'Ajustar'}
                         </Button>
+                    </CardContent>
+                </Card>
+            )}
+
+            {branch && replenishment.length > 0 && (
+                <Card>
+                    <CardHeader className='pb-3'>
+                        <CardTitle className='text-base'>Reposición sugerida</CardTitle>
+                        <CardDescription>
+                            Anaqueles por debajo de su mínimo interno. No es falta de mercancía en la
+                            sucursal: es que hay que bajarla de la bodega.
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <div className='overflow-x-auto'>
+                            <table className='w-full text-sm'>
+                                <thead className='text-left text-xs uppercase text-muted-foreground'>
+                                    <tr>
+                                        <th className='py-2 pr-3'>Producto</th>
+                                        <th className='py-2 pr-3'>Ubicación</th>
+                                        <th className='py-2 pr-3 text-right'>Hay</th>
+                                        <th className='py-2 pr-3 text-right'>Mínimo</th>
+                                        <th className='py-2 pr-3 text-right'>Falta</th>
+                                        <th className='py-2 pr-3'>Traer de</th>
+                                        <th className='py-2' />
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {replenishment.map((r) => (
+                                        <tr key={`${r.product_id}-${r.location_id}`} className='border-t'>
+                                            <td className='py-2 pr-3'>{r.product_name}</td>
+                                            <td className='py-2 pr-3 whitespace-nowrap'>
+                                                <span className='text-muted-foreground'>{r.warehouse_name} · </span>
+                                                <span className='font-mono'>{r.location_code}</span>
+                                            </td>
+                                            <td className='py-2 pr-3 text-right'>{r.stock}</td>
+                                            <td className='py-2 pr-3 text-right text-muted-foreground'>{r.min_stock}</td>
+                                            <td className='py-2 pr-3 text-right font-medium text-destructive'>{r.missing}</td>
+                                            <td className='py-2 pr-3 whitespace-nowrap'>
+                                                {r.from_location_code ? (
+                                                    <>
+                                                        <span className='text-muted-foreground'>{r.from_warehouse_name} · </span>
+                                                        <span className='font-mono'>{r.from_location_code}</span>
+                                                        <span className='ml-2 text-xs text-muted-foreground'>({r.from_stock})</span>
+                                                    </>
+                                                ) : (
+                                                    <span className='text-xs text-muted-foreground'>No hay en otra ubicación</span>
+                                                )}
+                                            </td>
+                                            <td className='py-2 text-right'>
+                                                {canMove && r.from_location_id && (
+                                                    <Button size='sm' variant='outline' onClick={() => preloadMove(r)}>
+                                                        <MoveRight className='mr-2 h-4 w-4' />
+                                                        Mover {r.suggested_qty}
+                                                    </Button>
+                                                )}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
                     </CardContent>
                 </Card>
             )}

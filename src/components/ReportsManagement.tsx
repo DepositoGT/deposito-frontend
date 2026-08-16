@@ -9,6 +9,8 @@
  */
 
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { fetchWarehouses } from "@/services/warehouseService";
 import { getApiBaseUrl, getAuthToken, tenantHeaders } from '@/services/api';
 import { useTenant } from '@/context/useTenant';
 import { useAuthPermissions } from '@/hooks/useAuthPermissions';
@@ -61,6 +63,16 @@ const ReportsManagement = () => {
   const canViewAll = hasPermission('branches.view_all');
   const [fBranch, setFBranch] = useState<string>(branch?.id || '');
   const showBranchPicker = branches.length > 1 || canViewAll;
+  // Los almacenes son de la sucursal activa: acotar por almacén solo tiene
+  // sentido cuando el reporte es de ella, no del consolidado ni de otra.
+  const [fWarehouse, setFWarehouse] = useState<string>('all');
+  const { data: warehouses } = useQuery({
+    queryKey: ['warehouses', branch?.id],
+    queryFn: fetchWarehouses,
+    enabled: filtersOpen,
+  });
+  const showWarehousePicker =
+    (warehouses?.length ?? 0) > 1 && (!fBranch || fBranch === branch?.id);
 
   // Generadores locales (mock) removidos. Toda la generación ocurre en el backend.
 
@@ -145,6 +157,56 @@ const ReportsManagement = () => {
       bgColor: "bg-primary/10",
       lastGenerated: "—",
       size: "—"
+    },
+    {
+      id: "stock-by-location",
+      name: "Existencias por Almacén",
+      description: "Unidades y valor por almacén, con el detalle de cada ubicación",
+      icon: InventarioIcon,
+      color: "text-primary",
+      bgColor: "bg-primary/10",
+      lastGenerated: "—",
+      size: "—"
+    },
+    {
+      id: "kardex",
+      name: "Kardex por Ubicación",
+      description: "Entradas, salidas y saldo de cada ubicación en el período",
+      icon: InventariadoIcon,
+      color: "text-teal-600",
+      bgColor: "bg-teal-500/10",
+      lastGenerated: "—",
+      size: "—"
+    },
+    {
+      id: "internal-moves",
+      name: "Movimientos Internos",
+      description: "Qué se movió de un anaquel a otro, cuánto y quién lo movió",
+      icon: MercanciaIcon,
+      color: "text-accent",
+      bgColor: "bg-accent/10",
+      lastGenerated: "—",
+      size: "—"
+    },
+    {
+      id: "replenishment",
+      name: "Reposición Interna",
+      description: "Anaqueles bajo su mínimo y de qué ubicación traer lo que falta",
+      icon: AlertasIcon,
+      color: "text-liquor-amber",
+      bgColor: "bg-liquor-amber/10",
+      lastGenerated: "—",
+      size: "—"
+    },
+    {
+      id: "occupancy",
+      name: "Ocupación de Ubicaciones",
+      description: "SKUs y unidades por ubicación, cuáles están vacías y cuáles con un solo producto",
+      icon: AnalyticsIcon,
+      color: "text-liquor-burgundy",
+      bgColor: "bg-liquor-burgundy/10",
+      lastGenerated: "—",
+      size: "—"
     }
   ];
 
@@ -176,6 +238,20 @@ const ReportsManagement = () => {
                     ? 'El reporte suma todas las sucursales y las identifica una por una en su propio desglose.'
                     : 'El reporte incluye solo los datos de esta sucursal.'}
                 </p>
+              </div>
+            )}
+            {showWarehousePicker && (
+              <div className="space-y-2">
+                <p className="text-sm font-medium">Almacén</p>
+                <Select value={fWarehouse} onValueChange={setFWarehouse}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos los almacenes</SelectItem>
+                    {(warehouses ?? []).map((w) => (
+                      <SelectItem key={w.id} value={w.id}>{w.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             )}
             <div className="grid grid-cols-2 gap-4">
@@ -276,6 +352,7 @@ const ReportsManagement = () => {
                     if (fPeriod === 'quarter' && fMonth) params.set('quarter', String(Math.ceil(fMonth / 3)))
                     if (fPeriod === 'semester') params.set('semester', String(fSem))
                     params.set('format', fFormat)
+                    if (showWarehousePicker && fWarehouse !== 'all') params.set('warehouse_id', fWarehouse)
                     const token = getAuthToken()
                     // El alcance viaja en el header de tenant: un id de sucursal, o
                     // 'all' para el consolidado de la empresa (solo lectura).

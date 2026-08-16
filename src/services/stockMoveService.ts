@@ -116,3 +116,35 @@ export const fetchStockByLocation = (productId: string) =>
   apiFetch<LocationStock[]>(`/api/stock/by-location?product_id=${encodeURIComponent(productId)}`, {
     method: "GET",
   });
+
+/** Mínimo interno del anaquel: dispara mover, no comprar. */
+export const setLocationMin = (payload: {
+  product_id: string;
+  location_id: string;
+  min_stock: number;
+}) =>
+  apiFetch<LocationStock>("/api/stock/by-location/min", {
+    method: "PUT",
+    body: JSON.stringify(payload),
+  });
+
+export interface ReplenishmentRow {
+  product_id: string;
+  product_name: string;
+  barcode: string | null;
+  location_id: string;
+  location_code: string;
+  location_name: string | null;
+  warehouse_name: string;
+  stock: number;
+  min_stock: number;
+  missing: number;
+  from_location_id: string | null;
+  from_location_code: string | null;
+  from_warehouse_name: string | null;
+  from_stock: number | null;
+  suggested_qty: number;
+}
+
+export const fetchReplenishment = () =>
+  apiFetch<ReplenishmentRow[]>("/api/stock/replenishment", { method: "GET" });

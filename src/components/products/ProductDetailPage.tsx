@@ -41,6 +41,7 @@ import { useDeleteProduct, useRemoveProductFromBranch } from '@/hooks/useDeleteP
 import { useTenant } from '@/context/useTenant'
 import { ProductKitSection } from './ProductKitSection'
 import { ProductLotsSection } from './ProductLotsSection'
+import { ProductLocationsSection } from './ProductLocationsSection'
 
 type CategoryItem = { id: number | string; name: string }
 
@@ -729,6 +730,8 @@ export default function ProductDetailPage() {
           onUpdated={() => void reloadProduct()}
         />
       )}
+
+      {product && id && <ProductLocationsSection productId={id} />}
 
       {product && id && product.kind !== 'KIT' && (
         <ProductLotsSection productId={id} tracksExpiry={product.tracksExpiry === true} onMutated={() => void reloadProduct()} />
