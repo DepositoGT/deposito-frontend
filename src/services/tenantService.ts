@@ -38,7 +38,8 @@ export const fetchBranches = (all = false) =>
 
 export interface CreateBranchPayload {
   name: string;
-  code: string;
+  /** Se genera del nombre si no se manda. */
+  code?: string;
   address?: string;
   phone?: string;
 }

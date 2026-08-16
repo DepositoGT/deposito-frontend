@@ -44,7 +44,16 @@ import type { Branch } from '@/context/AuthContext'
 import { CompaniesCard } from './CompaniesCard'
 import { WarehousesCard } from './WarehousesCard'
 
-const emptyForm: CreateBranchPayload = { name: '', code: '', address: '', phone: '' }
+const emptyForm: CreateBranchPayload = { name: '', address: '', phone: '' }
+
+/** Vista previa del código que va a generar el backend (misma regla). */
+const autoCode = (name: string, max = 10) =>
+    name
+        .normalize('NFD')
+        .replace(/[̀-ͯ]/g, '')
+        .toUpperCase()
+        .replace(/[^A-Z0-9]/g, '')
+        .slice(0, max)
 
 export const BranchesManagement = () => {
     const { toast } = useToast()
@@ -94,11 +103,11 @@ export const BranchesManagement = () => {
     })
 
     const submit = () => {
-        if (!form.name.trim() || !form.code.trim()) {
-            toast({ title: 'Faltan datos', description: 'Nombre y código son obligatorios', variant: 'destructive' })
+        if (!form.name.trim()) {
+            toast({ title: 'Falta el nombre', variant: 'destructive' })
             return
         }
-        createMutation.mutate({ ...form, code: form.code.trim().toUpperCase() })
+        createMutation.mutate({ ...form, name: form.name.trim() })
     }
 
     return (
@@ -180,9 +189,8 @@ export const BranchesManagement = () => {
                     <DialogHeader>
                         <DialogTitle>Nueva sucursal</DialogTitle>
                         <DialogDescription>
-                            El código corto aparecerá en las referencias de sus documentos
-                            (por ejemplo V-{form.code.trim().toUpperCase() || 'CEN'}-000001) y no se
-                            puede cambiar después.
+                            El código corto se genera del nombre y aparecerá en las referencias de
+                            sus documentos (por ejemplo V-{autoCode(form.name) || 'CEN'}-000001).
                         </DialogDescription>
                     </DialogHeader>
                     <div className='space-y-4'>
@@ -193,16 +201,6 @@ export const BranchesManagement = () => {
                                 value={form.name}
                                 onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
                                 placeholder='Sucursal Centro'
-                            />
-                        </div>
-                        <div className='space-y-2'>
-                            <Label htmlFor='branch-code'>Código corto</Label>
-                            <Input
-                                id='branch-code'
-                                value={form.code}
-                                maxLength={10}
-                                onChange={(e) => setForm((f) => ({ ...f, code: e.target.value.toUpperCase() }))}
-                                placeholder='CEN'
                             />
                         </div>
                         <div className='space-y-2'>

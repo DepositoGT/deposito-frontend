@@ -54,7 +54,16 @@ import {
     type WarehousePayload,
 } from '@/services/warehouseService'
 
-const emptyWarehouse: WarehousePayload = { name: '', code: '', kind: 'BODEGA', dispatch_priority: 100 }
+const emptyWarehouse: WarehousePayload = { name: '', kind: 'BODEGA', dispatch_priority: 100 }
+
+/** Vista previa del código que genera el backend a partir del nombre. */
+const autoCode = (name: string, max: number) =>
+    name
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toUpperCase()
+        .replace(/[^A-Z0-9]/g, '')
+        .slice(0, max)
 
 export const WarehousesCard = ({ canManage }: { canManage: boolean }) => {
     const { toast } = useToast()
@@ -64,7 +73,7 @@ export const WarehousesCard = ({ canManage }: { canManage: boolean }) => {
     const [warehouseDialog, setWarehouseDialog] = useState(false)
     const [form, setForm] = useState<WarehousePayload>(emptyWarehouse)
     const [locationFor, setLocationFor] = useState<Warehouse | null>(null)
-    const [locationForm, setLocationForm] = useState({ code: '', name: '', dispatch_priority: 100 })
+    const [locationForm, setLocationForm] = useState({ name: '', dispatch_priority: 100 })
 
     const { data: warehouses = [], isLoading } = useQuery({
         queryKey: ['warehouses', branch?.id],
@@ -100,11 +109,11 @@ export const WarehousesCard = ({ canManage }: { canManage: boolean }) => {
     })
 
     const createLocationMutation = useMutation({
-        mutationFn: ({ warehouseId, ...payload }: { warehouseId: string; code: string; name?: string; dispatch_priority?: number }) =>
+        mutationFn: ({ warehouseId, ...payload }: { warehouseId: string; code?: string; name: string; dispatch_priority?: number }) =>
             createLocation(warehouseId, payload),
         onSuccess: () => {
             setLocationFor(null)
-            setLocationForm({ code: '', name: '', dispatch_priority: 100 })
+            setLocationForm({ name: '', dispatch_priority: 100 })
             void invalidate()
         },
         onError: fail,
@@ -281,16 +290,11 @@ export const WarehousesCard = ({ canManage }: { canManage: boolean }) => {
                                 placeholder='Sala de ventas'
                             />
                         </div>
-                        <div className='space-y-2'>
-                            <Label htmlFor='wh-code'>Código</Label>
-                            <Input
-                                id='wh-code'
-                                value={form.code}
-                                maxLength={20}
-                                onChange={(e) => setForm((f) => ({ ...f, code: e.target.value.toUpperCase() }))}
-                                placeholder='SALA'
-                            />
-                        </div>
+                        {form.name.trim() && (
+                            <p className='text-xs text-muted-foreground'>
+                                Código: <span className='font-mono'>{autoCode(form.name, 20)}</span> (se genera solo)
+                            </p>
+                        )}
                         <div className='space-y-2'>
                             <Label>Tipo</Label>
                             <Select
@@ -320,11 +324,11 @@ export const WarehousesCard = ({ canManage }: { canManage: boolean }) => {
                         <Button
                             disabled={createWarehouseMutation.isPending}
                             onClick={() => {
-                                if (!form.name.trim() || !form.code.trim()) {
-                                    toast({ title: 'Faltan datos', description: 'Nombre y código son obligatorios', variant: 'destructive' })
+                                if (!form.name.trim()) {
+                                    toast({ title: 'Falta el nombre', variant: 'destructive' })
                                     return
                                 }
-                                createWarehouseMutation.mutate({ ...form, code: form.code.trim().toUpperCase() })
+                                createWarehouseMutation.mutate({ ...form, name: form.name.trim() })
                             }}
                         >
                             {createWarehouseMutation.isPending ? 'Creando…' : 'Crear almacén'}
@@ -338,28 +342,24 @@ export const WarehousesCard = ({ canManage }: { canManage: boolean }) => {
                     <DialogHeader>
                         <DialogTitle>Nueva ubicación</DialogTitle>
                         <DialogDescription>
-                            Dentro de {locationFor?.name}. El código es el que se lee en el anaquel: A-01-03.
+                            Dentro de {locationFor?.name}. Ponle el nombre con el que la llaman en la
+                            bodega; el código sale de ahí.
                         </DialogDescription>
                     </DialogHeader>
                     <div className='space-y-4'>
                         <div className='space-y-2'>
-                            <Label htmlFor='loc-code'>Código</Label>
-                            <Input
-                                id='loc-code'
-                                value={locationForm.code}
-                                maxLength={30}
-                                onChange={(e) => setLocationForm((f) => ({ ...f, code: e.target.value.toUpperCase() }))}
-                                placeholder='A-01-03'
-                            />
-                        </div>
-                        <div className='space-y-2'>
-                            <Label htmlFor='loc-name'>Nombre (opcional)</Label>
+                            <Label htmlFor='loc-name'>Nombre</Label>
                             <Input
                                 id='loc-name'
                                 value={locationForm.name}
                                 onChange={(e) => setLocationForm((f) => ({ ...f, name: e.target.value }))}
-                                placeholder='Pasillo A, estante 1'
+                                placeholder='Pasillo A estante 1'
                             />
+                            {locationForm.name.trim() && (
+                                <p className='text-xs text-muted-foreground'>
+                                    Código: <span className='font-mono'>{autoCode(locationForm.name, 30)}</span>
+                                </p>
+                            )}
                         </div>
                         <div className='space-y-2'>
                             <Label htmlFor='loc-priority'>Prioridad de despacho</Label>
@@ -376,14 +376,13 @@ export const WarehousesCard = ({ canManage }: { canManage: boolean }) => {
                         <Button
                             disabled={createLocationMutation.isPending}
                             onClick={() => {
-                                if (!locationForm.code.trim() || !locationFor) {
-                                    toast({ title: 'Falta el código', variant: 'destructive' })
+                                if (!locationForm.name.trim() || !locationFor) {
+                                    toast({ title: 'Falta el nombre', variant: 'destructive' })
                                     return
                                 }
                                 createLocationMutation.mutate({
                                     warehouseId: locationFor.id,
-                                    code: locationForm.code.trim().toUpperCase(),
-                                    name: locationForm.name.trim() || undefined,
+                                    name: locationForm.name.trim(),
                                     dispatch_priority: locationForm.dispatch_priority,
                                 })
                             }}

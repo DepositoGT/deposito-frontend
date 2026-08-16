@@ -9,6 +9,7 @@
  */
 
 import { useState, useMemo, useEffect } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -32,6 +33,7 @@ import { useSuppliers } from '@/hooks/useSuppliers'
 import { SUPPLIERS_DROPDOWN_PARAMS } from '@/services/supplierService'
 import { useProducts } from '@/hooks/useProducts'
 import { apiFetch } from '@/services/api'
+import { fetchWarehouses } from '@/services/warehouseService'
 import { adaptApiProduct } from '@/services/productService'
 import { adaptApiSupplier } from '@/services/supplierService'
 import { useSupplier } from '@/hooks/useSupplier'
@@ -68,6 +70,17 @@ export const RegisterIncomingMerchandise = () => {
   const [paidAtLocal, setPaidAtLocal] = useState('')
   const [paymentReference, setPaymentReference] = useState('')
   const [dueDate, setDueDate] = useState('')
+  const [locationId, setLocationId] = useState('default')
+
+  // Ubicaciones de la sucursal: dónde se guarda lo que llega.
+  const { data: warehouses = [] } = useQuery({ queryKey: ['warehouses'], queryFn: fetchWarehouses })
+  const receiveLocations = useMemo(
+    () =>
+      warehouses
+        .filter((w) => w.active)
+        .flatMap((w) => w.locations.filter((l) => l.active).map((l) => ({ ...l, warehouse: w.name }))),
+    [warehouses]
+  )
 
   const { data: suppliersData } = useSuppliers(SUPPLIERS_DROPDOWN_PARAMS)
   const suppliers = useMemo(() => suppliersData?.items ?? [], [suppliersData])
@@ -328,6 +341,7 @@ export const RegisterIncomingMerchandise = () => {
           expiry_date: item.expiry_date || undefined,
         })),
         notes: notes.trim() || undefined,
+        location_id: locationId === 'default' ? undefined : locationId,
         payment_term_id: Number(paymentTermId),
         payment_status: paymentStatus,
         payment_reference: paymentReference.trim() || undefined,
@@ -356,7 +370,8 @@ export const RegisterIncomingMerchandise = () => {
       setPaidAtLocal('')
       setPaymentReference('')
       setDueDate('')
-      
+      setLocationId('default')
+
       // Navigate back to inventory
       navigate('/inventario')
     } catch (err: unknown) {
@@ -706,6 +721,30 @@ export const RegisterIncomingMerchandise = () => {
               </div>
             )}
           </div>
+
+          {/* Dónde se guarda lo que llega */}
+          {receiveLocations.length > 1 && (
+            <div>
+              <Label htmlFor="receive-location">¿Dónde se guarda?</Label>
+              <Select value={locationId} onValueChange={setLocationId}>
+                <SelectTrigger id="receive-location" className="mt-1">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="default">Ubicación de recepción por defecto</SelectItem>
+                  {receiveLocations.map((l) => (
+                    <SelectItem key={l.id} value={l.id}>
+                      {l.warehouse} · {l.code}{l.name ? ` — ${l.name}` : ''}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Todo el ingreso (y sus lotes) queda en esa ubicación. Después se puede repartir
+                con un movimiento interno.
+              </p>
+            </div>
+          )}
 
           {/* Notes */}
           <div>

@@ -53,7 +53,8 @@ export interface Warehouse {
 
 export interface WarehousePayload {
   name: string;
-  code: string;
+  /** Se genera del nombre si no se manda. */
+  code?: string;
   kind?: WarehouseKind;
   dispatch_priority?: number;
   is_default?: boolean;
@@ -62,8 +63,9 @@ export interface WarehousePayload {
 }
 
 export interface LocationPayload {
-  code: string;
-  name?: string;
+  /** Se genera del nombre si no se manda. */
+  code?: string;
+  name: string;
   pickable?: boolean;
   dispatch_priority?: number;
   is_default?: boolean;

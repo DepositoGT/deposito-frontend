@@ -47,7 +47,9 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { ArrowLeft, Plus, Receipt, Search, ChevronLeft, ChevronRight, PauseCircle, RotateCcw, Loader2, Landmark, Settings, List, LayoutGrid, ImageIcon, Package } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
-import { useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { fetchWarehouses } from '@/services/warehouseService'
+import { fetchStockByLocation } from '@/services/stockMoveService'
 import { useAllProducts, PRODUCTS_QUERY_KEY } from '@/hooks/useProducts'
 import { useCategories } from '@/hooks/useCategories'
 import { usePaymentMethods, PaymentMethod as PaymentMethodType } from '@/hooks/usePaymentMethods'
@@ -241,6 +243,13 @@ export default function NewSalePage() {
   const availableProducts = useMemo(() => productsQuery.data ?? [], [productsQuery.data])
   const categoriesQuery = useCategories()
 
+  // Ubicación desde la que despacha este punto de venta (si la sucursal la marcó).
+  const warehousesQuery = useQuery({ queryKey: ['warehouses'], queryFn: fetchWarehouses })
+  const posLocationId = useMemo(
+    () => warehousesQuery.data?.flatMap((w) => w.locations).find((l) => l.is_sales)?.id ?? null,
+    [warehousesQuery.data]
+  )
+
   const [productSearch, setProductSearch] = useState('')
   const [productPage, setProductPage] = useState(1)
   const [productPageSize, setProductPageSize] = useState(9)
@@ -260,6 +269,10 @@ export default function NewSalePage() {
   /** Fuerza recomputar si hay borrador en localStorage (React no observa el storage). */
   const [storedDraftRevision, setStoredDraftRevision] = useState(0)
   const [loadedOrder, setLoadedOrder] = useState<Order | null>(null)
+  /** Producto que el mostrador ya no tiene, pero sí hay en otra ubicación. */
+  const [elsewhere, setElsewhere] = useState<
+    { product: Product; atPos: number; rows: { label: string; stock: number }[] } | null
+  >(null)
   const [loadOrderRef, setLoadOrderRef] = useState('')
   const [loadOrderOpen, setLoadOrderOpen] = useState(false)
   const orderLineIdByProductRef = useRef<Map<string, string>>(new Map())
@@ -282,6 +295,35 @@ export default function NewSalePage() {
   )
 
   const cart = useCart({ availableProducts, getUnitPrice, getAvailableQty })
+
+  /**
+   * El mostrador despacha de SU ubicación. Si ahí ya no queda, no se bloquea la
+   * venta: se dice en qué anaquel está el producto y el cajero decide. Después
+   * sigue el flujo de siempre (cantidad adicional, autorización de admin).
+   */
+  const addProduct = async (product: Product) => {
+    if (!posLocationId) { cart.addToCart(product); return }
+    try {
+      const rows = await queryClient.fetchQuery({
+        queryKey: ['stock-by-location', product.id],
+        queryFn: () => fetchStockByLocation(product.id),
+        staleTime: 30_000,
+      })
+      const enCarrito = cart.cartItems.find((i) => i.id === product.id)?.qty ?? 0
+      const atPos = rows.find((r) => r.location.id === posLocationId)?.stock ?? 0
+      const otras = rows
+        .filter((r) => r.location.id !== posLocationId && r.stock > 0)
+        .map((r) => ({ label: `${r.location.warehouse.name} · ${r.location.code}`, stock: r.stock }))
+      if (enCarrito + 1 > atPos && otras.length > 0) {
+        setElsewhere({ product, atPos, rows: otras })
+        return
+      }
+    } catch {
+      // Si no se pudo consultar, no se estorba la venta: sigue el flujo normal.
+    }
+    cart.addToCart(product)
+  }
+
   const repriceCartRef = useRef(cart.repriceCartLines)
   repriceCartRef.current = cart.repriceCartLines
   const promotionCartItems = useMemo(
@@ -1553,7 +1595,7 @@ export default function NewSalePage() {
                       <ProductCard
                         key={product.id}
                         product={product}
-                        onAdd={() => cart.addToCart(product)}
+                        onAdd={() => void addProduct(product)}
                         disabled={isProcessing}
                         formatPrice={fmt}
                         displayUnitPrice={getUnitPrice(product)}
@@ -1607,6 +1649,46 @@ export default function NewSalePage() {
           </Card>
         </div>
       </div>
+
+      <AlertDialog open={elsewhere !== null} onOpenChange={(o) => !o && setElsewhere(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {elsewhere?.atPos === 0
+                ? `No queda ${elsewhere?.product.name} en el mostrador`
+                : `Solo quedan ${elsewhere?.atPos} en el mostrador`}
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div>
+                <p>Pero sí hay en:</p>
+                <ul className="mt-2 space-y-1">
+                  {elsewhere?.rows.map((r) => (
+                    <li key={r.label} className="text-foreground">
+                      <span className="font-mono">{r.label}</span>
+                      <span className="text-muted-foreground"> — {r.stock} unidad(es)</span>
+                    </li>
+                  ))}
+                </ul>
+                <p className="mt-3">
+                  Si continúas, la venta saldrá de ahí. Conviene traerlo al mostrador con un
+                  movimiento interno para que las existencias digan la verdad.
+                </p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (elsewhere) cart.addToCart(elsewhere.product)
+                setElsewhere(null)
+              }}
+            >
+              Continuar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <AvailabilityDialog
         state={cart.availabilityDialog}

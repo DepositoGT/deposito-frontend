@@ -24,7 +24,7 @@ import { Switch } from '@/components/ui/switch'
 import {
     Plus, Search, Filter, ScanLine, Download,
     QrCode, Upload, LayoutGrid, List, Package,
-    ClipboardList, ChevronDown, RotateCcw, CalendarClock, MoveRight,
+    ClipboardList, ChevronDown, RotateCcw, CalendarClock, MoveRight, Store,
 } from 'lucide-react'
 import {
     DropdownMenu,
@@ -39,9 +39,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Checkbox } from '@/components/ui/checkbox'
 import { useToast } from '@/hooks/use-toast'
 import type { Product } from '@/types'
-import { useProducts } from '@/hooks/useProducts'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useProducts, PRODUCTS_QUERY_KEY } from '@/hooks/useProducts'
 import { useCategories } from '@/hooks/useCategories'
-import { adaptApiProduct, fetchAllProducts } from '@/services/productService'
+import { adaptApiProduct, addProductToBranch, fetchAllProducts } from '@/services/productService'
 import { Pagination } from '@/components/shared/Pagination'
 
 // Feature imports
@@ -55,6 +56,7 @@ import { formatMoney } from '@/utils'
 const ProductManagement = () => {
     const navigate = useNavigate()
     const { toast } = useToast()
+    const queryClient = useQueryClient()
     const { hasPermission } = useAuthPermissions()
     const { locale, currencyCode } = useSystemSettings()
     const fmt = (n: number) => formatMoney(n, locale, currencyCode)
@@ -167,6 +169,21 @@ const ProductManagement = () => {
     const canCreate = hasPermission('products.create')
     const canDelete = hasPermission('products.delete')
     const canRegisterIncoming = hasPermission('products.register_incoming')
+    const canEdit = hasPermission('products.edit', 'products.create')
+
+    // Empezar a manejar aquí un producto del catálogo de la empresa.
+    const addToBranchMutation = useMutation({
+        mutationFn: (product: Product) => addProductToBranch(product.id),
+        onSuccess: (_r, product) => {
+            toast({
+                title: `${product.name} ya se maneja aquí`,
+                description: 'Arranca en 0: regístrale un ingreso o muévelo desde otra sucursal.',
+            })
+            void queryClient.invalidateQueries({ queryKey: PRODUCTS_QUERY_KEY })
+        },
+        onError: (e: Error) =>
+            toast({ title: 'No se pudo agregar', description: e.message, variant: 'destructive' }),
+    })
     const canInventoryCount = hasPermission(
         'inventory_count.view',
         'inventory_count.count',
@@ -517,8 +534,30 @@ const ProductManagement = () => {
                                                     </td>
                                                     <td className="p-3"><Badge variant="outline">{String(product.category)}</Badge></td>
                                                     <td className="p-3 text-center">
-                                                        <div className="font-medium text-foreground">{product.stock}</div>
-                                                        <div className="text-xs text-muted-foreground">Min: {product.minStock}</div>
+                                                        {product.inBranch === false ? (
+                                                            <div
+                                                                onClick={(e) => e.stopPropagation()}
+                                                                onKeyDown={(e) => e.stopPropagation()}
+                                                            >
+                                                                <p className="text-xs text-muted-foreground">No se maneja aquí</p>
+                                                                {canEdit && (
+                                                                    <Button
+                                                                        variant="outline"
+                                                                        size="sm"
+                                                                        className="mt-1 h-7 text-xs"
+                                                                        disabled={addToBranchMutation.isPending}
+                                                                        onClick={() => addToBranchMutation.mutate(product)}
+                                                                    >
+                                                                        <Store className="mr-1 h-3 w-3" /> Manejar aquí
+                                                                    </Button>
+                                                                )}
+                                                            </div>
+                                                        ) : (
+                                                            <>
+                                                                <div className="font-medium text-foreground">{product.stock}</div>
+                                                                <div className="text-xs text-muted-foreground">Min: {product.minStock}</div>
+                                                            </>
+                                                        )}
                                                     </td>
                                                     <td className="p-3 text-right">
                                                         <div className="font-medium text-foreground">{fmt(product.price)}</div>
@@ -594,15 +633,32 @@ const ProductManagement = () => {
                                                 {/* Estado arriba + stock abajo: evita pt-11 y huecos */}
                                                 <div className="shrink-0 w-[4.75rem] sm:w-[5rem] flex flex-col items-end justify-between text-right border-l border-border/50 pl-2.5 sm:pl-3">
                                                     <div className="shrink-0">{getStatusBadge(product)}</div>
-                                                    <div>
-                                                        <div className="text-[11px] text-muted-foreground">Stock</div>
-                                                        <div className="text-xl font-bold text-foreground tabular-nums leading-none">
-                                                            {product.stock}
+                                                    {product.inBranch === false ? (
+                                                        <div onClick={(e) => e.stopPropagation()}>
+                                                            <div className="text-[11px] text-muted-foreground">No se maneja aquí</div>
+                                                            {canEdit && (
+                                                                <Button
+                                                                    variant="outline"
+                                                                    size="sm"
+                                                                    className="mt-1 h-7 px-2 text-[11px]"
+                                                                    disabled={addToBranchMutation.isPending}
+                                                                    onClick={() => addToBranchMutation.mutate(product)}
+                                                                >
+                                                                    <Store className="mr-1 h-3 w-3" /> Manejar
+                                                                </Button>
+                                                            )}
                                                         </div>
-                                                        <div className="text-[11px] text-muted-foreground mt-0.5">
-                                                            Min: {product.minStock}
+                                                    ) : (
+                                                        <div>
+                                                            <div className="text-[11px] text-muted-foreground">Stock</div>
+                                                            <div className="text-xl font-bold text-foreground tabular-nums leading-none">
+                                                                {product.stock}
+                                                            </div>
+                                                            <div className="text-[11px] text-muted-foreground mt-0.5">
+                                                                Min: {product.minStock}
+                                                            </div>
                                                         </div>
-                                                    </div>
+                                                    )}
                                                 </div>
                                             </div>
                                         </div>

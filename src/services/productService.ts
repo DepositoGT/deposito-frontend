@@ -113,6 +113,7 @@ export const adaptApiProduct = (p: ApiProduct): Product => {
     availableForSale: (p as { available_for_sale?: boolean }).available_for_sale !== false,
     tracksExpiry: (p as { tracks_expiry?: boolean }).tracks_expiry === true,
     kind: (p.kind === "KIT" ? "KIT" : "STANDARD") as import("@/types/product").ProductKind,
+    inBranch: (p as { in_branch?: boolean }).in_branch !== false,
     stockAssembled: p.stock_assembled === true,
     kitComponents: Array.isArray(p.kit_components) ? p.kit_components : undefined,
   };
@@ -347,3 +348,10 @@ export const updateProduct = async (id: string, payload: UpdateProductPayload): 
   return data;
 };
 
+
+/** Empieza a manejar el producto en la sucursal activa (su stock arranca en 0). */
+export const addProductToBranch = (productId: string) =>
+  apiFetch<{ ok: true; already?: boolean }>(
+    `/api/products/${encodeURIComponent(productId)}/branch-stock`,
+    { method: "POST", body: JSON.stringify({}) }
+  );
