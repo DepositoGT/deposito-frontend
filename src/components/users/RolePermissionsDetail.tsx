@@ -91,6 +91,42 @@ const RolePermissionsDetail = () => {
     return selectedPerms.includes(code);
   };
 
+  /** code → permisos que arrastra, y al revés, según lo que manda el backend. */
+  const { impliedBy, impliesOf } = useMemo(() => {
+    const impliesOf = new Map<string, string[]>();
+    const impliedBy = new Map<string, string[]>();
+    for (const p of allPermissions) {
+      const list = p.implies ?? [];
+      if (list.length) impliesOf.set(p.code, list);
+      for (const dep of list) {
+        impliedBy.set(dep, [...(impliedBy.get(dep) ?? []), p.code]);
+      }
+    }
+    return { impliedBy, impliesOf };
+  }, [allPermissions]);
+
+  const nameOf = useMemo(
+    () => new Map(allPermissions.map((p) => [p.code, p.name])),
+    [allPermissions],
+  );
+
+  /** Cierre transitivo: marcar "Ajustar existencias" trae ver movimientos y ver almacenes. */
+  const expand = (codes: string[]) => {
+    const out = new Set<string>();
+    const pending = [...codes];
+    while (pending.length) {
+      const code = pending.pop()!;
+      if (out.has(code)) continue;
+      out.add(code);
+      for (const dep of impliesOf.get(code) ?? []) pending.push(dep);
+    }
+    return [...out];
+  };
+
+  /** Quién de los marcados obliga a tener este permiso (para no dejar desmarcarlo). */
+  const requiredBy = (code: string) =>
+    (impliedBy.get(code) ?? []).filter((parent) => selectedPerms.includes(parent));
+
   const initialPerms = useMemo(() => {
     if (!role || !Array.isArray(role.permissions)) return [];
     return [...role.permissions.map((p) => p.code)].sort();
@@ -119,8 +155,20 @@ const RolePermissionsDetail = () => {
       return;
     }
 
+    const forced = requiredBy(code);
+    if (selectedPerms.includes(code) && forced.length > 0) {
+      toast({
+        title: "Este permiso viene incluido",
+        description: `Lo necesita ${forced.map((c) => nameOf.get(c) ?? c).join(", ")}. Desmarcá eso primero.`,
+      });
+      return;
+    }
+
     setSelectedPerms((current) =>
-      current.includes(code) ? current.filter((c) => c !== code) : [...current, code],
+      current.includes(code)
+        ? current.filter((c) => c !== code)
+        // Marcar uno trae los que necesita: sin "ver", "editar" solo da 403.
+        : expand([...current, code]),
     );
   };
 
@@ -377,6 +425,16 @@ const RolePermissionsDetail = () => {
                           {perm.description && (
                             <span className="block text-muted-foreground">
                               {perm.description}
+                            </span>
+                          )}
+                          {(perm.implies?.length ?? 0) > 0 && (
+                            <span className="block text-[10px] text-muted-foreground/80">
+                              Incluye: {perm.implies!.map((c) => nameOf.get(c) ?? c).join(", ")}
+                            </span>
+                          )}
+                          {requiredBy(perm.code).length > 0 && (
+                            <span className="block text-[10px] text-primary/80">
+                              Incluido por {requiredBy(perm.code).map((c) => nameOf.get(c) ?? c).join(", ")}
                             </span>
                           )}
                         </span>

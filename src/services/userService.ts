@@ -41,6 +41,8 @@ export interface Permission {
   code: string;
   name: string;
   description?: string | null;
+  /** Permisos que este otorga por sí solo (los manda el backend). */
+  implies?: string[];
 }
 
 export interface Role {
