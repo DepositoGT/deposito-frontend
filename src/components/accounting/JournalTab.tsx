@@ -78,8 +78,11 @@ export const JournalTab = ({ accounts, canCreate }: { accounts: Account[]; canCr
     try {
       const res = await postPending()
       toast({
-        title: 'Contabilización completada',
-        description: `${res.posted} operaciones contabilizadas${res.skipped.length ? `, ${res.skipped.length} omitidas (${res.skipped[0].reason})` : ''}`,
+        title: res.hasMore ? 'Contabilización parcial' : 'Contabilización completada',
+        description:
+          `${res.posted} operaciones contabilizadas` +
+          (res.skipped.length ? `, ${res.skipped.length} omitidas (${res.skipped[0].reason})` : '') +
+          (res.hasMore ? '. Quedaron más pendientes: vuelva a contabilizar.' : ''),
       })
       void load(1)
     } catch (e) {

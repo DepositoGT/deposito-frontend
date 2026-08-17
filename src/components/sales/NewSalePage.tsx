@@ -276,6 +276,9 @@ export default function NewSalePage() {
   const [loadOrderRef, setLoadOrderRef] = useState('')
   const [loadOrderOpen, setLoadOrderOpen] = useState(false)
   const orderLineIdByProductRef = useRef<Map<string, string>>(new Map())
+  // Clave del intento de cobro. Sobrevive a un error para que reintentar sea el
+  // mismo intento y no una segunda venta; se renueva al terminar uno.
+  const intentoDeCobroRef = useRef<string>(crypto.randomUUID())
   const pedidoLoadedRef = useRef<string | null>(null)
 
   const customerContactIdForPricing =
@@ -928,6 +931,7 @@ export default function NewSalePage() {
       change: isCash ? changeAmount : undefined,
       admin_authorized_products: Array.from(cart.adminAuthorizedProducts),
       promotion_codes: promotions.promotionCodes,
+      idempotency_key: intentoDeCobroRef.current,
     }
     setIsProcessing(true)
     try {
@@ -989,6 +993,7 @@ export default function NewSalePage() {
           currencyCode,
         })
       }
+      intentoDeCobroRef.current = crypto.randomUUID()
       toast({ title: 'Venta registrada correctamente' })
       salesData.refreshSales()
       await queryClient.invalidateQueries({ queryKey: PRODUCTS_QUERY_KEY })

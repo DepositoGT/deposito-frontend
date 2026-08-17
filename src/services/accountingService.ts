@@ -59,7 +59,12 @@ export type AccountingPeriod = {
   closedBy?: { name: string } | null
 }
 
-export type PostPendingResult = { posted: number; skipped: { source: string; reason: string }[] }
+export type PostPendingResult = {
+  posted: number
+  skipped: { source: string; reason: string }[]
+  /** La corrida llenó una tanda: quedaron operaciones para la siguiente */
+  hasMore?: boolean
+}
 
 export type AccountingConfig = { defaults: Record<string, string>; keys: string[] }
 
