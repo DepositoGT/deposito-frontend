@@ -29,6 +29,8 @@ export interface User {
   cash_register?: { id: string; name: string; code: string; active: boolean } | null;
   /** Sucursales del usuario dentro de la empresa activa */
   branches?: { id: string; name: string; code: string; active?: boolean }[];
+  /** false = quedó sin ninguna empresa; sale en la lista para poder recuperarlo. */
+  in_company?: boolean;
   /** Empresas a las que pertenece (solo en el detalle) */
   companies?: { id: string; name: string; code: string }[];
   default_branch_id?: string | null;

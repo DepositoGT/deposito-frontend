@@ -501,8 +501,14 @@ const UserManagement = () => {
                       </td>
                       <td className="p-4">
                         <div className="flex flex-wrap gap-1">
-                          {(user.branches ?? []).length === 0 ? (
-                            <span className="text-sm text-muted-foreground">Sin sucursal</span>
+                          {user.in_company === false ? (
+                            <Badge variant="destructive" className="text-xs" title="No pertenece a ninguna empresa: no puede entrar hasta que se le devuelva el acceso">
+                              Sin empresa
+                            </Badge>
+                          ) : (user.branches ?? []).length === 0 ? (
+                            <span className="text-sm text-muted-foreground" title="Pertenece a la empresa pero no tiene sucursal: entra y no puede operar">
+                              Sin sucursal
+                            </span>
                           ) : (
                             user.branches!.map((b) => (
                               <Badge key={b.id} variant="outline" className="text-xs">{b.name}</Badge>
@@ -542,6 +548,9 @@ const UserManagement = () => {
                   </div>
                   <div className="mb-3 flex flex-wrap items-center gap-1">
                     {getRoleBadge(user.role?.name || 'Sin rol')}
+                    {user.in_company === false && (
+                      <Badge variant="destructive" className="text-xs">Sin empresa</Badge>
+                    )}
                     {(user.branches ?? []).map((b) => (
                       <Badge key={b.id} variant="outline" className="text-xs">{b.name}</Badge>
                     ))}
