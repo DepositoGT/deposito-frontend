@@ -415,6 +415,13 @@ export const TransfersManagement = () => {
                         </DialogDescription>
                     </DialogHeader>
                     <div className='space-y-3'>
+                        {/* Con una sola ubicación no hay nada que elegir, pero igual
+                            se dice a dónde entra: si no, nadie sabe dónde quedó. */}
+                        {receiveLocations.length === 1 && (
+                            <p className='text-sm text-muted-foreground'>
+                                Entra a <span className='font-mono'>{receiveLocations[0].warehouse} · {receiveLocations[0].code}</span>.
+                            </p>
+                        )}
                         {receiveLocations.length > 1 && (
                             <div className='space-y-1'>
                                 <Label>¿Dónde se guarda?</Label>
