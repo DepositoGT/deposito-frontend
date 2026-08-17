@@ -36,7 +36,9 @@ export interface ProductComboboxProps {
 function useProducts() {
   return useQuery({
     queryKey: ['products-list'],
-    queryFn: fetchAllProducts,
+    // Envuelto: React Query pasa su contexto como primer argumento y
+    // fetchAllProducts lo tomaría como sus opciones.
+    queryFn: () => fetchAllProducts(),
     staleTime: 5 * 60 * 1000
   })
 }

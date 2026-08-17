@@ -23,6 +23,7 @@ export const SOURCE_LABELS: Record<JournalSourceType, string> = {
   PURCHASE: 'Compra',
   PURCHASE_PAYMENT: 'Abono',
   CLOSING: 'Cierre',
+  STOCK_ADJUSTMENT: 'Ajuste de inventario',
 }
 
 export const TYPE_LABELS: Record<AccountType, string> = {
