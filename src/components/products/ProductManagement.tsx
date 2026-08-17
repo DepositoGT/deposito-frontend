@@ -47,6 +47,7 @@ import { fetchWarehouses } from '@/services/warehouseService'
 import { fetchStockByLocation } from '@/services/stockMoveService'
 import { useTenant } from '@/context/useTenant'
 import { Pagination } from '@/components/shared/Pagination'
+import { ExportDialog } from '@/components/shared/ExportDialog'
 
 // Feature imports
 import { ImportDialog } from './components'
@@ -87,6 +88,11 @@ const StockBreakdownRow = ({ productId }: { productId: string }) => {
         </tr>
     )
 }
+
+/** Columnas con las que abre el diálogo de exportación. */
+const DEFAULT_EXPORT_COLUMNS = [
+    'name', 'category', 'brand', 'size', 'price', 'price_wholesale', 'price_promotion', 'stock',
+]
 
 const ProductManagement = () => {
     const navigate = useNavigate()
@@ -130,9 +136,6 @@ const ProductManagement = () => {
         { id: 'status', label: 'Estado' },
         { id: 'description', label: 'Descripción' },
     ]
-    const [exportSelectedFields, setExportSelectedFields] = useState<string[]>([
-        'name', 'category', 'brand', 'size', 'price', 'price_wholesale', 'price_promotion', 'stock',
-    ])
     const [exportIncludeSummary, setExportIncludeSummary] = useState(true)
 
     // Selección para exportar (IDs de productos)
@@ -360,16 +363,9 @@ const ProductManagement = () => {
                                         Importar / exportar
                                     </DropdownMenuLabel>
                                     {canExport && (
-                                        <DropdownMenuItem
-                                            onClick={() => {
-                                                if (selectedIds.length > 0 && viewMode === 'cards') {
-                                                    setExportSelectedFields([])
-                                                }
-                                                setIsExportDialogOpen(true)
-                                            }}
-                                        >
+                                        <DropdownMenuItem onClick={() => setIsExportDialogOpen(true)}>
                                             <Download className="mr-2 h-4 w-4" />
-                                            Exportar PDF
+                                            Exportar
                                         </DropdownMenuItem>
                                     )}
                                     {canImport && (
@@ -872,108 +868,49 @@ const ProductManagement = () => {
             />
 
             {/* Export PDF Dialog — columnas del reporte de inventario */}
-            <Dialog open={isExportDialogOpen} onOpenChange={setIsExportDialogOpen}>
-                <DialogContent className="max-w-md">
-                    <DialogHeader>
-                        <DialogTitle>Exportar inventario</DialogTitle>
-                        <p className="text-sm text-muted-foreground">
-                            {selectedIds.length > 0
-                                ? `Se exportan los ${selectedIds.length} producto(s) seleccionados.`
-                                : `Se exporta lo que estás viendo: ${scopeLabel}${searchTerm ? `, buscando "${searchTerm}"` : ''}${categoryFilter !== 'all' ? `, categoría ${categoryFilter}` : ''} (${totalItems} producto(s)).`}
-                        </p>
-                        <p className="text-sm text-muted-foreground">
-                            Elige qué columnas incluir en el PDF del inventario.
-                        </p>
-                    </DialogHeader>
-                    <div className="space-y-4 py-2">
-                        <div className="flex flex-wrap gap-4">
-                            {EXPORT_COLUMNS.map((col) => (
-                                <label key={col.id} className="flex items-center gap-2 cursor-pointer">
-                                    <Checkbox
-                                        checked={exportSelectedFields.includes(col.id)}
-                                        onCheckedChange={(checked) => {
-                                            setExportSelectedFields((prev) =>
-                                                checked ? [...prev, col.id] : prev.filter((f) => f !== col.id)
-                                            )
-                                        }}
-                                    />
-                                    <span className="text-sm">{col.label}</span>
-                                </label>
-                            ))}
-                        </div>
-                        <label className="flex items-center gap-2 cursor-pointer pt-2">
-                            <Checkbox
-                                checked={exportIncludeSummary}
-                                onCheckedChange={(checked) => setExportIncludeSummary(checked === true)}
-                            />
-                            <span className="text-sm">Incluir resumen (productos registrados, unidades, valor del inventario)</span>
-                        </label>
-                        <div className="flex flex-wrap gap-2 pt-2 border-t">
-                            <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                onClick={() =>
-                                    setExportSelectedFields([
-                                        'name', 'category', 'brand', 'size', 'price', 'price_wholesale', 'price_promotion', 'stock',
-                                    ])
-                                }
-                            >
-                                Listado de precios
-                            </Button>
-                            <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                onClick={() => setExportSelectedFields(EXPORT_COLUMNS.map((c) => c.id))}
-                            >
-                                Seleccionar todo
-                            </Button>
-                            <Button
-                                type="button"
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleExport(undefined, selectedIds.length ? selectedIds : undefined, exportIncludeSummary)}
-                            >
-                                Vista de tarjetas (completa)
-                            </Button>
-                            <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                className="ml-auto"
-                                onClick={() =>
-                                    handleExport(
-                                        exportSelectedFields.length ? exportSelectedFields : undefined,
-                                        selectedIds.length ? selectedIds : undefined,
-                                        exportIncludeSummary,
-                                        'csv',
-                                    )
-                                }
-                            >
-                                <Download className="w-4 h-4 mr-2" />
-                                CSV / Excel
-                            </Button>
-                            <Button
-                                type="button"
-                                size="sm"
-                                className="bg-liquor-amber hover:bg-liquor-amber/90 text-white"
-                                onClick={() =>
-                                    handleExport(
-                                        exportSelectedFields.length ? exportSelectedFields : undefined,
-                                        selectedIds.length ? selectedIds : undefined,
-                                        exportIncludeSummary,
-                                        'pdf',
-                                    )
-                                }
-                            >
-                                <Download className="w-4 h-4 mr-2" />
-                                PDF
-                            </Button>
-                        </div>
-                    </div>
-                </DialogContent>
-            </Dialog>
+            <ExportDialog
+                open={isExportDialogOpen}
+                onOpenChange={setIsExportDialogOpen}
+                title="Exportar inventario"
+                summary={
+                    selectedIds.length > 0
+                        ? `Se exportan los ${selectedIds.length} producto(s) seleccionados.`
+                        : `Se exporta lo que estás viendo: ${scopeLabel}${searchTerm ? `, buscando "${searchTerm}"` : ''}${categoryFilter !== 'all' ? `, categoría ${categoryFilter}` : ''} (${totalItems} producto(s)).`
+                }
+                columns={EXPORT_COLUMNS}
+                defaultColumns={DEFAULT_EXPORT_COLUMNS}
+                presets={[
+                    {
+                        label: 'Listado de precios',
+                        columns: ['name', 'category', 'brand', 'size', 'price', 'price_wholesale', 'price_promotion', 'stock'],
+                    },
+                    { label: 'Todas las columnas', columns: EXPORT_COLUMNS.map((c) => c.id) },
+                ]}
+                extras={
+                    <label className="flex items-center gap-2 cursor-pointer">
+                        <Checkbox
+                            checked={exportIncludeSummary}
+                            onCheckedChange={(checked) => setExportIncludeSummary(checked === true)}
+                        />
+                        <span className="text-sm">
+                            Incluir resumen (productos registrados, unidades, valor del inventario)
+                        </span>
+                    </label>
+                }
+                secondaryAction={{
+                    label: 'Vista de tarjetas (PDF completo)',
+                    onClick: () =>
+                        handleExport(undefined, selectedIds.length ? selectedIds : undefined, exportIncludeSummary),
+                }}
+                onExport={({ format, columns }) =>
+                    handleExport(
+                        columns?.length ? columns : undefined,
+                        selectedIds.length ? selectedIds : undefined,
+                        exportIncludeSummary,
+                        format,
+                    )
+                }
+            />
         </div>
     )
 }

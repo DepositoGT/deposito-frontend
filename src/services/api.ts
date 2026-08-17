@@ -233,9 +233,15 @@ export const resolveAlert = async (id: string) => {
  * mande el servidor. El interceptor ya le pone empresa, sucursal y sesión: acá
  * solo queda el blob y el ancla, que es lo que cada pantalla venía repitiendo.
  */
-export const downloadFile = async (path: string, fallbackName: string): Promise<void> => {
+export const downloadFile = async (
+  path: string,
+  fallbackName: string,
+  /** Headers extra: p. ej. un alcance de sucursal distinto al activo. */
+  headers?: Record<string, string>
+): Promise<void> => {
   const res = await fetch(`${getApiBaseUrl()}${path.startsWith("/") ? path : `/${path}`}`, {
     method: "GET",
+    ...(headers ? { headers } : {}),
   });
   if (!res.ok) {
     const text = await res.text();

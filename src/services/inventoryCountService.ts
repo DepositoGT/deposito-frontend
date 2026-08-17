@@ -4,7 +4,7 @@
  * API inventariado (sesiones de conteo físico).
  */
 
-import { apiFetch, getApiBaseUrl, getAuthToken } from "./api";
+import { apiFetch, downloadFile } from "./api";
 
 export type InventoryCountSessionStatus =
   | "DRAFT"
@@ -172,26 +172,10 @@ export async function downloadInventorySessionReport(
   sessionId: string,
   format: "pdf" | "csv"
 ): Promise<void> {
-  const token = getAuthToken();
-  const url = `${getApiBaseUrl()}/reports/inventory-count-session/${sessionId}?format=${format}`;
-  const res = await fetch(url, {
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
-  });
-  if (!res.ok) {
-    const t = await res.text();
-    throw new Error(t || `Error ${res.status}`);
-  }
-  const blob = await res.blob();
-  const dispo = res.headers.get("Content-Disposition");
-  let filename = `inventariado-${sessionId.slice(0, 8)}.${format === "pdf" ? "pdf" : "csv"}`;
-  const m = dispo?.match(/filename="?([^";]+)"?/i);
-  if (m) filename = m[1];
-  const href = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = href;
-  a.download = filename;
-  a.click();
-  URL.revokeObjectURL(href);
+  await downloadFile(
+    `/reports/inventory-count-session/${sessionId}?format=${format}`,
+    `inventariado-${sessionId.slice(0, 8)}.${format}`
+  );
 }
 
 export function statusLabel(s: InventoryCountSessionStatus): string {

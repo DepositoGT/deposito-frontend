@@ -11,7 +11,8 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { fetchWarehouses } from "@/services/warehouseService";
-import { getApiBaseUrl, getAuthToken, tenantHeaders } from '@/services/api';
+import { downloadFile } from '@/services/api';
+import { ExportDialog } from '@/components/shared/ExportDialog';
 import { useTenant } from '@/context/useTenant';
 import { useAuthPermissions } from '@/hooks/useAuthPermissions';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -73,6 +74,56 @@ const ReportsManagement = () => {
   });
   const showWarehousePicker =
     (warehouses?.length ?? 0) > 1 && (!fBranch || fBranch === branch?.id);
+
+  const PERIOD_LABELS: Record<string, string> = {
+    week: 'Esta semana', month: 'Un mes', quarter: 'Un trimestre',
+    semester: 'Un semestre', year: 'Un año', all: 'Todo el histórico',
+  }
+
+  /** Qué alcance y qué período se lleva el documento, en texto. */
+  const scopeSummary = (() => {
+    const suc = fBranch === 'all'
+      ? 'Todas las sucursales (consolidado)'
+      : branches.find((b) => b.id === (fBranch || branch?.id))?.name ?? 'Sucursal activa'
+    const alm = showWarehousePicker && fWarehouse !== 'all'
+      ? (warehouses ?? []).find((w) => w.id === fWarehouse)?.name
+      : null
+    return alm ? `${suc} · ${alm}` : suc
+  })()
+
+  const periodSummary = `${PERIOD_LABELS[fPeriod] ?? 'Período'}${fYear === 'all' ? '' : ` de ${fYear}`}`
+
+  /** Descarga el reporte con los filtros elegidos. */
+  const generateReport = async (format: 'pdf' | 'csv') => {
+    if (!pendingReport) return
+    setIsGeneratingReport(true)
+    try {
+      toast({ title: 'Generando...', description: pendingReport.name })
+      const params = new URLSearchParams()
+      params.set('period', fPeriod)
+      if (fYear !== 'all') params.set('year', String(fYear))
+      if (fPeriod === 'month' && fMonth) params.set('month', String(fMonth))
+      if (fPeriod === 'quarter' && fMonth) params.set('quarter', String(Math.ceil(fMonth / 3)))
+      if (fPeriod === 'semester') params.set('semester', String(fSem))
+      params.set('format', format)
+      if (showWarehousePicker && fWarehouse !== 'all') params.set('warehouse_id', fWarehouse)
+      // El alcance de sucursal viaja en el header de tenant ('all' = consolidado).
+      const scopeBranch = fBranch || branch?.id || ''
+      await downloadFile(
+        `/reports/${pendingReport.id}?${params.toString()}`,
+        `${pendingReport.name.toLowerCase().replace(/\s+/g, '-')}-${fPeriod}.${format}`,
+        scopeBranch ? { 'X-Branch-Id': scopeBranch } : undefined,
+      )
+      toast({ title: 'Reporte listo', description: `${pendingReport.name} descargado` })
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'No se pudo generar el reporte'
+      toast({ title: 'Error', description: msg, variant: 'destructive' })
+    } finally {
+      setIsGeneratingReport(false)
+      setFiltersOpen(false)
+      setPendingReport(null)
+    }
+  }
 
   // Generadores locales (mock) removidos. Toda la generación ocurre en el backend.
 
@@ -214,193 +265,118 @@ const ReportsManagement = () => {
 
   return (
     <div className="p-6 space-y-6 animate-fade-in">
-      <Dialog open={filtersOpen} onOpenChange={(o) => { if (!o) { setPendingReport(null); } setFiltersOpen(o) }}>
-        <DialogContent className="sm:max-w-[520px]">
-          <DialogHeader>
-            <DialogTitle>Generar {pendingReport?.name || 'Reporte'}</DialogTitle>
-            <DialogDescription>Configura los filtros antes de generar el documento.</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            {showBranchPicker && (
-              <div className="space-y-2">
-                <p className="text-sm font-medium">Sucursal</p>
-                <Select value={fBranch || branch?.id || ''} onValueChange={setFBranch}>
-                  <SelectTrigger><SelectValue placeholder="Selecciona sucursal" /></SelectTrigger>
-                  <SelectContent>
-                    {branches.map((b) => (
-                      <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
-                    ))}
-                    {canViewAll && <SelectItem value="all">Toda la empresa (consolidado)</SelectItem>}
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-muted-foreground">
-                  {fBranch === 'all'
-                    ? 'El reporte suma todas las sucursales y las identifica una por una en su propio desglose.'
-                    : 'El reporte incluye solo los datos de esta sucursal.'}
-                </p>
-              </div>
-            )}
-            {showWarehousePicker && (
-              <div className="space-y-2">
-                <p className="text-sm font-medium">Almacén</p>
-                <Select value={fWarehouse} onValueChange={setFWarehouse}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos los almacenes</SelectItem>
-                    {(warehouses ?? []).map((w) => (
-                      <SelectItem key={w.id} value={w.id}>{w.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <p className="text-sm font-medium">Período</p>
-                <Select value={fPeriod} onValueChange={(v) => { setFPeriod(v as 'week' | 'month' | 'quarter' | 'semester' | 'year' | 'all'); if (v !== 'month') { setFMonth(null); } }}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="week">Semana</SelectItem>
-                    <SelectItem value="month">Mes</SelectItem>
-                    <SelectItem value="quarter">Trimestre</SelectItem>
-                    <SelectItem value="semester">Semestre</SelectItem>
-                    <SelectItem value="year">Año</SelectItem>
-                    <SelectItem value="all">Todos</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <p className="text-sm font-medium">Formato</p>
-                <Select value={fFormat} onValueChange={(v) => setFFormat(v as 'pdf' | 'csv')}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="pdf">PDF</SelectItem>
-                    <SelectItem value="csv">CSV / Excel</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <p className="text-sm font-medium">Año</p>
-                <Select value={String(fYear)} onValueChange={(v) => setFYear(v === 'all' ? 'all' : Number(v))}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos</SelectItem>
-                    {Array.from({ length: currentYear - 2025 + 1 }, (_, i) => 2025 + i).map(y => (
-                      <SelectItem key={y} value={String(y)}>{y}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              {fPeriod === 'month' && (
-                <div className="space-y-2">
-                  <p className="text-sm font-medium">Mes</p>
-                  <Select value={fMonth ? String(fMonth) : ''} onValueChange={(v) => setFMonth(Number(v))}>
-                    <SelectTrigger><SelectValue placeholder="Selecciona mes" /></SelectTrigger>
-                    <SelectContent>
-                      {Array.from({ length: 12 }, (_, i) => i + 1).map(m => (
-                        <SelectItem key={m} value={String(m)}>{m.toString().padStart(2, '0')}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
-              {fPeriod === 'semester' && (
-                <div className="space-y-2">
-                  <p className="text-sm font-medium">Semestre</p>
-                  <Select value={String(fSem)} onValueChange={(v) => setFSem(v === '2' ? 2 : 1)}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="1">1</SelectItem>
-                      <SelectItem value="2">2</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
-            </div>
-            {fPeriod === 'quarter' && (
-              <div className="space-y-2">
-                <p className="text-sm font-medium">Trimestre</p>
-                <Select value={String(Math.ceil((fMonth || new Date().getMonth() + 1) / 3))} onValueChange={(v) => {
-                  const q = Number(v); const qm = (q - 1) * 3 + 1; setFMonth(qm)
-                }}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="1">Q1</SelectItem>
-                    <SelectItem value="2">Q2</SelectItem>
-                    <SelectItem value="3">Q3</SelectItem>
-                    <SelectItem value="4">Q4</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-            <div className="flex justify-end space-x-2 pt-2">
-              <Button variant="outline" onClick={() => { setFiltersOpen(false); setPendingReport(null); }} disabled={isGeneratingReport}>Cancelar</Button>
-              <Button
-                className="bg-liquor-amber hover:bg-liquor-amber/90 text-white"
-                disabled={isGeneratingReport}
-                onClick={async () => {
-                  if (!pendingReport) { return }
-                  setIsGeneratingReport(true);
-                  try {
-                    toast({ title: 'Generando...', description: pendingReport.name })
-                    const params = new URLSearchParams()
-                    params.set('period', fPeriod)
-                    if (fYear !== 'all') params.set('year', String(fYear))
-                    if (fPeriod === 'month' && fMonth) params.set('month', String(fMonth))
-                    if (fPeriod === 'quarter' && fMonth) params.set('quarter', String(Math.ceil(fMonth / 3)))
-                    if (fPeriod === 'semester') params.set('semester', String(fSem))
-                    params.set('format', fFormat)
-                    if (showWarehousePicker && fWarehouse !== 'all') params.set('warehouse_id', fWarehouse)
-                    const token = getAuthToken()
-                    // El alcance viaja en el header de tenant: un id de sucursal, o
-                    // 'all' para el consolidado de la empresa (solo lectura).
-                    const scopeBranch = fBranch || branch?.id || ''
-                    const res = await fetch(`${getApiBaseUrl()}/reports/${pendingReport.id}?${params.toString()}`, {
-                      credentials: 'include',
-                      headers: {
-                        ...tenantHeaders(),
-                        ...(scopeBranch ? { 'X-Branch-Id': scopeBranch } : {}),
-                        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-                      },
-                    })
-                    if (!res.ok) throw new Error('Error al generar el reporte')
-                    const blob = await res.blob()
-                    const url = window.URL.createObjectURL(blob)
-                    const a = document.createElement('a')
-                    const ext = fFormat === 'pdf' ? 'pdf' : 'csv'
-                    a.href = url
-                    a.download = `${pendingReport.name.toLowerCase().replace(/\s+/g, '-')}-${fPeriod}.${ext}`
-                    a.click()
-                    window.URL.revokeObjectURL(url)
-                    toast({ title: 'Reporte listo', description: `${pendingReport.name} descargado` })
-                  } catch (err) {
-                    const msg = err instanceof Error ? err.message : 'No se pudo generar el reporte'
-                    toast({ title: 'Error', description: msg, variant: 'destructive' })
-                  } finally {
-                    setIsGeneratingReport(false);
-                    setFiltersOpen(false)
-                    setPendingReport(null)
-                  }
-                }}
-              >
-                {isGeneratingReport ? (
-                  <>
-                    <svg className="animate-spin w-4 h-4 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
-                    </svg>
-                    Generando...
-                  </>
-                ) : (
-                  "Generar"
-                )}
-              </Button>
-            </div>
+      <ExportDialog
+        open={filtersOpen}
+        onOpenChange={(o) => { if (!o) setPendingReport(null); setFiltersOpen(o) }}
+        title={`Generar ${pendingReport?.name || 'reporte'}`}
+        summary={`${scopeSummary}. ${periodSummary}.`}
+        pending={isGeneratingReport}
+        onExport={({ format }) => void generateReport(format)}
+      >
+        {showBranchPicker && (
+          <div className="space-y-2">
+            <p className="text-sm font-medium">Sucursal</p>
+            <Select value={fBranch || branch?.id || ''} onValueChange={setFBranch}>
+              <SelectTrigger><SelectValue placeholder="Selecciona sucursal" /></SelectTrigger>
+              <SelectContent>
+                {branches.map((b) => (
+                  <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
+                ))}
+                {canViewAll && <SelectItem value="all">Toda la empresa (consolidado)</SelectItem>}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              {fBranch === 'all'
+                ? 'El reporte suma todas las sucursales y las identifica una por una en su propio desglose.'
+                : 'El reporte incluye solo los datos de esta sucursal.'}
+            </p>
           </div>
-        </DialogContent>
-      </Dialog>
+        )}
+        {showWarehousePicker && (
+          <div className="space-y-2">
+            <p className="text-sm font-medium">Almacén</p>
+            <Select value={fWarehouse} onValueChange={setFWarehouse}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos los almacenes</SelectItem>
+                {(warehouses ?? []).map((w) => (
+                  <SelectItem key={w.id} value={w.id}>{w.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <p className="text-sm font-medium">Período</p>
+            <Select value={fPeriod} onValueChange={(v) => { setFPeriod(v as typeof fPeriod); if (v !== 'month') { setFMonth(null); } }}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="week">Semana</SelectItem>
+                <SelectItem value="month">Mes</SelectItem>
+                <SelectItem value="quarter">Trimestre</SelectItem>
+                <SelectItem value="semester">Semestre</SelectItem>
+                <SelectItem value="year">Año</SelectItem>
+                <SelectItem value="all">Todos</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <p className="text-sm font-medium">Año</p>
+            <Select value={String(fYear)} onValueChange={(v) => setFYear(v === 'all' ? 'all' : Number(v))}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos</SelectItem>
+                {Array.from({ length: currentYear - 2025 + 1 }, (_, i) => 2025 + i).map(y => (
+                  <SelectItem key={y} value={String(y)}>{y}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          {fPeriod === 'month' && (
+            <div className="space-y-2">
+              <p className="text-sm font-medium">Mes</p>
+              <Select value={fMonth ? String(fMonth) : ''} onValueChange={(v) => setFMonth(Number(v))}>
+                <SelectTrigger><SelectValue placeholder="Selecciona mes" /></SelectTrigger>
+                <SelectContent>
+                  {Array.from({ length: 12 }, (_, i) => i + 1).map(m => (
+                    <SelectItem key={m} value={String(m)}>{m.toString().padStart(2, '0')}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+          {fPeriod === 'semester' && (
+            <div className="space-y-2">
+              <p className="text-sm font-medium">Semestre</p>
+              <Select value={String(fSem)} onValueChange={(v) => setFSem(v === '2' ? 2 : 1)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="1">1</SelectItem>
+                  <SelectItem value="2">2</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+          {fPeriod === 'quarter' && (
+            <div className="space-y-2">
+              <p className="text-sm font-medium">Trimestre</p>
+              <Select
+                value={String(Math.ceil((fMonth || new Date().getMonth() + 1) / 3))}
+                onValueChange={(v) => setFMonth((Number(v) - 1) * 3 + 1)}
+              >
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="1">Q1</SelectItem>
+                  <SelectItem value="2">Q2</SelectItem>
+                  <SelectItem value="3">Q3</SelectItem>
+                  <SelectItem value="4">Q4</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+        </div>
+      </ExportDialog>
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
