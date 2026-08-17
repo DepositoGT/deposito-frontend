@@ -26,11 +26,14 @@ import {
     DialogTitle,
 } from '@/components/ui/dialog'
 
-export type ExportFormat = 'pdf' | 'csv'
+export type ExportFormat = 'pdf' | 'csv' | 'xlsx'
 
 export const FORMAT_LABELS: Record<ExportFormat, string> = {
     pdf: 'PDF',
     csv: 'CSV / Excel',
+    // Contabilidad arma el archivo en el navegador, con los montos como números
+    // para que el contador pueda operar sobre ellos.
+    xlsx: 'Excel',
 }
 
 export interface ExportColumn {

@@ -902,14 +902,15 @@ const ProductManagement = () => {
                     onClick: () =>
                         handleExport(undefined, selectedIds.length ? selectedIds : undefined, exportIncludeSummary),
                 }}
-                onExport={({ format, columns }) =>
+                onExport={({ format, columns }) => {
+                    if (format === 'xlsx') return // este diálogo ofrece PDF y CSV
                     handleExport(
                         columns?.length ? columns : undefined,
                         selectedIds.length ? selectedIds : undefined,
                         exportIncludeSummary,
                         format,
                     )
-                }
+                }}
             />
         </div>
     )

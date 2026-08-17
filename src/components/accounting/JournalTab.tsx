@@ -25,8 +25,9 @@ import {
   type Account, type JournalEntry,
 } from '@/services/accountingService'
 import { useTenant } from '@/context/useTenant'
-import { fmtQ, fmtDate, SOURCE_LABELS } from './format'
+import { fmtQ, fmtDate, SOURCE_LABELS , rangoTexto } from './format'
 import { exportJournal } from './exportExcel'
+import { ExportDialog } from '@/components/shared/ExportDialog'
 import { NewEntryDialog } from './NewEntryDialog'
 import { AccountingImportDialog } from './AccountingImportDialog'
 import { ExpenseDialog } from './ExpenseDialog'
@@ -53,6 +54,7 @@ export const JournalTab = ({ accounts, canCreate }: { accounts: Account[]; canCr
   const [isExpenseOpen, setIsExpenseOpen] = useState(false)
   const [posting, setPosting] = useState(false)
   const [exporting, setExporting] = useState(false)
+  const [exportOpen, setExportOpen] = useState(false)
 
   const load = useCallback(async (p: number) => {
     setLoading(true)
@@ -142,9 +144,14 @@ export const JournalTab = ({ accounts, canCreate }: { accounts: Account[]; canCr
             <span className="text-sm font-normal text-muted-foreground">({totalItems} asientos)</span>
           </CardTitle>
           <div className="flex flex-wrap items-center gap-2">
-            <Button variant="outline" size="sm" onClick={handleExport} disabled={exporting || totalItems === 0}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setExportOpen(true)}
+              disabled={exporting || totalItems === 0}
+            >
               <Download className="h-4 w-4 mr-2" />
-              {exporting ? 'Exportando…' : 'Exportar Excel'}
+              {exporting ? 'Exportando…' : 'Exportar'}
             </Button>
             {canCreate && (
               <>

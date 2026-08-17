@@ -20,8 +20,9 @@ import { BookText, Download } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useToast } from '@/hooks/use-toast'
 import { getLedger, type Account, type LedgerResponse } from '@/services/accountingService'
-import { fmtQ, fmtDate } from './format'
+import { fmtQ, fmtDate, rangoTexto } from './format'
 import { exportLedger } from './exportExcel'
+import { ExportDialog } from '@/components/shared/ExportDialog'
 
 export const LedgerTab = ({ accounts }: { accounts: Account[] }) => {
   const { toast } = useToast()
@@ -30,6 +31,7 @@ export const LedgerTab = ({ accounts }: { accounts: Account[] }) => {
   const [to, setTo] = useState('')
   const [data, setData] = useState<LedgerResponse | null>(null)
   const [loading, setLoading] = useState(false)
+  const [exportOpen, setExportOpen] = useState(false)
 
   const postables = accounts.filter((a) => !a.is_group)
 
@@ -56,9 +58,9 @@ export const LedgerTab = ({ accounts }: { accounts: Account[] }) => {
           <Button
             variant="outline" size="sm"
             disabled={!data || loading}
-            onClick={() => data && exportLedger(data, { from: from || undefined, to: to || undefined })}
+            onClick={() => setExportOpen(true)}
           >
-            <Download className="h-4 w-4 mr-2" />Exportar Excel
+            <Download className="h-4 w-4 mr-2" />Exportar
           </Button>
         </div>
       </CardHeader>
@@ -135,6 +137,17 @@ export const LedgerTab = ({ accounts }: { accounts: Account[] }) => {
           </div>
         )}
       </CardContent>
+      <ExportDialog
+        open={exportOpen}
+        onOpenChange={setExportOpen}
+        title="Exportar libro mayor"
+        summary={`${data?.account ? `${data.account.code} — ${data.account.name}` : 'Cuenta sin elegir'}. ${rangoTexto(from, to)} (${data?.movements.length ?? 0} movimiento(s)).`}
+        formats={['xlsx']}
+        onExport={() => {
+          if (data) exportLedger(data, { from: from || undefined, to: to || undefined })
+          setExportOpen(false)
+        }}
+      />
     </Card>
   )
 }

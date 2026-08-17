@@ -271,7 +271,8 @@ const ReportsManagement = () => {
         title={`Generar ${pendingReport?.name || 'reporte'}`}
         summary={`${scopeSummary}. ${periodSummary}.`}
         pending={isGeneratingReport}
-        onExport={({ format }) => void generateReport(format)}
+        // Este diálogo solo ofrece PDF y CSV; 'xlsx' es de contabilidad.
+        onExport={({ format }) => { if (format !== 'xlsx') void generateReport(format) }}
       >
         {showBranchPicker && (
           <div className="space-y-2">

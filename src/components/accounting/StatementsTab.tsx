@@ -26,8 +26,9 @@ import {
   type IncomeStatementResponse, type BalanceSheetResponse, type StatementRow,
   type BranchResultsResponse,
 } from '@/services/accountingService'
-import { fmtQ, todayISO } from './format'
+import { fmtQ, todayISO , rangoTexto } from './format'
 import { exportStatements } from './exportExcel'
+import { ExportDialog } from '@/components/shared/ExportDialog'
 
 const firstOfYearISO = () => `${new Date().getFullYear()}-01-01`
 
@@ -59,6 +60,7 @@ export const StatementsTab = () => {
   const [from, setFrom] = useState(firstOfYearISO())
   const [to, setTo] = useState(todayISO())
   const [asOf, setAsOf] = useState(todayISO())
+  const [exportOpen, setExportOpen] = useState(false)
   const [pnl, setPnl] = useState<IncomeStatementResponse | null>(null)
   const [bs, setBs] = useState<BalanceSheetResponse | null>(null)
   const [loadingPnl, setLoadingPnl] = useState(true)
@@ -102,9 +104,9 @@ export const StatementsTab = () => {
         <Button
           variant="outline" size="sm"
           disabled={!pnl || !bs || loadingPnl || loadingBs}
-          onClick={() => pnl && bs && exportStatements(pnl, bs, { from: from || undefined, to: to || undefined, asOf: asOf || undefined })}
+          onClick={() => setExportOpen(true)}
         >
-          <Download className="h-4 w-4 mr-2" />Exportar Excel (ambos estados)
+          <Download className="h-4 w-4 mr-2" />Exportar
         </Button>
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
@@ -274,6 +276,20 @@ export const StatementsTab = () => {
           </CardContent>
         </Card>
       )}
+
+      <ExportDialog
+        open={exportOpen}
+        onOpenChange={setExportOpen}
+        title="Exportar estados financieros"
+        summary={`Estado de resultados ${rangoTexto(from, to).toLowerCase()} y balance general al ${asOf || 'día de hoy'}. Salen los dos en el mismo archivo.`}
+        formats={['xlsx']}
+        onExport={() => {
+          if (pnl && bs) {
+            exportStatements(pnl, bs, { from: from || undefined, to: to || undefined, asOf: asOf || undefined })
+          }
+          setExportOpen(false)
+        }}
+      />
     </div>
   )
 }

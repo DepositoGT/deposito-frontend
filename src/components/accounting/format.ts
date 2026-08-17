@@ -44,3 +44,7 @@ export const todayISO = () => {
   const d = new Date()
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
+
+/** Rango elegido, en texto: lo usa el diálogo de exportación de cada pestaña. */
+export const rangoTexto = (from?: string, to?: string) =>
+  from || to ? `Del ${from || 'inicio'} al ${to || 'hoy'}` : 'Todos los movimientos'
