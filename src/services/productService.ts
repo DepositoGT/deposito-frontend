@@ -8,7 +8,7 @@
  * For licensing inquiries: GitHub @dpatzan2
  */
 
-import { apiFetch, getApiBaseUrl } from "./api";
+import { apiFetch, downloadFile, getApiBaseUrl } from "./api";
 import type { Product, StockStatus } from "@/types";
 import type { ApiProduct as ApiProductType, CreateProductPayload as CreateProductPayloadType, UpdateProductPayload as UpdateProductPayloadType } from "@/types/product";
 
@@ -289,60 +289,44 @@ export const removeProductFromBranch = async (id: string): Promise<{ ok?: boolea
 // options.fields: optional list of column keys. Omit for full card layout.
 // options.ids: optional list of product IDs to export only those (if empty or omitted, exports all).
 // options.includeSummary: if false, omits the summary block (productos registrados, unidades, valor inventario). Default true.
-export const exportProductsPdf = async (options?: { fields?: string[]; ids?: string[]; includeSummary?: boolean }): Promise<void> => {
-  const token = localStorage.getItem("auth:token");
+export interface ProductExportOptions {
+  /** Columnas elegidas en el diálogo; sin ellas sale la ficha completa. */
+  fields?: string[];
+  /** Selección explícita de productos: manda sobre los filtros de pantalla. */
+  ids?: string[];
+  includeSummary?: boolean;
+  format?: "pdf" | "csv";
+  /** Mismo alcance y filtros que la lista, para que salga lo que se ve. */
+  scope?: {
+    branchId?: string;
+    warehouseId?: string;
+    locationId?: string;
+    search?: string;
+    category?: string;
+    inBranchOnly?: boolean;
+  };
+}
+
+/** Exporta el inventario que se está viendo, en PDF o CSV. */
+export const exportProducts = async (options?: ProductExportOptions): Promise<void> => {
   const params = new URLSearchParams();
-  if (options?.fields?.length) {
-    params.set("fields", options.fields.join(","));
-  }
-  if (options?.ids?.length) {
-    params.set("ids", options.ids.join(","));
-  }
-  if (options?.includeSummary === false) {
-    params.set("includeSummary", "0");
-  }
+  if (options?.fields?.length) params.set("fields", options.fields.join(","));
+  if (options?.ids?.length) params.set("ids", options.ids.join(","));
+  if (options?.includeSummary === false) params.set("includeSummary", "0");
+  if (options?.format === "csv") params.set("format", "csv");
+  const scope = options?.scope;
+  if (scope?.branchId) params.set("branch_id", scope.branchId);
+  if (scope?.warehouseId) params.set("warehouse_id", scope.warehouseId);
+  if (scope?.locationId) params.set("location_id", scope.locationId);
+  if (scope?.search) params.set("search", scope.search);
+  if (scope?.category && scope.category !== "all") params.set("category", scope.category);
+  if (scope?.inBranchOnly) params.set("in_branch", "1");
+
   const qs = params.toString();
-  const url = `${getApiBaseUrl()}/products/report.pdf${qs ? `?${qs}` : ""}`;
-
-  const res = await fetch(url, {
-    method: "GET",
-    headers: {
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
-  });
-
-  if (!res.ok) {
-    const text = await res.text();
-    let data: unknown;
-    try {
-      data = text ? JSON.parse(text) : undefined;
-    } catch {
-      data = text;
-    }
-
-    const extractMessage = (v: unknown): string | undefined => {
-      if (!v || typeof v !== 'object') return undefined;
-      const maybe = v as { message?: unknown };
-      if (typeof maybe.message === 'string') return maybe.message;
-      if (typeof maybe.message === 'object' && maybe.message !== null) {
-        try { return JSON.stringify(maybe.message); } catch { return undefined; }
-      }
-      return undefined;
-    };
-
-    const msg = extractMessage(data) ?? res.statusText ?? 'Error descargando PDF';
-    throw new Error(msg);
-  }
-
-  const blob = await res.blob();
-  const blobUrl = window.URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = blobUrl;
-  a.download = 'productos_reporte.pdf';
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  window.URL.revokeObjectURL(blobUrl);
+  await downloadFile(
+    `/products/report.pdf${qs ? `?${qs}` : ""}`,
+    options?.format === "csv" ? "inventario.csv" : "inventario.pdf",
+  );
 };
 
 export type UpdateProductPayload = UpdateProductPayloadType;

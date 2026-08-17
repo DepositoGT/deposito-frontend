@@ -191,6 +191,21 @@ const ProductManagement = () => {
         [scopeWarehouses, scopeWarehouse]
     )
 
+    /** Cómo se llama lo que se está viendo; va en el aviso y en el archivo. */
+    const scopeLabel = useMemo(() => {
+        const partes = [
+            scopeBranch === 'all'
+                ? 'todas las sucursales'
+                : branches.find((b) => b.id === scopeBranch)?.name ?? 'la sucursal',
+        ]
+        const alm = scopeWarehouses.find((w) => w.id === scopeWarehouse)
+        if (alm) partes.push(alm.name)
+        const ubi = scopeLocations.find((l) => l.id === scopeLocation)
+        if (ubi) partes.push(ubi.code)
+        return partes.join(' · ')
+    }, [scopeBranch, scopeWarehouse, scopeLocation, branches, scopeWarehouses, scopeLocations])
+
+
     // Products are already filtered and paginated by the backend
     const paginatedProducts = products
     const totalPages = productsData?.totalPages || 1
@@ -252,18 +267,38 @@ const ProductManagement = () => {
     const hasFileActions = canExport || canImport
     const hasStockActions = canRegisterIncoming || canInventoryCount
 
-    // Export handler: pass selected fields for table PDF, or none for full card layout. If selectedIds.length > 0, only those products are exported.
-    const handleExport = async (fields?: string[], ids?: string[], includeSummary?: boolean) => {
+    /**
+     * Exporta lo que se está viendo: mismo alcance y mismos filtros que la
+     * lista. Con productos seleccionados manda la selección.
+     */
+    const handleExport = async (
+        fields?: string[],
+        ids?: string[],
+        includeSummary?: boolean,
+        format: 'pdf' | 'csv' = 'pdf',
+    ) => {
         if (!canExport) return
         try {
             const svc = await import('@/services/productService')
-            await svc.exportProductsPdf({
+            await svc.exportProducts({
+                format,
                 ...(fields?.length ? { fields } : {}),
                 ...(ids?.length ? { ids } : {}),
                 ...(includeSummary === false ? { includeSummary: false } : {}),
+                scope: {
+                    branchId: scopeBranch,
+                    warehouseId: scopeWarehouse !== 'all' ? scopeWarehouse : undefined,
+                    locationId: scopeLocation !== 'all' ? scopeLocation : undefined,
+                    search: searchTerm || undefined,
+                    category: categoryFilter,
+                    inBranchOnly: scopeBranch !== 'all' && inBranchOnly,
+                },
             })
             setIsExportDialogOpen(false)
-            toast({ title: 'Exportado', description: 'El reporte PDF se descargó correctamente' })
+            toast({
+                title: 'Exportado',
+                description: `Se descargó ${format === 'csv' ? 'el CSV' : 'el PDF'} de ${scopeLabel}.`,
+            })
         } catch (err: unknown) {
             const message = (err as { message?: string })?.message || 'No se pudo descargar el reporte'
             toast({ title: 'Error', description: message, variant: 'destructive' })
@@ -842,6 +877,11 @@ const ProductManagement = () => {
                     <DialogHeader>
                         <DialogTitle>Exportar inventario</DialogTitle>
                         <p className="text-sm text-muted-foreground">
+                            {selectedIds.length > 0
+                                ? `Se exportan los ${selectedIds.length} producto(s) seleccionados.`
+                                : `Se exporta lo que estás viendo: ${scopeLabel}${searchTerm ? `, buscando "${searchTerm}"` : ''}${categoryFilter !== 'all' ? `, categoría ${categoryFilter}` : ''} (${totalItems} producto(s)).`}
+                        </p>
+                        <p className="text-sm text-muted-foreground">
                             Elige qué columnas incluir en el PDF del inventario.
                         </p>
                     </DialogHeader>
@@ -899,19 +939,36 @@ const ProductManagement = () => {
                             </Button>
                             <Button
                                 type="button"
+                                variant="outline"
                                 size="sm"
-                                className="ml-auto bg-liquor-amber hover:bg-liquor-amber/90 text-white"
-                                onClick={() => {
-                                    const idsToExport = selectedIds.length ? selectedIds : undefined
-                                    if (exportSelectedFields.length === 0) {
-                                        handleExport(undefined, idsToExport, exportIncludeSummary)
-                                    } else {
-                                        handleExport(exportSelectedFields, idsToExport, exportIncludeSummary)
-                                    }
-                                }}
+                                className="ml-auto"
+                                onClick={() =>
+                                    handleExport(
+                                        exportSelectedFields.length ? exportSelectedFields : undefined,
+                                        selectedIds.length ? selectedIds : undefined,
+                                        exportIncludeSummary,
+                                        'csv',
+                                    )
+                                }
                             >
                                 <Download className="w-4 h-4 mr-2" />
-                                Generar PDF
+                                CSV / Excel
+                            </Button>
+                            <Button
+                                type="button"
+                                size="sm"
+                                className="bg-liquor-amber hover:bg-liquor-amber/90 text-white"
+                                onClick={() =>
+                                    handleExport(
+                                        exportSelectedFields.length ? exportSelectedFields : undefined,
+                                        selectedIds.length ? selectedIds : undefined,
+                                        exportIncludeSummary,
+                                        'pdf',
+                                    )
+                                }
+                            >
+                                <Download className="w-4 h-4 mr-2" />
+                                PDF
                             </Button>
                         </div>
                     </div>

@@ -227,3 +227,36 @@ export const resolveAlert = async (id: string) => {
     method: 'PATCH',
   })
 }
+
+/**
+ * Descarga un archivo del backend (PDF, CSV) y lo guarda con el nombre que
+ * mande el servidor. El interceptor ya le pone empresa, sucursal y sesión: acá
+ * solo queda el blob y el ancla, que es lo que cada pantalla venía repitiendo.
+ */
+export const downloadFile = async (path: string, fallbackName: string): Promise<void> => {
+  const res = await fetch(`${getApiBaseUrl()}${path.startsWith("/") ? path : `/${path}`}`, {
+    method: "GET",
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    let message = res.statusText || "No se pudo descargar el archivo";
+    try {
+      const parsed = JSON.parse(text) as { message?: unknown };
+      if (typeof parsed.message === "string") message = parsed.message;
+    } catch {
+      if (text) message = text;
+    }
+    throw new Error(message);
+  }
+  const dispo = res.headers.get("Content-Disposition");
+  const match = dispo?.match(/filename="?([^";]+)"?/i);
+  const blob = await res.blob();
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = match ? match[1] : fallbackName;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  window.URL.revokeObjectURL(url);
+};

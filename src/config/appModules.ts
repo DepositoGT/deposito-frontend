@@ -31,6 +31,8 @@ import {
     UsuariosIcon,
     MercanciaIcon,
     ConfiguracionIcon,
+    TrasladosIcon,
+    SucursalesIcon,
     type ModuleIconProps
 } from '@/components/icons/CustomIcons'
 import { ForwardRefExoticComponent, RefAttributes } from 'react'
@@ -217,7 +219,7 @@ export const appModules: AppModule[] = [
         id: 'transfers',
         label: 'Traslados',
         path: '/traslados',
-        icon: MercanciaIcon,
+        icon: TrasladosIcon,
         color: 'bg-cyan-100/90',
         iconColor: 'text-cyan-900',
         permissions: ['transfers.view', 'transfers.create']
@@ -226,7 +228,7 @@ export const appModules: AppModule[] = [
         id: 'branches',
         label: 'Sucursales',
         path: '/sucursales',
-        icon: InventarioIcon,
+        icon: SucursalesIcon,
         color: 'bg-teal-100/90',
         iconColor: 'text-teal-900',
         permissions: ['branches.manage', 'companies.manage']

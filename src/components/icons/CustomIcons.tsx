@@ -89,3 +89,7 @@ export const UsuariosIcon = createModuleIcon(`${base}/usuarios.svg`, 'UsuariosIc
 export const MercanciaIcon = createModuleIcon(`${base}/mercancia.svg`, 'MercanciaIcon')
 // Papirus: preferences-desktop.svg (engranajes / escritorio, ~32px)
 export const ConfiguracionIcon = createModuleIcon(`${base}/configuracion.svg`, 'ConfiguracionIcon')
+
+export const TrasladosIcon = createModuleIcon(`${base}/traslados.svg`, 'TrasladosIcon')
+
+export const SucursalesIcon = createModuleIcon(`${base}/sucursales.svg`, 'SucursalesIcon')
