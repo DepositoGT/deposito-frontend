@@ -50,6 +50,11 @@ export type AnalyticsResponse = {
     monthly: { month: number; amount: number }[];
     topSuppliers: { name: string; amount: number }[];
   };
+  initialInventory: {
+    total: number;
+    units: number;
+    count: number;
+  };
 }
 
 export async function getAnalytics(year: number | 'all'): Promise<AnalyticsResponse> {

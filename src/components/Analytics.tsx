@@ -373,10 +373,11 @@ const Analytics = () => {
 
         {/* ============ COMPRAS ============ */}
         <TabsContent value="compras" className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <KpiCard label="Compras del Período" value={fmtCurrency(data?.purchases.total ?? 0)} icon={Truck} loading={isLoading} />
             <KpiCard label="Cuentas por Pagar" value={fmtCurrency(data?.purchases.payablePending ?? 0)} icon={Wallet} accent="text-red-600" loading={isLoading} hint="Saldo pendiente a proveedores" />
             <KpiCard label="Ingresos Pendientes" value={fmtNumber(data?.purchases.payableCount ?? 0)} icon={AlertTriangle} accent="text-orange-600" loading={isLoading} hint="Registros sin liquidar" />
+            <KpiCard label="Inventario Inicial" value={fmtCurrency(data?.initialInventory.total ?? 0)} icon={Boxes} accent="text-muted-foreground" loading={isLoading} hint="Saldo de apertura, no es compra del período" />
           </div>
 
           <Card>
