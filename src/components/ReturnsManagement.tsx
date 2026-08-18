@@ -247,6 +247,7 @@ const ReturnsManagement = () => {
                       <th className="text-left p-3 font-medium">Fecha</th>
                       <th className="text-left p-3 font-medium">Venta</th>
                       <th className="text-left p-3 font-medium">Cliente</th>
+                      <th className="text-left p-3 font-medium">Sucursal</th>
                       <th className="text-left p-3 font-medium">Items</th>
                       <th className="text-left p-3 font-medium">Total Reembolso</th>
                       <th className="text-left p-3 font-medium">Estado</th>
@@ -272,6 +273,7 @@ const ReturnsManagement = () => {
                         <td className="p-3 text-sm">{formatDateTime(ret.return_date, undefined, locale)}</td>
                         <td className="p-3 font-mono text-sm">{ret.sale_id.substring(0, 8)}...</td>
                         <td className="p-3">{ret.sale?.customer || 'N/A'}</td>
+                        <td className="p-3 text-sm text-muted-foreground">{ret.sale?.branch?.name ?? '—'}</td>
                         <td className="p-3 text-center">{ret.items_count}</td>
                         <td className="p-3 font-medium">{formatMoney(ret.total_refund, locale, currencyCode)}</td>
                         <td className="p-3">{getStatusBadge(ret.status.name)}</td>

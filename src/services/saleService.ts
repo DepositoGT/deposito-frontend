@@ -28,6 +28,8 @@ export interface CreateSalePayload {
   sales_channel?: string;
   /** Caja seleccionada en el POS; el backend valida el turno abierto contra ella */
   cash_register_id?: string;
+  /** Clave del intento de cobro: reintentar con la misma devuelve la venta ya creada */
+  idempotency_key?: string;
   items: SaleItemPayload[];
 }
 

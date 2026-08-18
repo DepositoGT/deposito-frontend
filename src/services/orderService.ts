@@ -18,6 +18,8 @@ export type OrderStatus =
 export type Order = {
   id: string;
   reference?: string | null;
+  branch_id?: string;
+  branch?: { id: string; name: string; code: string } | null;
   doc_type: "ORDER";
   status: OrderStatus;
   valid_until?: string | null;
@@ -71,6 +73,8 @@ export type Order = {
 };
 
 export type CreateOrderPayload = {
+  /** Sucursal a la que pertenece; por defecto la activa */
+  branch_id?: string;
   customer?: string;
   customer_nit?: string;
   is_final_consumer?: boolean;
@@ -154,6 +158,14 @@ export async function updateOrder(id: string, payload: CreateOrderPayload): Prom
   return apiFetch<Order>(`/api/orders/${encodeURIComponent(id)}`, {
     method: "PUT",
     body: JSON.stringify(payload),
+  });
+}
+
+/** Reasigna un pedido en borrador a otra sucursal. Cambia su correlativo. */
+export async function changeOrderBranch(id: string, branchId: string): Promise<Order> {
+  return apiFetch<Order>(`/api/orders/${encodeURIComponent(id)}/branch`, {
+    method: "PUT",
+    body: JSON.stringify({ branch_id: branchId }),
   });
 }
 

@@ -10,7 +10,7 @@
 
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -31,8 +31,14 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { ArrowLeft, CalendarClock, PackageOpen } from 'lucide-react'
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
+import { ArrowLeft, CalendarClock, PackageOpen, Trash2 } from 'lucide-react'
 import { apiFetch } from '@/services/api'
+import { useToast } from '@/hooks/use-toast'
+import { useAuthPermissions } from '@/hooks/useAuthPermissions'
 
 type LotStatusFilter = 'all' | 'expiring' | 'expired'
 
@@ -43,6 +49,7 @@ interface ExpiringLot {
   qty_remaining: number
   days_to_expiry: number
   received_at: string
+  location?: { id: string; code: string; name: string | null } | null
   product: {
     id: string
     name: string
@@ -78,8 +85,39 @@ export const LotsExpiryPage = () => {
   })
 
   const lots = data?.lots ?? []
-  const expiredCount = lots.filter((l) => l.days_to_expiry < 0).length
+  const expired = lots.filter((l) => l.days_to_expiry < 0)
+  const expiredCount = expired.length
   const expiringCount = lots.length - expiredCount
+
+  // Dar de baja saca del anaquel lo que quede del lote: destruye existencias,
+  // así que va con el mismo permiso que un ajuste manual.
+  const { toast } = useToast()
+  const queryClient = useQueryClient()
+  const { hasPermission } = useAuthPermissions()
+  const canWriteOff = hasPermission('stock_moves.adjust')
+  const [confirming, setConfirming] = useState<ExpiringLot[] | null>(null)
+
+  const writeOffMutation = useMutation({
+    mutationFn: (lotIds: string[]) =>
+      apiFetch<{ lots: number; units: number }>('/api/products/lots/write-off', {
+        method: 'POST',
+        body: JSON.stringify({ lot_ids: lotIds, reason: 'Lote vencido' }),
+      }),
+    onSuccess: (r) => {
+      toast({
+        title: 'Lotes dados de baja',
+        description: `${r.units} unidad(es) salieron del inventario en ${r.lots} lote(s).`,
+      })
+      setConfirming(null)
+      void queryClient.invalidateQueries({ queryKey: ['lots-expiring'] })
+      void queryClient.invalidateQueries({ queryKey: ['products'] })
+      void queryClient.invalidateQueries({ queryKey: ['stock-by-location'] })
+    },
+    onError: (e: Error) =>
+      toast({ title: 'No se pudo dar de baja', description: e.message, variant: 'destructive' }),
+  })
+
+  const unitsToWriteOff = (confirming ?? []).reduce((s, l) => s + l.qty_remaining, 0)
 
   return (
     <div className="p-3 sm:p-6 space-y-4 sm:space-y-6 animate-fade-in">
@@ -107,6 +145,16 @@ export const LotsExpiryPage = () => {
                 : `${lots.length} lote${lots.length === 1 ? '' : 's'} · ${expiredCount} vencido${expiredCount === 1 ? '' : 's'} · ${expiringCount} por vencer`}
             </CardTitle>
             <div className="flex items-end gap-3">
+              {canWriteOff && expiredCount > 0 && (
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={() => setConfirming(expired)}
+                >
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Dar de baja los {expiredCount} vencidos
+                </Button>
+              )}
               <div>
                 <Label htmlFor="lots-days" className="text-xs text-muted-foreground">
                   Ventana (días)
@@ -155,16 +203,18 @@ export const LotsExpiryPage = () => {
                   <TableRow>
                     <TableHead>Producto</TableHead>
                     <TableHead>Lote</TableHead>
+                    <TableHead>Ubicación</TableHead>
                     <TableHead>Caducidad</TableHead>
                     <TableHead className="text-right">Días</TableHead>
                     <TableHead className="text-right">Cant. en lote</TableHead>
                     <TableHead className="text-right">Stock (sin lote)</TableHead>
                     <TableHead>Estado</TableHead>
+                    <TableHead />
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {lots.map((lot) => {
-                    const expired = lot.days_to_expiry < 0
+                    const isExpired = lot.days_to_expiry < 0
                     return (
                       <TableRow
                         key={lot.id}
@@ -178,21 +228,33 @@ export const LotsExpiryPage = () => {
                           </p>
                         </TableCell>
                         <TableCell>{lot.lot_code || '—'}</TableCell>
+                        <TableCell className="text-muted-foreground">{lot.location?.code || '—'}</TableCell>
                         <TableCell>{formatDate(lot.expiry_date)}</TableCell>
                         <TableCell className="text-right">
-                          {expired ? `hace ${Math.abs(lot.days_to_expiry)}` : lot.days_to_expiry}
+                          {isExpired ? `hace ${Math.abs(lot.days_to_expiry)}` : lot.days_to_expiry}
                         </TableCell>
                         <TableCell className="text-right font-medium">{lot.qty_remaining}</TableCell>
                         <TableCell className="text-right text-muted-foreground">
                           {lot.product.stock} ({lot.product.unlotted})
                         </TableCell>
                         <TableCell>
-                          {expired ? (
+                          {isExpired ? (
                             <Badge variant="destructive">Vencido</Badge>
                           ) : (
                             <Badge className="bg-amber-500/15 text-amber-600 dark:text-amber-400 hover:bg-amber-500/15">
                               Por vencer
                             </Badge>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {canWriteOff && isExpired && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={(e) => { e.stopPropagation(); setConfirming([lot]) }}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
                           )}
                         </TableCell>
                       </TableRow>
@@ -204,6 +266,30 @@ export const LotsExpiryPage = () => {
           )}
         </CardContent>
       </Card>
+
+      <AlertDialog open={confirming !== null} onOpenChange={(o) => !o && setConfirming(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              ¿Dar de baja {confirming?.length === 1 ? 'este lote' : `${confirming?.length ?? 0} lotes`}?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Salen {unitsToWriteOff} unidad(es) del inventario, de la ubicación donde está cada
+              lote. Queda anotado en el libro como ajuste por lote vencido y no se puede deshacer
+              con un botón: habría que volver a ingresarlas.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={writeOffMutation.isPending}
+              onClick={() => writeOffMutation.mutate((confirming ?? []).map((l) => l.id))}
+            >
+              {writeOffMutation.isPending ? 'Dando de baja…' : 'Dar de baja'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

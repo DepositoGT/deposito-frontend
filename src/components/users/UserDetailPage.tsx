@@ -38,6 +38,7 @@ import {
   type UpdateUserPayload,
 } from '@/services/userService'
 import { useDeleteUser } from '@/hooks/useDeleteUser'
+import { UserTenantAccessCard } from './UserTenantAccessCard'
 import { listCashRegisters, type CashRegisterDto } from '@/services/cashSessionsService'
 import {
   AlertDialog,
@@ -85,6 +86,8 @@ export default function UserDetailPage() {
   const [editCashRegisterId, setEditCashRegisterId] = useState('')
   const [cashRegisters, setCashRegisters] = useState<CashRegisterDto[]>([])
 
+  const [accessVersion, setAccessVersion] = useState(0)
+
   useEffect(() => {
     const load = async () => {
       if (!id) return
@@ -103,7 +106,7 @@ export default function UserDetailPage() {
       }
     }
     load()
-  }, [id, toast])
+  }, [id, toast, accessVersion])
 
   useEffect(() => {
     const loadRoles = async () => {
@@ -540,6 +543,15 @@ export default function UserDetailPage() {
           </div>
         </CardContent>
       </Card>
+
+      {canEdit && (
+        <UserTenantAccessCard
+          userId={user.id}
+          userCompanies={user.companies ?? []}
+          canManage={canEdit}
+          onChanged={() => setAccessVersion((v) => v + 1)}
+        />
+      )}
     </div>
   )
 }

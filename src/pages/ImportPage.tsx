@@ -19,6 +19,9 @@
  */
 import { useState, useEffect, useMemo } from 'react'
 import { apiFetch, getApiBaseUrl, getAuthToken } from '@/services/api'
+import { useQuery } from '@tanstack/react-query'
+import { useTenant } from '@/context/useTenant'
+import { fetchWarehouses } from '@/services/warehouseService'
 import { useNavigate } from 'react-router-dom'
 import * as XLSX from 'xlsx'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -117,6 +120,23 @@ export default function ImportPage() {
 
     const [createCategories, setCreateCategories] = useState<string[]>([])
     const [createSuppliers, setCreateSuppliers] = useState<string[]>([])
+    const [importLocation, setImportLocation] = useState('default')
+
+    // El catálogo es de la empresa, pero las existencias del archivo caen en la
+    // sucursal activa: hay que decir en cuál, y dejar elegir el anaquel.
+    const { branch } = useTenant()
+    const { data: warehouses = [] } = useQuery({
+        queryKey: ['warehouses', branch?.id],
+        queryFn: () => fetchWarehouses(),
+        enabled: Boolean(branch),
+    })
+    const importLocations = useMemo(
+        () =>
+            warehouses
+                .filter((w) => w.active)
+                .flatMap((w) => w.locations.filter((l) => l.active).map((l) => ({ ...l, warehouse: w.name }))),
+        [warehouses]
+    )
     const [skipRowIndexes, setSkipRowIndexes] = useState<number[]>([])
     const [resolutionHints, setResolutionHints] = useState<ResolutionHint[]>([])
 
@@ -469,17 +489,21 @@ export default function ImportPage() {
             setStep('importing')
             setImportProgress(65)
 
-            const result = await apiFetch<{ created: number; skipped?: number }>('/products/bulk-import-mapped', {
-                method: 'POST',
-                body: JSON.stringify({
-                    products: mappedData,
-                    importOptions: {
-                        createCategories,
-                        createSuppliers,
-                        skipRowIndexes,
-                    },
-                }),
-            })
+            const result = await apiFetch<{ created: number; adopted?: number; skipped?: number; message?: string }>(
+                '/products/bulk-import-mapped',
+                {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        products: mappedData,
+                        location_id: importLocation === 'default' ? undefined : importLocation,
+                        importOptions: {
+                            createCategories,
+                            createSuppliers,
+                            skipRowIndexes,
+                        },
+                    }),
+                }
+            )
 
             setImportProgress(100)
             setImportResult(result)
@@ -487,7 +511,7 @@ export default function ImportPage() {
 
             toast({
                 title: '¡Importación exitosa!',
-                description: `Se importaron ${result.created} productos`,
+                description: result.message ?? `Se importaron ${result.created} productos`,
             })
         } catch (err) {
             setErrorMessage(err instanceof Error ? err.message : 'Error en importación')
@@ -662,6 +686,39 @@ export default function ImportPage() {
                                     <CardTitle className="text-sm font-medium">Datos a importar</CardTitle>
                                 </CardHeader>
                                 <CardContent className="space-y-4">
+                                    {/* A dónde va lo que trae el archivo */}
+                                    <div className="rounded-md border bg-muted/40 p-2 text-xs space-y-2">
+                                        <p className="text-muted-foreground">
+                                            Los productos se crean en el catálogo de la empresa. Las
+                                            existencias del archivo se cargan en{' '}
+                                            <span className="font-medium text-foreground">{branch?.name ?? 'la sucursal activa'}</span>.
+                                        </p>
+                                        {importLocations.length > 1 ? (
+                                            <div className="space-y-1">
+                                                <Label className="text-xs text-muted-foreground">Ubicación:</Label>
+                                                <Select value={importLocation} onValueChange={setImportLocation}>
+                                                    <SelectTrigger className="h-8"><SelectValue /></SelectTrigger>
+                                                    <SelectContent>
+                                                        <SelectItem value="default">Ubicación de recepción por defecto</SelectItem>
+                                                        {importLocations.map((l) => (
+                                                            <SelectItem key={l.id} value={l.id}>
+                                                                {l.warehouse} · {l.code}
+                                                            </SelectItem>
+                                                        ))}
+                                                    </SelectContent>
+                                                </Select>
+                                            </div>
+                                        ) : importLocations.length === 1 ? (
+                                            <p className="text-muted-foreground">
+                                                Entran a <span className="font-mono">{importLocations[0].warehouse} · {importLocations[0].code}</span>.
+                                            </p>
+                                        ) : null}
+                                        <p className="text-muted-foreground">
+                                            Si un código de barras ya está en el catálogo, no se duplica:
+                                            se le carga esa existencia aquí.
+                                        </p>
+                                    </div>
+
                                     {/* File info */}
                                     <div className="flex items-center gap-2 text-sm">
                                         <FileSpreadsheet className="h-4 w-4 text-green-600" />

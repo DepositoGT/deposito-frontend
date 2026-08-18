@@ -11,6 +11,23 @@
 /* eslint-disable react-refresh/only-export-components */
 import { createContext } from "react";
 
+export interface Company {
+  id: string;
+  name: string;
+  code: string;
+  logo_url?: string | null;
+  active?: boolean;
+}
+
+export interface Branch {
+  id: string;
+  company_id: string;
+  name: string;
+  code: string;
+  active?: boolean;
+  is_default?: boolean;
+}
+
 export interface AuthUser {
   id: string;
   name: string;
@@ -30,6 +47,10 @@ export interface AuthUser {
   cash_register?: { id: string; name: string; code: string; active: boolean } | null;
   // Códigos de permisos asignados al usuario (derivados de su rol)
   permissions?: string[];
+  // Empresas y sucursales a las que pertenece (multi-empresa)
+  companies?: Company[];
+  branches?: Branch[];
+  default_branch_id?: string | null;
 }
 
 export type AuthContextType = {
@@ -38,6 +59,8 @@ export type AuthContextType = {
   user: AuthUser | null;
   login: () => void;
   logout: () => void;
+  /** Relee /auth/me: empresas y sucursales del usuario pueden haber cambiado. */
+  refreshUser: () => Promise<void>;
 };
 
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);

@@ -44,12 +44,12 @@ const rangeLabel = (from?: string, to?: string) =>
 
 const stamp = () => new Date().toISOString().slice(0, 10)
 
-export function exportJournal(entries: JournalEntry[], filters: { from?: string; to?: string; source?: string }) {
+export function exportJournal(entries: JournalEntry[], filters: { from?: string; to?: string; source?: string; branch_id?: string }) {
   const rows: Cell[][] = [
     ['Libro Diario'],
     [rangeLabel(filters.from, filters.to) + (filters.source ? ` · Origen: ${SOURCE_LABELS[filters.source as keyof typeof SOURCE_LABELS] ?? filters.source}` : '')],
     [],
-    ['Número', 'Fecha', 'Descripción', 'Origen', 'Cuenta', 'Debe', 'Haber'],
+    ['Número', 'Fecha', 'Descripción', 'Sucursal', 'Origen', 'Cuenta', 'Debe', 'Haber'],
   ]
   let totalDebit = 0
   let totalCredit = 0
@@ -63,6 +63,7 @@ export function exportJournal(entries: JournalEntry[], filters: { from?: string;
         i === 0 ? entry.entry_number : null,
         i === 0 ? fmtDate(entry.date) : null,
         i === 0 ? entry.description : null,
+        i === 0 ? (entry.branch?.name ?? 'Empresa') : null,
         i === 0 ? SOURCE_LABELS[entry.source_type] : null,
         line.account ? `${line.account.code} — ${line.account.name}` : String(line.account_id),
         debit > 0 ? debit : null,
@@ -71,9 +72,9 @@ export function exportJournal(entries: JournalEntry[], filters: { from?: string;
     }
   }
   rows.push([])
-  rows.push([null, null, null, null, 'Totales', num(totalDebit), num(totalCredit)])
+  rows.push([null, null, null, null, null, 'Totales', num(totalDebit), num(totalCredit)])
   download(`libro-diario-${stamp()}.xlsx`, [
-    { name: 'Diario', rows, colWidths: [12, 12, 40, 10, 38, 14, 14] },
+    { name: 'Diario', rows, colWidths: [12, 12, 40, 16, 10, 38, 14, 14] },
   ])
 }
 

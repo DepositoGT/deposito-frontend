@@ -16,6 +16,7 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { useUsers } from "@/hooks/useUsers";
 import { useUpdateUser } from "@/hooks/useUpdateUser";
@@ -34,6 +35,7 @@ import {
 } from "lucide-react";
 import UserImportDialog from "./users/UserImportDialog";
 import { useAuth } from "@/context/useAuth";
+import { useTenant } from "@/context/useTenant";
 import { useAuthPermissions } from "@/hooks/useAuthPermissions";
 import type { User } from "@/services/userService";
 import { Pagination } from "@/components/shared/Pagination";
@@ -96,6 +98,8 @@ const UserManagement = () => {
   // Búsqueda y filtros
   const [searchTerm, setSearchTerm] = useState("");
   const [filterRole, setFilterRole] = useState<string>("all");
+  const [filterBranch, setFilterBranch] = useState<string>("all");
+  const { branches } = useTenant();
 
   const {
     page: currentPage,
@@ -112,6 +116,7 @@ const UserManagement = () => {
     page: currentPage,
     pageSize,
     role_id: filterRole !== "all" ? Number(filterRole) : undefined,
+    branch_id: filterBranch !== "all" ? filterBranch : undefined,
     search: searchTerm || undefined,
   });
   
@@ -232,7 +237,7 @@ const UserManagement = () => {
     }
   };
 
-  useResetPageOnFilterChange(setCurrentPage, [searchTerm, filterRole, pageSize]);
+  useResetPageOnFilterChange(setCurrentPage, [searchTerm, filterRole, filterBranch, pageSize]);
 
   // Los usuarios ya vienen filtrados del backend
   const filteredUsers = users;
@@ -347,6 +352,21 @@ const UserManagement = () => {
                 ))}
               </SelectContent>
             </Select>
+            {branches.length > 1 && (
+              <Select value={filterBranch} onValueChange={setFilterBranch}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Filtrar por sucursal" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todas las sucursales</SelectItem>
+                  {branches.map((b) => (
+                    <SelectItem key={b.id} value={b.id}>
+                      {b.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -441,6 +461,7 @@ const UserManagement = () => {
                     <th className="text-left p-4 font-medium">Usuario</th>
                     <th className="text-left p-4 font-medium">Email</th>
                     <th className="text-left p-4 font-medium">Rol</th>
+                    <th className="text-left p-4 font-medium">Sucursales</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -478,6 +499,23 @@ const UserManagement = () => {
                       <td className="p-4">
                         {getRoleBadge(user.role?.name || 'Sin rol')}
                       </td>
+                      <td className="p-4">
+                        <div className="flex flex-wrap gap-1">
+                          {user.in_company === false ? (
+                            <Badge variant="destructive" className="text-xs" title="No pertenece a ninguna empresa: no puede entrar hasta que se le devuelva el acceso">
+                              Sin empresa
+                            </Badge>
+                          ) : (user.branches ?? []).length === 0 ? (
+                            <span className="text-sm text-muted-foreground" title="Pertenece a la empresa pero no tiene sucursal: entra y no puede operar">
+                              Sin sucursal
+                            </span>
+                          ) : (
+                            user.branches!.map((b) => (
+                              <Badge key={b.id} variant="outline" className="text-xs">{b.name}</Badge>
+                            ))
+                          )}
+                        </div>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -508,8 +546,14 @@ const UserManagement = () => {
                       )}
                     </div>
                   </div>
-                  <div className="mb-3">
+                  <div className="mb-3 flex flex-wrap items-center gap-1">
                     {getRoleBadge(user.role?.name || 'Sin rol')}
+                    {user.in_company === false && (
+                      <Badge variant="destructive" className="text-xs">Sin empresa</Badge>
+                    )}
+                    {(user.branches ?? []).map((b) => (
+                      <Badge key={b.id} variant="outline" className="text-xs">{b.name}</Badge>
+                    ))}
                   </div>
                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
                     <Mail className="w-3 h-3 flex-shrink-0" />

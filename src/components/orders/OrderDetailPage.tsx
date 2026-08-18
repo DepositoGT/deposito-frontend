@@ -39,9 +39,11 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuthPermissions } from "@/hooks/useAuthPermissions";
 import { useSystemSettings } from "@/hooks/useSystemSettings";
 import { usePaymentMethods } from "@/hooks/usePaymentMethods";
+import { useTenant } from "@/context/useTenant";
 import { formatMoney, formatDateTime } from "@/utils/formatters";
 import {
   cancelOrder,
+  changeOrderBranch,
   confirmOrder,
   convertOrderToSale,
   fetchOrderById,
@@ -70,6 +72,7 @@ export default function OrderDetailPage() {
 
   const canManage = hasPermission("orders.manage");
   const canSell = hasPermission("sales.create");
+  const { branches } = useTenant();
 
   const [saleDialogOpen, setSaleDialogOpen] = useState(false);
   const [paymentMethodId, setPaymentMethodId] = useState<string>("");
@@ -117,6 +120,17 @@ export default function OrderDetailPage() {
       queryClient.setQueryData(["order", id], updated);
       invalidate();
       toast({ title: "Pedido confirmado", description: "Stock reservado." });
+    },
+    onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  const branchMutation = useMutation({
+    mutationFn: (branchId: string) => changeOrderBranch(id!, branchId),
+    onSuccess: (updated) => {
+      queryClient.setQueryData(["order", id], updated);
+      invalidate();
+      // La referencia se regenera con la serie de la sucursal nueva
+      toast({ title: "Pedido movido de sucursal", description: updated.reference ?? undefined });
     },
     onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
@@ -234,6 +248,26 @@ export default function OrderDetailPage() {
             <p><span className="text-muted-foreground">Nombre:</span> {order.customer || order.customerContact?.name || "—"}</p>
             <p><span className="text-muted-foreground">Vigencia reserva:</span>{" "}
               {order.valid_until ? formatDateTime(order.valid_until, undefined, locale) : "—"}</p>
+            {order.status === "DRAFT" && canManage && branches.length > 1 ? (
+              <div className="space-y-1">
+                <Label htmlFor="order-branch" className="text-muted-foreground font-normal">Sucursal</Label>
+                <Select
+                  value={order.branch?.id ?? ""}
+                  onValueChange={(v) => branchMutation.mutate(v)}
+                  disabled={branchMutation.isPending}
+                >
+                  <SelectTrigger id="order-branch"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {branches.map((b) => (
+                      <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">Al moverlo cambia su correlativo.</p>
+              </div>
+            ) : (
+              <p><span className="text-muted-foreground">Sucursal:</span> {order.branch?.name ?? "—"}</p>
+            )}
             {order.confirmed_at && (
               <p><span className="text-muted-foreground">Confirmado:</span>{" "}
                 {formatDateTime(order.confirmed_at, undefined, locale)}</p>

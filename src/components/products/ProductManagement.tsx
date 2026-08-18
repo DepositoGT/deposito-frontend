@@ -14,16 +14,17 @@
  * This component orchestrates the product management feature.
  * Logic is extracted into custom hooks, UI into sub-components.
  */
-import { useState, useMemo, useEffect } from 'react'
+import { Fragment, useState, useMemo, useEffect } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Label } from '@/components/ui/label'
+import { Switch } from '@/components/ui/switch'
 import {
     Plus, Search, Filter, ScanLine, Download,
     QrCode, Upload, LayoutGrid, List, Package,
-    ClipboardList, ChevronDown, RotateCcw, CalendarClock,
+    ClipboardList, ChevronDown, RotateCcw, CalendarClock, MoveRight, Store,
 } from 'lucide-react'
 import {
     DropdownMenu,
@@ -38,10 +39,15 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Checkbox } from '@/components/ui/checkbox'
 import { useToast } from '@/hooks/use-toast'
 import type { Product } from '@/types'
-import { useProducts } from '@/hooks/useProducts'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useProducts, PRODUCTS_QUERY_KEY } from '@/hooks/useProducts'
 import { useCategories } from '@/hooks/useCategories'
-import { adaptApiProduct, fetchAllProducts } from '@/services/productService'
+import { adaptApiProduct, addProductToBranch, fetchAllProducts } from '@/services/productService'
+import { fetchWarehouses } from '@/services/warehouseService'
+import { fetchStockByLocation } from '@/services/stockMoveService'
+import { useTenant } from '@/context/useTenant'
 import { Pagination } from '@/components/shared/Pagination'
+import { ExportDialog } from '@/components/shared/ExportDialog'
 
 // Feature imports
 import { ImportDialog } from './components'
@@ -51,9 +57,48 @@ import { usePersistedListUiState, useResetPageOnFilterChange } from '@/hooks/use
 import { useNavigate } from 'react-router-dom'
 import { formatMoney } from '@/utils'
 
+/** Dónde está lo que hay de un producto. Se consulta al abrir, no antes. */
+const StockBreakdownRow = ({ productId }: { productId: string }) => {
+    const { data, isLoading } = useQuery({
+        queryKey: ['stock-by-location', productId],
+        queryFn: () => fetchStockByLocation(productId),
+        staleTime: 30_000,
+    })
+    return (
+        <tr className="border-b border-border bg-muted/40">
+            <td colSpan={6} className="px-3 py-2">
+                {isLoading ? (
+                    <span className="text-xs text-muted-foreground">Cargando ubicaciones…</span>
+                ) : !data?.length ? (
+                    <span className="text-xs text-muted-foreground">Sin existencias en ninguna ubicación.</span>
+                ) : (
+                    <div className="space-y-1">
+                        {data.map((r) => (
+                            <div key={r.location.id} className="flex justify-between text-xs">
+                                <span className="text-muted-foreground">
+                                    {r.location.warehouse.branch ? `${r.location.warehouse.branch.name} · ` : ''}
+                                    {r.location.warehouse.name} · <span className="font-mono">{r.location.code}</span>
+                                </span>
+                                <span className="font-medium text-foreground">{r.stock}</span>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </td>
+        </tr>
+    )
+}
+
+/** Columnas con las que abre el diálogo de exportación. */
+const DEFAULT_EXPORT_COLUMNS = [
+    'name', 'category', 'brand', 'size', 'price', 'price_wholesale', 'price_promotion', 'stock',
+]
+
 const ProductManagement = () => {
     const navigate = useNavigate()
     const { toast } = useToast()
+    const queryClient = useQueryClient()
+    const { branches } = useTenant()
     const { hasPermission } = useAuthPermissions()
     const { locale, currencyCode } = useSystemSettings()
     const fmt = (n: number) => formatMoney(n, locale, currencyCode)
@@ -91,9 +136,6 @@ const ProductManagement = () => {
         { id: 'status', label: 'Estado' },
         { id: 'description', label: 'Descripción' },
     ]
-    const [exportSelectedFields, setExportSelectedFields] = useState<string[]>([
-        'name', 'category', 'brand', 'size', 'price', 'price_wholesale', 'price_promotion', 'stock',
-    ])
     const [exportIncludeSummary, setExportIncludeSummary] = useState(true)
 
     // Selección para exportar (IDs de productos)
@@ -101,6 +143,14 @@ const ProductManagement = () => {
     const [selectingAllPages, setSelectingAllPages] = useState(false)
 
     const [scannedCode, setScannedCode] = useState('')
+    // Alcance de la pantalla: el inventario es de la empresa y se acota aquí, no
+    // con el selector global (que sigue mandando en ventas, caja y traslados).
+    const [scopeBranch, setScopeBranch] = useState('all')
+    const [scopeWarehouse, setScopeWarehouse] = useState('all')
+    const [scopeLocation, setScopeLocation] = useState('all')
+    const [expandedId, setExpandedId] = useState<string | null>(null)
+    // Con una sucursal elegida: solo lo que esa sucursal maneja, o todo el catálogo.
+    const [inBranchOnly, setInBranchOnly] = useState(true)
 
     // Data hooks
     const { data: productsData, isLoading, isError } = useProducts({
@@ -108,6 +158,10 @@ const ProductManagement = () => {
         pageSize: pageSize,
         search: searchTerm || undefined,
         category: categoryFilter !== 'all' ? categoryFilter : undefined,
+        branchId: scopeBranch,
+        warehouseId: scopeWarehouse !== 'all' ? scopeWarehouse : undefined,
+        locationId: scopeLocation !== 'all' ? scopeLocation : undefined,
+        inBranchOnly: scopeBranch !== 'all' && inBranchOnly ? true : undefined,
     })
     const { data: categoriesData } = useCategories()
     const products = useMemo(() => {
@@ -123,7 +177,37 @@ const ProductManagement = () => {
         return base.concat(['Whisky', 'Vinos', 'Cervezas', 'Rones', 'Vodkas', 'Tequilas', 'Ginebras'])
     }, [categoriesData])
 
-    useResetPageOnFilterChange(setCurrentPage, [searchTerm, categoryFilter, pageSize])
+    useResetPageOnFilterChange(setCurrentPage, [
+        searchTerm, categoryFilter, pageSize, inBranchOnly, scopeBranch, scopeWarehouse, scopeLocation,
+    ])
+
+    // Almacenes del alcance elegido (y sus ubicaciones, ya en plano).
+    const { data: scopeWarehouses = [] } = useQuery({
+        queryKey: ['warehouses', 'scope', scopeBranch],
+        queryFn: () => fetchWarehouses(scopeBranch),
+    })
+    const scopeLocations = useMemo(
+        () =>
+            scopeWarehouses
+                .filter((w) => scopeWarehouse === 'all' || w.id === scopeWarehouse)
+                .flatMap((w) => w.locations.map((l) => ({ ...l, warehouse: w.name }))),
+        [scopeWarehouses, scopeWarehouse]
+    )
+
+    /** Cómo se llama lo que se está viendo; va en el aviso y en el archivo. */
+    const scopeLabel = useMemo(() => {
+        const partes = [
+            scopeBranch === 'all'
+                ? 'todas las sucursales'
+                : branches.find((b) => b.id === scopeBranch)?.name ?? 'la sucursal',
+        ]
+        const alm = scopeWarehouses.find((w) => w.id === scopeWarehouse)
+        if (alm) partes.push(alm.name)
+        const ubi = scopeLocations.find((l) => l.id === scopeLocation)
+        if (ubi) partes.push(ubi.code)
+        return partes.join(' · ')
+    }, [scopeBranch, scopeWarehouse, scopeLocation, branches, scopeWarehouses, scopeLocations])
+
 
     // Products are already filtered and paginated by the backend
     const paginatedProducts = products
@@ -162,26 +246,62 @@ const ProductManagement = () => {
     const canCreate = hasPermission('products.create')
     const canDelete = hasPermission('products.delete')
     const canRegisterIncoming = hasPermission('products.register_incoming')
+    const canEdit = hasPermission('products.edit', 'products.create')
+
+    // Empezar a manejar aquí un producto del catálogo de la empresa.
+    const addToBranchMutation = useMutation({
+        mutationFn: (product: Product) => addProductToBranch(product.id),
+        onSuccess: (_r, product) => {
+            toast({
+                title: `${product.name} ya se maneja aquí`,
+                description: 'Arranca en 0: regístrale un ingreso o muévelo desde otra sucursal.',
+            })
+            void queryClient.invalidateQueries({ queryKey: PRODUCTS_QUERY_KEY })
+        },
+        onError: (e: Error) =>
+            toast({ title: 'No se pudo agregar', description: e.message, variant: 'destructive' }),
+    })
     const canInventoryCount = hasPermission(
         'inventory_count.view',
         'inventory_count.count',
         'inventory_count.create'
     )
+    const canSeeStockMoves = hasPermission('stock_moves.view', 'stock_moves.create')
     const hasFileActions = canExport || canImport
     const hasStockActions = canRegisterIncoming || canInventoryCount
 
-    // Export handler: pass selected fields for table PDF, or none for full card layout. If selectedIds.length > 0, only those products are exported.
-    const handleExport = async (fields?: string[], ids?: string[], includeSummary?: boolean) => {
+    /**
+     * Exporta lo que se está viendo: mismo alcance y mismos filtros que la
+     * lista. Con productos seleccionados manda la selección.
+     */
+    const handleExport = async (
+        fields?: string[],
+        ids?: string[],
+        includeSummary?: boolean,
+        format: 'pdf' | 'csv' = 'pdf',
+    ) => {
         if (!canExport) return
         try {
             const svc = await import('@/services/productService')
-            await svc.exportProductsPdf({
+            await svc.exportProducts({
+                format,
                 ...(fields?.length ? { fields } : {}),
                 ...(ids?.length ? { ids } : {}),
                 ...(includeSummary === false ? { includeSummary: false } : {}),
+                scope: {
+                    branchId: scopeBranch,
+                    warehouseId: scopeWarehouse !== 'all' ? scopeWarehouse : undefined,
+                    locationId: scopeLocation !== 'all' ? scopeLocation : undefined,
+                    search: searchTerm || undefined,
+                    category: categoryFilter,
+                    inBranchOnly: scopeBranch !== 'all' && inBranchOnly,
+                },
             })
             setIsExportDialogOpen(false)
-            toast({ title: 'Exportado', description: 'El reporte PDF se descargó correctamente' })
+            toast({
+                title: 'Exportado',
+                description: `Se descargó ${format === 'csv' ? 'el CSV' : 'el PDF'} de ${scopeLabel}.`,
+            })
         } catch (err: unknown) {
             const message = (err as { message?: string })?.message || 'No se pudo descargar el reporte'
             toast({ title: 'Error', description: message, variant: 'destructive' })
@@ -243,16 +363,9 @@ const ProductManagement = () => {
                                         Importar / exportar
                                     </DropdownMenuLabel>
                                     {canExport && (
-                                        <DropdownMenuItem
-                                            onClick={() => {
-                                                if (selectedIds.length > 0 && viewMode === 'cards') {
-                                                    setExportSelectedFields([])
-                                                }
-                                                setIsExportDialogOpen(true)
-                                            }}
-                                        >
+                                        <DropdownMenuItem onClick={() => setIsExportDialogOpen(true)}>
                                             <Download className="mr-2 h-4 w-4" />
-                                            Exportar PDF
+                                            Exportar
                                         </DropdownMenuItem>
                                     )}
                                     {canImport && (
@@ -302,6 +415,12 @@ const ProductManagement = () => {
                                 <CalendarClock className="mr-2 h-4 w-4" />
                                 Lotes y caducidades
                             </DropdownMenuItem>
+                            {canSeeStockMoves && (
+                                <DropdownMenuItem onClick={() => navigate('/inventario/movimientos')}>
+                                    <MoveRight className="mr-2 h-4 w-4" />
+                                    Movimientos internos
+                                </DropdownMenuItem>
+                            )}
                             <DropdownMenuItem onClick={() => setIsScannerOpen(true)}>
                                 <ScanLine className="mr-2 h-4 w-4" />
                                 Escanear código
@@ -376,6 +495,66 @@ const ProductManagement = () => {
                                 ))}
                             </SelectContent>
                         </Select>
+                        <Select
+                            value={scopeBranch}
+                            onValueChange={(v) => { setScopeBranch(v); setScopeWarehouse('all'); setScopeLocation('all') }}
+                        >
+                            <SelectTrigger className="w-48">
+                                <Store className="w-4 h-4 mr-2" />
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">Todas las sucursales</SelectItem>
+                                {branches.map((b) => (
+                                    <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                        {scopeWarehouses.length > 1 && (
+                            <Select
+                                value={scopeWarehouse}
+                                onValueChange={(v) => { setScopeWarehouse(v); setScopeLocation('all') }}
+                            >
+                                <SelectTrigger className="w-48">
+                                    <SelectValue placeholder="Almacén" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">Todos los almacenes</SelectItem>
+                                    {scopeWarehouses.map((w) => (
+                                        <SelectItem key={w.id} value={w.id}>
+                                            {scopeBranch === 'all' && w.branch ? `${w.branch.name} · ` : ''}{w.name}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        )}
+                        {scopeLocations.length > 1 && (
+                            <Select value={scopeLocation} onValueChange={setScopeLocation}>
+                                <SelectTrigger className="w-48">
+                                    <SelectValue placeholder="Ubicación" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">Todas las ubicaciones</SelectItem>
+                                    {scopeLocations.map((l) => (
+                                        <SelectItem key={l.id} value={l.id}>
+                                            {scopeWarehouse === 'all' ? `${l.warehouse} · ` : ''}{l.code}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        )}
+                        {scopeBranch !== 'all' && (
+                            <div className="flex items-center gap-2 whitespace-nowrap">
+                                <Switch
+                                    id="in-branch-only"
+                                    checked={inBranchOnly}
+                                    onCheckedChange={setInBranchOnly}
+                                />
+                                <Label htmlFor="in-branch-only" className="text-sm font-normal">
+                                    Solo lo que maneja
+                                </Label>
+                            </div>
+                        )}
                     </div>
                 </CardContent>
             </Card>
@@ -456,8 +635,8 @@ const ProductManagement = () => {
                                         </thead>
                                         <tbody>
                                             {paginatedProducts.map((product, index) => (
+                                              <Fragment key={product.id}>
                                                 <tr
-                                                    key={product.id}
                                                     role="button"
                                                     tabIndex={0}
                                                     className="border-b border-border hover:bg-muted transition-colors animate-slide-up cursor-pointer"
@@ -495,8 +674,43 @@ const ProductManagement = () => {
                                                     </td>
                                                     <td className="p-3"><Badge variant="outline">{String(product.category)}</Badge></td>
                                                     <td className="p-3 text-center">
-                                                        <div className="font-medium text-foreground">{product.stock}</div>
-                                                        <div className="text-xs text-muted-foreground">Min: {product.minStock}</div>
+                                                        {product.inBranch === false ? (
+                                                            <div
+                                                                onClick={(e) => e.stopPropagation()}
+                                                                onKeyDown={(e) => e.stopPropagation()}
+                                                            >
+                                                                <p className="text-xs text-muted-foreground">No se maneja aquí</p>
+                                                                {canEdit && (
+                                                                    <Button
+                                                                        variant="outline"
+                                                                        size="sm"
+                                                                        className="mt-1 h-7 text-xs"
+                                                                        disabled={addToBranchMutation.isPending}
+                                                                        onClick={() => addToBranchMutation.mutate(product)}
+                                                                    >
+                                                                        <Store className="mr-1 h-3 w-3" /> Manejar aquí
+                                                                    </Button>
+                                                                )}
+                                                            </div>
+                                                        ) : (
+                                                            <button
+                                                                type="button"
+                                                                className="mx-auto flex items-center gap-1 rounded px-1 hover:bg-muted"
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation()
+                                                                    setExpandedId((id) => (id === product.id ? null : product.id))
+                                                                }}
+                                                                title="Ver en qué ubicaciones está"
+                                                            >
+                                                                <div>
+                                                                    <div className="font-medium text-foreground">{product.stock}</div>
+                                                                    <div className="text-xs text-muted-foreground">Min: {product.minStock}</div>
+                                                                </div>
+                                                                <ChevronDown
+                                                                    className={`h-3 w-3 text-muted-foreground transition-transform ${expandedId === product.id ? 'rotate-180' : ''}`}
+                                                                />
+                                                            </button>
+                                                        )}
                                                     </td>
                                                     <td className="p-3 text-right">
                                                         <div className="font-medium text-foreground">{fmt(product.price)}</div>
@@ -506,6 +720,10 @@ const ProductManagement = () => {
                                                     </td>
                                                     <td className="p-3 text-center">{getStatusBadge(product)}</td>
                                                 </tr>
+                                                {expandedId === product.id && (
+                                                    <StockBreakdownRow productId={product.id} />
+                                                )}
+                                              </Fragment>
                                             ))}
                                         </tbody>
                                     </table>
@@ -572,15 +790,32 @@ const ProductManagement = () => {
                                                 {/* Estado arriba + stock abajo: evita pt-11 y huecos */}
                                                 <div className="shrink-0 w-[4.75rem] sm:w-[5rem] flex flex-col items-end justify-between text-right border-l border-border/50 pl-2.5 sm:pl-3">
                                                     <div className="shrink-0">{getStatusBadge(product)}</div>
-                                                    <div>
-                                                        <div className="text-[11px] text-muted-foreground">Stock</div>
-                                                        <div className="text-xl font-bold text-foreground tabular-nums leading-none">
-                                                            {product.stock}
+                                                    {product.inBranch === false ? (
+                                                        <div onClick={(e) => e.stopPropagation()}>
+                                                            <div className="text-[11px] text-muted-foreground">No se maneja aquí</div>
+                                                            {canEdit && (
+                                                                <Button
+                                                                    variant="outline"
+                                                                    size="sm"
+                                                                    className="mt-1 h-7 px-2 text-[11px]"
+                                                                    disabled={addToBranchMutation.isPending}
+                                                                    onClick={() => addToBranchMutation.mutate(product)}
+                                                                >
+                                                                    <Store className="mr-1 h-3 w-3" /> Manejar
+                                                                </Button>
+                                                            )}
                                                         </div>
-                                                        <div className="text-[11px] text-muted-foreground mt-0.5">
-                                                            Min: {product.minStock}
+                                                    ) : (
+                                                        <div>
+                                                            <div className="text-[11px] text-muted-foreground">Stock</div>
+                                                            <div className="text-xl font-bold text-foreground tabular-nums leading-none">
+                                                                {product.stock}
+                                                            </div>
+                                                            <div className="text-[11px] text-muted-foreground mt-0.5">
+                                                                Min: {product.minStock}
+                                                            </div>
                                                         </div>
-                                                    </div>
+                                                    )}
                                                 </div>
                                             </div>
                                         </div>
@@ -633,86 +868,50 @@ const ProductManagement = () => {
             />
 
             {/* Export PDF Dialog — columnas del reporte de inventario */}
-            <Dialog open={isExportDialogOpen} onOpenChange={setIsExportDialogOpen}>
-                <DialogContent className="max-w-md">
-                    <DialogHeader>
-                        <DialogTitle>Exportar inventario</DialogTitle>
-                        <p className="text-sm text-muted-foreground">
-                            Elige qué columnas incluir en el PDF del inventario.
-                        </p>
-                    </DialogHeader>
-                    <div className="space-y-4 py-2">
-                        <div className="flex flex-wrap gap-4">
-                            {EXPORT_COLUMNS.map((col) => (
-                                <label key={col.id} className="flex items-center gap-2 cursor-pointer">
-                                    <Checkbox
-                                        checked={exportSelectedFields.includes(col.id)}
-                                        onCheckedChange={(checked) => {
-                                            setExportSelectedFields((prev) =>
-                                                checked ? [...prev, col.id] : prev.filter((f) => f !== col.id)
-                                            )
-                                        }}
-                                    />
-                                    <span className="text-sm">{col.label}</span>
-                                </label>
-                            ))}
-                        </div>
-                        <label className="flex items-center gap-2 cursor-pointer pt-2">
-                            <Checkbox
-                                checked={exportIncludeSummary}
-                                onCheckedChange={(checked) => setExportIncludeSummary(checked === true)}
-                            />
-                            <span className="text-sm">Incluir resumen (productos registrados, unidades, valor del inventario)</span>
-                        </label>
-                        <div className="flex flex-wrap gap-2 pt-2 border-t">
-                            <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                onClick={() =>
-                                    setExportSelectedFields([
-                                        'name', 'category', 'brand', 'size', 'price', 'price_wholesale', 'price_promotion', 'stock',
-                                    ])
-                                }
-                            >
-                                Listado de precios
-                            </Button>
-                            <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                onClick={() => setExportSelectedFields(EXPORT_COLUMNS.map((c) => c.id))}
-                            >
-                                Seleccionar todo
-                            </Button>
-                            <Button
-                                type="button"
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleExport(undefined, selectedIds.length ? selectedIds : undefined, exportIncludeSummary)}
-                            >
-                                Vista de tarjetas (completa)
-                            </Button>
-                            <Button
-                                type="button"
-                                size="sm"
-                                className="ml-auto bg-liquor-amber hover:bg-liquor-amber/90 text-white"
-                                onClick={() => {
-                                    const idsToExport = selectedIds.length ? selectedIds : undefined
-                                    if (exportSelectedFields.length === 0) {
-                                        handleExport(undefined, idsToExport, exportIncludeSummary)
-                                    } else {
-                                        handleExport(exportSelectedFields, idsToExport, exportIncludeSummary)
-                                    }
-                                }}
-                            >
-                                <Download className="w-4 h-4 mr-2" />
-                                Generar PDF
-                            </Button>
-                        </div>
-                    </div>
-                </DialogContent>
-            </Dialog>
+            <ExportDialog
+                open={isExportDialogOpen}
+                onOpenChange={setIsExportDialogOpen}
+                title="Exportar inventario"
+                summary={
+                    selectedIds.length > 0
+                        ? `Se exportan los ${selectedIds.length} producto(s) seleccionados.`
+                        : `Se exporta lo que estás viendo: ${scopeLabel}${searchTerm ? `, buscando "${searchTerm}"` : ''}${categoryFilter !== 'all' ? `, categoría ${categoryFilter}` : ''} (${totalItems} producto(s)).`
+                }
+                columns={EXPORT_COLUMNS}
+                defaultColumns={DEFAULT_EXPORT_COLUMNS}
+                presets={[
+                    {
+                        label: 'Listado de precios',
+                        columns: ['name', 'category', 'brand', 'size', 'price', 'price_wholesale', 'price_promotion', 'stock'],
+                    },
+                    { label: 'Todas las columnas', columns: EXPORT_COLUMNS.map((c) => c.id) },
+                ]}
+                extras={
+                    <label className="flex items-center gap-2 cursor-pointer">
+                        <Checkbox
+                            checked={exportIncludeSummary}
+                            onCheckedChange={(checked) => setExportIncludeSummary(checked === true)}
+                        />
+                        <span className="text-sm">
+                            Incluir resumen (productos registrados, unidades, valor del inventario)
+                        </span>
+                    </label>
+                }
+                secondaryAction={{
+                    label: 'Vista de tarjetas (PDF completo)',
+                    onClick: () =>
+                        handleExport(undefined, selectedIds.length ? selectedIds : undefined, exportIncludeSummary),
+                }}
+                onExport={({ format, columns }) => {
+                    if (format === 'xlsx') return // este diálogo ofrece PDF y CSV
+                    handleExport(
+                        columns?.length ? columns : undefined,
+                        selectedIds.length ? selectedIds : undefined,
+                        exportIncludeSummary,
+                        format,
+                    )
+                }}
+            />
         </div>
     )
 }

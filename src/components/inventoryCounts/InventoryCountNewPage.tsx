@@ -6,7 +6,7 @@
 
 import { useState, useMemo, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { ArrowLeft, ClipboardList } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,6 +20,14 @@ import { useCategories } from "@/hooks/useCategories";
 import { useAllSuppliers } from "@/hooks/useSuppliers";
 import { createInventorySession, startInventorySession } from "@/services/inventoryCountService";
 import type { InventoryCountScope } from "@/services/inventoryCountService";
+import { fetchWarehouses } from "@/services/warehouseService";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 type ScopeMode = "full" | "filtered";
 
@@ -28,6 +36,9 @@ export default function InventoryCountNewPage() {
   const { toast } = useToast();
   const [name, setName] = useState("");
   const [notes, setNotes] = useState("");
+  const [warehouseId, setWarehouseId] = useState("all");
+  const { data: warehousesData } = useQuery({ queryKey: ["warehouses"], queryFn: () => fetchWarehouses() });
+  const warehouses = (warehousesData ?? []).filter((w) => w.active);
   const [scopeMode, setScopeMode] = useState<ScopeMode>("full");
   const [selCategories, setSelCategories] = useState<Set<number>>(new Set());
   const [selSuppliers, setSelSuppliers] = useState<Set<string>>(new Set());
@@ -85,6 +96,7 @@ export default function InventoryCountNewPage() {
 
       const session = await createInventorySession({
         name: name.trim() || undefined,
+        warehouse_id: warehouseId === "all" ? undefined : warehouseId,
         scope,
         notes: notes.trim() || undefined,
         dual_approval: dualApproval,
@@ -157,6 +169,28 @@ export default function InventoryCountNewPage() {
               </label>
             </RadioGroup>
           </div>
+
+          {warehouses.length > 1 && (
+            <div className="space-y-2">
+              <Label>¿Qué almacén vamos a recorrer?</Label>
+              <Select value={warehouseId} onValueChange={setWarehouseId}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Toda la sucursal</SelectItem>
+                  {warehouses.map((w) => (
+                    <SelectItem key={w.id} value={w.id}>
+                      {w.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Elegir un almacén deja fuera las ubicaciones de los demás: se cuenta solo lo que hay ahí.
+              </p>
+            </div>
+          )}
 
           <div className="space-y-2">
             <Label htmlFor="ic-name">Nombre para reconocer este inventario (opcional)</Label>

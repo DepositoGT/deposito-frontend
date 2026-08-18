@@ -26,6 +26,8 @@ export type QuoteLine = {
 export type Quote = {
   id: string;
   reference?: string | null;
+  branch_id?: string;
+  branch?: { id: string; name: string; code: string } | null;
   doc_type: "QUOTE";
   status: QuoteStatus;
   valid_until?: string | null;
@@ -74,6 +76,8 @@ export type QuoteLinePayload = {
 };
 
 export type CreateQuotePayload = {
+  /** Sucursal a la que pertenece; por defecto la activa */
+  branch_id?: string;
   customer?: string;
   customer_nit?: string;
   is_final_consumer?: boolean;

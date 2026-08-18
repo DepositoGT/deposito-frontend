@@ -18,8 +18,9 @@ import { Download, Scale } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useToast } from '@/hooks/use-toast'
 import { getTrialBalance, type TrialBalanceResponse } from '@/services/accountingService'
-import { fmtQ, TYPE_LABELS, todayISO } from './format'
+import { fmtQ, TYPE_LABELS, todayISO , rangoTexto } from './format'
 import { exportTrialBalance } from './exportExcel'
+import { ExportDialog } from '@/components/shared/ExportDialog'
 
 const firstOfMonthISO = () => {
   const d = new Date()
@@ -32,6 +33,7 @@ export const TrialBalanceTab = () => {
   const [to, setTo] = useState(todayISO())
   const [data, setData] = useState<TrialBalanceResponse | null>(null)
   const [loading, setLoading] = useState(true)
+  const [exportOpen, setExportOpen] = useState(false)
 
   useEffect(() => {
     let active = true
@@ -63,9 +65,9 @@ export const TrialBalanceTab = () => {
             <Button
               variant="outline" size="sm"
               disabled={!data || data.rows.length === 0 || loading}
-              onClick={() => data && exportTrialBalance(data, { from: from || undefined, to: to || undefined })}
+              onClick={() => setExportOpen(true)}
             >
-              <Download className="h-4 w-4 mr-2" />Exportar Excel
+              <Download className="h-4 w-4 mr-2" />Exportar
             </Button>
           </div>
         </div>
@@ -123,6 +125,17 @@ export const TrialBalanceTab = () => {
           </div>
         )}
       </CardContent>
+      <ExportDialog
+        open={exportOpen}
+        onOpenChange={setExportOpen}
+        title="Exportar balanza de comprobación"
+        summary={`${rangoTexto(from, to)} (${data?.rows.length ?? 0} cuenta(s)).`}
+        formats={['xlsx']}
+        onExport={() => {
+          if (data) exportTrialBalance(data, { from: from || undefined, to: to || undefined })
+          setExportOpen(false)
+        }}
+      />
     </Card>
   )
 }

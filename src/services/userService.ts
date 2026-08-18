@@ -27,6 +27,13 @@ export interface User {
   /** Caja POS asignada (null = usa la predeterminada) */
   cash_register_id?: string | null;
   cash_register?: { id: string; name: string; code: string; active: boolean } | null;
+  /** Sucursales del usuario dentro de la empresa activa */
+  branches?: { id: string; name: string; code: string; active?: boolean }[];
+  /** false = quedó sin ninguna empresa; sale en la lista para poder recuperarlo. */
+  in_company?: boolean;
+  /** Empresas a las que pertenece (solo en el detalle) */
+  companies?: { id: string; name: string; code: string }[];
+  default_branch_id?: string | null;
   created_at?: string;
   updated_at?: string;
 }
@@ -36,6 +43,8 @@ export interface Permission {
   code: string;
   name: string;
   description?: string | null;
+  /** Permisos que este otorga por sí solo (los manda el backend). */
+  implies?: string[];
 }
 
 export interface Role {
@@ -73,6 +82,7 @@ export interface UsersQueryParams {
   page?: number;
   pageSize?: number;
   role_id?: number;
+  branch_id?: string;
   search?: string;
 }
 
@@ -91,6 +101,7 @@ export const getUsers = async (params?: UsersQueryParams): Promise<UsersResponse
   if (params?.page) search.set("page", String(params.page));
   if (params?.pageSize) search.set("pageSize", String(params.pageSize));
   if (params?.role_id) search.set("role_id", String(params.role_id));
+  if (params?.branch_id) search.set("branch_id", params.branch_id);
   if (params?.search) search.set("search", params.search);
 
   const url = `/api/auth/users${search.toString() ? `?${search.toString()}` : ""}`;

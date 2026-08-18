@@ -24,6 +24,7 @@ import {
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { AppLauncher } from './AppLauncher'
+import { TenantSwitcher } from './TenantSwitcher'
 import { CompanyLogo } from '@/components/branding/CompanyLogo'
 import { appModules, getUserRole } from '@/config/appModules'
 import { useAuthPermissions } from '@/hooks/useAuthPermissions'
@@ -127,8 +128,10 @@ export const TopBar = () => {
                 {/* Spacer */}
                 <div className='flex-1' />
 
-                {/* Zona derecha: alertas + cuenta */}
+                {/* Zona derecha: sucursal + alertas + cuenta */}
                 <div className='flex items-center gap-1 sm:gap-2 shrink-0'>
+                    <TenantSwitcher />
+
                     {/* Alertas */}
                     {canViewAlerts && (
                         <Button

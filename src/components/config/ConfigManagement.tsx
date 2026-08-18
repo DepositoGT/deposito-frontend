@@ -7,6 +7,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { useTenant } from '@/context/useTenant'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -58,6 +59,7 @@ export default function ConfigManagement() {
   const { hasPermission } = useAuthPermissions()
   const { refetch: refetchSystemSettings } = useSystemSettings()
   const canManage = hasPermission('settings.manage')
+  const { company } = useTenant()
 
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -308,7 +310,9 @@ export default function ConfigManagement() {
       <div className="mb-6">
         <h1 className="text-xl sm:text-2xl font-bold">Configuración</h1>
         <p className="text-sm text-muted-foreground">
-          Parámetros generales del sistema, moneda, zona horaria y denominaciones para cierre de caja.
+          Todo lo de esta pantalla es de{' '}
+          <strong>{company?.name ?? 'la empresa activa'}</strong>: moneda, zona horaria, datos
+          fiscales y denominaciones. Otra empresa tiene los suyos; cambiala en el selector de arriba.
         </p>
       </div>
 

@@ -23,6 +23,9 @@ if (!VITE_API_URL) {
 // Export for use in other files that need direct access
 export const getApiBaseUrl = () => VITE_API_URL;
 
+// `fetch` sin interceptar: lo usan el propio interceptor y el refresh de sesión.
+const nativeFetch = window.fetch.bind(window);
+
 export class ApiError extends Error {
   status: number;
   data?: unknown;
@@ -43,12 +46,40 @@ export const setAuthToken = (token: string | null) => {
   else localStorage.removeItem("auth:token");
 };
 
+/**
+ * Empresa y sucursal activas: viajan como X-Company-Id / X-Branch-Id en cada
+ * request. El backend valida la pertenencia; si no se mandan, usa la sucursal
+ * por defecto del usuario. `all` en la sucursal = vista consolidada (solo GET).
+ */
+const COMPANY_KEY = "tenant:companyId";
+const BRANCH_KEY = "tenant:branchId";
+
+export const getActiveCompanyId = () => localStorage.getItem(COMPANY_KEY);
+export const getActiveBranchId = () => localStorage.getItem(BRANCH_KEY);
+
+export const setActiveTenant = (companyId: string | null, branchId: string | null) => {
+  if (companyId) localStorage.setItem(COMPANY_KEY, companyId);
+  else localStorage.removeItem(COMPANY_KEY);
+  if (branchId) localStorage.setItem(BRANCH_KEY, branchId);
+  else localStorage.removeItem(BRANCH_KEY);
+  window.dispatchEvent(new Event("tenant:changed"));
+};
+
+export const tenantHeaders = (): Record<string, string> => {
+  const companyId = getActiveCompanyId();
+  const branchId = getActiveBranchId();
+  return {
+    ...(companyId ? { "X-Company-Id": companyId } : {}),
+    ...(branchId ? { "X-Branch-Id": branchId } : {}),
+  };
+};
+
 // El refresh es idempotente por sesión: si varias requests reciben 401 a la vez,
 // comparten un único POST /auth/refresh en lugar de rotar el token N veces.
 let refreshInFlight: Promise<boolean> | null = null;
 const tryRefresh = (): Promise<boolean> => {
   if (!refreshInFlight) {
-    refreshInFlight = fetch(`${VITE_API_URL}/auth/refresh`, {
+    refreshInFlight = nativeFetch(`${VITE_API_URL}/auth/refresh`, {
       method: "POST",
       credentials: "include",
     })
@@ -65,6 +96,43 @@ const tryRefresh = (): Promise<boolean> => {
 const isSessionPath = (p: string) =>
   /\/auth\/(login|refresh|logout)\b/.test(p);
 
+/**
+ * Interceptor único para todo request al backend. Existen ~35 llamadas con
+ * `fetch` directo (PDFs, importaciones, subida de imágenes, cierre de caja,
+ * cajas) que no pasan por `apiFetch`; sin esto les faltaban dos cosas:
+ *
+ *  - empresa y sucursal, así que ese módulo mostraba datos de otra sucursal;
+ *  - el reintento tras refrescar la sesión, que es lo que hacía fallar
+ *    "no se pudo verificar la caja" en la primera carga y funcionar al
+ *    reintentar (para entonces otra llamada ya había refrescado la cookie).
+ *
+ * ponytail: interceptar una vez es más seguro que recordarlo en cada llamada
+ * nueva. No toca URLs ajenas (Supabase, CDNs) ni pisa headers ya puestos.
+ */
+const installApiInterceptor = () => {
+  window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url =
+      typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+    if (!url.startsWith(VITE_API_URL)) return nativeFetch(input, init);
+
+    const headers = new Headers(
+      init?.headers ?? (input instanceof Request ? input.headers : undefined)
+    );
+    for (const [k, v] of Object.entries(tenantHeaders())) {
+      if (!headers.has(k)) headers.set(k, v);
+    }
+    // Las cookies httpOnly son la sesión; sin esto un fetch cross-origin no las manda.
+    const options: RequestInit = { credentials: "include", ...init, headers };
+
+    const res = await nativeFetch(input, options);
+    if (res.status !== 401 || isSessionPath(url)) return res;
+    if (!(await tryRefresh())) return res;
+    return nativeFetch(input, options);
+  };
+};
+
+installApiInterceptor();
+
 export const apiFetch = async <T>(
   path: string,
   options: RequestInit = {},
@@ -73,6 +141,7 @@ export const apiFetch = async <T>(
   const token = getAuthToken();
   const headers: HeadersInit = {
     "Content-Type": "application/json",
+    ...tenantHeaders(),
     ...(options.headers || {}),
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
   };
@@ -158,3 +227,42 @@ export const resolveAlert = async (id: string) => {
     method: 'PATCH',
   })
 }
+
+/**
+ * Descarga un archivo del backend (PDF, CSV) y lo guarda con el nombre que
+ * mande el servidor. El interceptor ya le pone empresa, sucursal y sesión: acá
+ * solo queda el blob y el ancla, que es lo que cada pantalla venía repitiendo.
+ */
+export const downloadFile = async (
+  path: string,
+  fallbackName: string,
+  /** Headers extra: p. ej. un alcance de sucursal distinto al activo. */
+  headers?: Record<string, string>
+): Promise<void> => {
+  const res = await fetch(`${getApiBaseUrl()}${path.startsWith("/") ? path : `/${path}`}`, {
+    method: "GET",
+    ...(headers ? { headers } : {}),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    let message = res.statusText || "No se pudo descargar el archivo";
+    try {
+      const parsed = JSON.parse(text) as { message?: unknown };
+      if (typeof parsed.message === "string") message = parsed.message;
+    } catch {
+      if (text) message = text;
+    }
+    throw new Error(message);
+  }
+  const dispo = res.headers.get("Content-Disposition");
+  const match = dispo?.match(/filename="?([^";]+)"?/i);
+  const blob = await res.blob();
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = match ? match[1] : fallbackName;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  window.URL.revokeObjectURL(url);
+};

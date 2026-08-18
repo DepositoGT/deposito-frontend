@@ -37,9 +37,11 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import { useDeleteProduct } from '@/hooks/useDeleteProduct'
+import { useDeleteProduct, useRemoveProductFromBranch } from '@/hooks/useDeleteProduct'
+import { useTenant } from '@/context/useTenant'
 import { ProductKitSection } from './ProductKitSection'
 import { ProductLotsSection } from './ProductLotsSection'
+import { ProductLocationsSection } from './ProductLocationsSection'
 
 type CategoryItem = { id: number | string; name: string }
 
@@ -83,7 +85,11 @@ export default function ProductDetailPage() {
   const deleteMutation = useDeleteProduct()
   const { mutateAsync: deleteProductAsync, isPending: deleteIsLoading } = deleteMutation
 
+  const { branch, branches } = useTenant()
+  const { mutateAsync: removeFromBranchAsync, isPending: removeBranchIsLoading } = useRemoveProductFromBranch()
+
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
+  const [isBranchDialogOpen, setIsBranchDialogOpen] = useState(false)
 
   useEffect(() => {
     const load = async () => {
@@ -222,6 +228,19 @@ export default function ProductDetailPage() {
     }
   }
 
+  const handleRemoveFromBranch = async () => {
+    if (!product) return
+    try {
+      await removeFromBranchAsync(product.id)
+      setIsBranchDialogOpen(false)
+      toast({ title: 'Producto quitado', description: `Ya no se maneja en ${branch?.name || 'esta sucursal'}.` })
+      navigate('/inventario')
+    } catch (err: unknown) {
+      const message = (err as { message?: string })?.message || 'No se pudo quitar el producto de la sucursal'
+      toast({ title: 'Error', description: message, variant: 'destructive' })
+    }
+  }
+
   const handleEditProductImageFile = async (file: File) => {
     try {
       setIsUploadingImage(true)
@@ -312,22 +331,65 @@ export default function ProductDetailPage() {
               Editar
             </Button>
           )}
+          {canDelete && !isEditing && branches.length > 1 && (
+            <Button variant="outline" onClick={() => setIsBranchDialogOpen(true)}>
+              <Trash2 className="w-4 h-4 mr-2" />
+              Quitar de esta sucursal
+            </Button>
+          )}
           {canDelete && !isEditing && (
             <Button variant="destructive" onClick={() => setIsDeleteDialogOpen(true)}>
               <Trash2 className="w-4 h-4 mr-2" />
-              Eliminar
+              {branches.length > 1 ? 'Eliminar de la empresa' : 'Eliminar'}
             </Button>
           )}
         </div>
       </div>
 
+      <AlertDialog open={isBranchDialogOpen} onOpenChange={setIsBranchDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Quitar de {branch?.name || 'esta sucursal'}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              «{product.name}» dejará de manejarse en esta sucursal. Sigue existiendo en las demás y puede volver a
+              darse de alta aquí ingresando mercancía. Requiere stock en 0.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={removeBranchIsLoading}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={removeBranchIsLoading}
+              onClick={(e) => {
+                e.preventDefault()
+                void handleRemoveFromBranch()
+              }}
+            >
+              {removeBranchIsLoading ? 'Quitando…' : 'Quitar'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>¿Eliminar producto?</AlertDialogTitle>
+            <AlertDialogTitle>
+              {branches.length > 1 ? '¿Eliminar el producto de toda la empresa?' : '¿Eliminar producto?'}
+            </AlertDialogTitle>
             <AlertDialogDescription>
-              Se eliminará «{product.name}» del inventario. Si tu sistema usa eliminación lógica, podrás restaurarlo
-              desde Inventario → Acciones → Productos eliminados.
+              {branches.length > 1 ? (
+                <>
+                  El catálogo es de la empresa, así que «{product.name}» dejará de existir en{' '}
+                  <strong>las {branches.length} sucursales</strong>, no solo en {branch?.name || 'esta'}. Para sacarlo
+                  únicamente de aquí usá «Quitar de esta sucursal». Podés restaurarlo desde Inventario → Acciones →
+                  Productos eliminados.
+                </>
+              ) : (
+                <>
+                  Se eliminará «{product.name}» del inventario. Podrás restaurarlo desde Inventario → Acciones →
+                  Productos eliminados.
+                </>
+              )}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -340,7 +402,11 @@ export default function ProductDetailPage() {
                 void handleDeleteProduct()
               }}
             >
-              {deleteIsLoading ? 'Eliminando…' : 'Eliminar'}
+              {deleteIsLoading
+                ? 'Eliminando…'
+                : branches.length > 1
+                  ? `Eliminar de las ${branches.length} sucursales`
+                  : 'Eliminar'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -664,6 +730,8 @@ export default function ProductDetailPage() {
           onUpdated={() => void reloadProduct()}
         />
       )}
+
+      {product && id && <ProductLocationsSection productId={id} />}
 
       {product && id && product.kind !== 'KIT' && (
         <ProductLotsSection productId={id} tracksExpiry={product.tracksExpiry === true} onMutated={() => void reloadProduct()} />

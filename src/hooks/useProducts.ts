@@ -21,16 +21,20 @@ export const useProducts = (params?: ProductsQueryParams) => {
   return useQuery<ProductsResponse, Error>({
     queryKey: [...PRODUCTS_QUERY_KEY, params],
     queryFn: () => fetchProducts(params),
-    staleTime: 60 * 1000, // 1 min
+    // Sin staleTime: al volver al listado (o al cambiar el filtro de sucursal) se
+    // re-consulta. Con caché de 1 min, un producto recién agregado a la sucursal
+    // desde su ficha solo aparecía recargando la página.
+    staleTime: 0,
   });
 };
 
 /** Catálogo completo en memoria (p. ej. POS). Con `forSaleOnly`, excluye productos marcados solo para inventario. */
-export const useAllProducts = (options?: { forSaleOnly?: boolean }) => {
+export const useAllProducts = (options?: { forSaleOnly?: boolean; inBranchOnly?: boolean }) => {
   const forSaleOnly = options?.forSaleOnly === true;
+  const inBranchOnly = options?.inBranchOnly === true;
   return useQuery<Product[], Error>({
-    queryKey: [...PRODUCTS_QUERY_KEY, "all", forSaleOnly],
-    queryFn: async () => fetchAllProducts({ forSaleOnly }),
+    queryKey: [...PRODUCTS_QUERY_KEY, "all", forSaleOnly, inBranchOnly],
+    queryFn: async () => fetchAllProducts({ forSaleOnly, inBranchOnly }),
     staleTime: 60 * 1000, // 1 min
   });
 };

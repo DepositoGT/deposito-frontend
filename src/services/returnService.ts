@@ -80,6 +80,7 @@ export interface Return {
       id: number
       name: string
     }
+    branch?: { id: string; name: string; code: string } | null
   }
   _stockAdjustment?: string
   _transition?: string

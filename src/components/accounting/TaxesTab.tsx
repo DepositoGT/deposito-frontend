@@ -28,6 +28,7 @@ import { useToast } from '@/hooks/use-toast'
 import { getTaxesReport, type TaxesReportResponse } from '@/services/accountingService'
 import { fmtQ, MONTH_LABELS } from './format'
 import { exportTaxes } from './exportExcel'
+import { ExportDialog } from '@/components/shared/ExportDialog'
 
 const cell = (v: number) => (v !== 0 ? fmtQ(v) : '')
 
@@ -37,6 +38,7 @@ export const TaxesTab = () => {
   const [year, setYear] = useState(currentYear)
   const [data, setData] = useState<TaxesReportResponse | null>(null)
   const [loading, setLoading] = useState(true)
+  const [exportOpen, setExportOpen] = useState(false)
 
   const years = Array.from({ length: 6 }, (_, i) => currentYear - 4 + i)
 
@@ -85,9 +87,9 @@ export const TaxesTab = () => {
             <Button
               variant="outline" size="sm"
               disabled={!data || !hasMovements || loading}
-              onClick={() => data && exportTaxes(data)}
+              onClick={() => setExportOpen(true)}
             >
-              <Download className="h-4 w-4 mr-2" />Exportar Excel
+              <Download className="h-4 w-4 mr-2" />Exportar
             </Button>
           </div>
         </div>
@@ -179,6 +181,17 @@ export const TaxesTab = () => {
           </>
         )}
       </CardContent>
+      <ExportDialog
+        open={exportOpen}
+        onOpenChange={setExportOpen}
+        title="Exportar reporte de impuestos"
+        summary={`Año ${year}, mes por mes.`}
+        formats={['xlsx']}
+        onExport={() => {
+          if (data) exportTaxes(data)
+          setExportOpen(false)
+        }}
+      />
     </Card>
   )
 }

@@ -30,6 +30,7 @@ import {
   type ApplicableProductRef,
   type ApplicableCategoryRef
 } from './PromotionApplicableScopeFields'
+import { PromotionBranchesField } from './PromotionBranchesField'
 import {
   ArrowLeft,
   Tag,
@@ -88,6 +89,8 @@ export default function PromotionCreatePage() {
   const [newManualCode, setNewManualCode] = useState('')
   const [applicableProducts, setApplicableProducts] = useState<ApplicableProductRef[]>([])
   const [applicableCategories, setApplicableCategories] = useState<ApplicableCategoryRef[]>([])
+  const [appliesToAllBranches, setAppliesToAllBranches] = useState(true)
+  const [branchIds, setBranchIds] = useState<string[]>([])
 
   const { data: promotionTypes = [] } = useQuery({
     queryKey: ['promotion-types'],
@@ -161,7 +164,9 @@ export default function PromotionCreatePage() {
         : null,
       min_purchase_amount: formData.min_purchase_amount
         ? parseFloat(formData.min_purchase_amount)
-        : null
+        : null,
+      applies_to_all_branches: appliesToAllBranches,
+      branch_ids: appliesToAllBranches ? [] : branchIds
     }
 
     if (selectedType.name === 'PERCENTAGE' || selectedType.name === 'MIN_QTY_DISCOUNT') {
@@ -229,6 +234,15 @@ export default function PromotionCreatePage() {
         payload.product_ids = applicableProducts.map((p) => p.id)
         payload.category_ids = applicableCategories.map((c) => c.id)
       }
+    }
+
+    if (!appliesToAllBranches && branchIds.length === 0) {
+      toast({
+        title: 'Sucursales',
+        description: 'Elige al menos una sucursal o marca que aplica en todas.',
+        variant: 'destructive'
+      })
+      return
     }
 
     if (codeMode === 'auto') {
@@ -730,6 +744,14 @@ export default function PromotionCreatePage() {
                   onCategoriesChange={setApplicableCategories}
                 />
               )}
+            <div className="border-t pt-4">
+              <PromotionBranchesField
+                appliesToAll={appliesToAllBranches}
+                branchIds={branchIds}
+                onAppliesToAllChange={setAppliesToAllBranches}
+                onBranchIdsChange={setBranchIds}
+              />
+            </div>
           </CardContent>
         </Card>
 

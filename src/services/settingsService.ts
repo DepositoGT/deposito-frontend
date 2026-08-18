@@ -4,7 +4,7 @@
  * This source code is licensed under a Proprietary License.
  */
 
-import { apiFetch } from './api'
+import { apiFetch, getApiBaseUrl } from './api'
 
 export interface SystemSettings {
   currency_code?: string
@@ -72,17 +72,13 @@ export async function getCompanyNamePublic(): Promise<{ company_name: string; co
 }
 
 export async function uploadCompanyLogo(file: File): Promise<{ imageUrl: string; company_logo_url: string }> {
-  const { getAuthToken } = await import('@/services/api')
-  const token = getAuthToken()
-  if (!token) throw new Error('No estás autenticado')
-
-  const base = import.meta.env.VITE_API_URL ?? ''
-  const path = base.endsWith('/') ? base + 'settings/upload-logo' : base + '/settings/upload-logo'
+  // La sesión son cookies httpOnly: no hay bearer que mandar. Exigir uno hacía
+  // fallar toda subida con "No estás autenticado" sin llegar al servidor.
   const fd = new FormData()
   fd.append('image', file)
-  const res = await fetch(path, {
+  const res = await fetch(`${getApiBaseUrl()}/settings/upload-logo`, {
     method: 'POST',
-    headers: { Authorization: `Bearer ${token}` },
+    credentials: 'include',
     body: fd,
   })
   const data = await res.json()

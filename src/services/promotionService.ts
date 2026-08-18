@@ -40,6 +40,9 @@ export interface Promotion {
     max_uses?: number
     current_uses: number
     active: boolean
+    /** true = toda la empresa; false = solo las sucursales de `branches` */
+    applies_to_all_branches?: boolean
+    branches?: { branch: { id: string; name: string; code: string } }[]
 }
 
 export interface CartItemForPromotion {
@@ -130,6 +133,7 @@ export const getPromotionByCode = async (code: string): Promise<Promotion> => {
 export const createPromotion = async (data: Partial<Promotion> & {
     product_ids?: string[]
     category_ids?: number[]
+    branch_ids?: string[]
 }): Promise<Promotion> => {
     return apiFetch<Promotion>('/promotions', {
         method: 'POST',
@@ -140,7 +144,10 @@ export const createPromotion = async (data: Partial<Promotion> & {
 /**
  * Update a promotion (admin)
  */
-export const updatePromotion = async (id: string, data: Partial<Promotion>): Promise<Promotion> => {
+export const updatePromotion = async (
+    id: string,
+    data: Partial<Promotion> & { branch_ids?: string[] }
+): Promise<Promotion> => {
     return apiFetch<Promotion>(`/promotions/${id}`, {
         method: 'PUT',
         body: JSON.stringify(data)

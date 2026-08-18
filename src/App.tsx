@@ -27,7 +27,9 @@ import CatalogImportPage from "./pages/CatalogImportPage";
 import UserImportPage from "./pages/UserImportPage";
 import { RegisterIncomingMerchandise } from "./pages/RegisterIncomingMerchandise";
 import LotsExpiryPage from "./pages/LotsExpiryPage";
+import StockMovesPage from "@/components/stock/StockMovesPage";
 import AuthProvider from "@/context/AuthProvider";
+import TenantProvider from "@/context/TenantProvider";
 
 // Layout
 import { MainLayout } from "@/components/layout";
@@ -56,6 +58,8 @@ import RolesPermissionsManagement from "@/components/users/RolesPermissionsManag
 import RolePermissionsDetail from "@/components/users/RolePermissionsDetail";
 import RoleCreatePage from "@/components/users/RoleCreatePage";
 import { CatalogsManagement } from "@/components/CatalogsManagement";
+import BranchesManagement from "@/components/branches/BranchesManagement";
+import TransfersManagement from "@/components/transfers/TransfersManagement";
 import ReturnsManagement from "@/components/ReturnsManagement";
 import CashClosureManagement from "@/components/CashClosureManagement";
 import { CashClosureCreatePage } from "@/components/cash-closure/CashClosureCreatePage";
@@ -89,6 +93,7 @@ const App = () => (
       <Toaster />
       <Sonner />
       <AuthProvider>
+       <TenantProvider>
         <BrowserRouter>
           <Routes>
             {/* Public routes (only when NOT authenticated) */}
@@ -250,6 +255,14 @@ const App = () => (
                   element={
                     <PermissionRoute any={["products.view"]}>
                       <LotsExpiryPage />
+                    </PermissionRoute>
+                  }
+                />
+                <Route
+                  path="/inventario/movimientos"
+                  element={
+                    <PermissionRoute any={["stock_moves.view", "stock_moves.create"]}>
+                      <StockMovesPage />
                     </PermissionRoute>
                   }
                 />
@@ -444,6 +457,24 @@ const App = () => (
                   }
                 /> */}
 
+                {/* Sucursales y traslados (multi-empresa) */}
+                <Route
+                  path="/sucursales"
+                  element={
+                    <PermissionRoute any={["branches.manage", "companies.manage"]}>
+                      <BranchesManagement />
+                    </PermissionRoute>
+                  }
+                />
+                <Route
+                  path="/traslados"
+                  element={
+                    <PermissionRoute any={["transfers.view", "transfers.create"]}>
+                      <TransfersManagement />
+                    </PermissionRoute>
+                  }
+                />
+
                 {/* Promotions (Admin / permisos de promociones) */}
                 <Route
                   path="/promociones"
@@ -564,6 +595,7 @@ const App = () => (
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
+       </TenantProvider>
       </AuthProvider>
     </TooltipProvider>
   </QueryClientProvider>

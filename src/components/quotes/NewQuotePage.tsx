@@ -27,6 +27,7 @@ import { useAuthPermissions } from "@/hooks/useAuthPermissions";
 import { formatMoney } from "@/utils/formatters";
 import { postPricingPreview, fetchProductsAvailability } from "@/services/productService";
 import { createQuote } from "@/services/quoteService";
+import { useTenant } from "@/context/useTenant";
 import { adaptApiSupplier, fetchSupplierById } from "@/services/supplierService";
 import { SavedCustomerMany2One } from "@/components/sales/components/SavedCustomerMany2One";
 import type { Product } from "@/types/product";
@@ -59,7 +60,7 @@ export default function NewQuotePage() {
   const fmt = (n: number) => formatMoney(n, locale, currencyCode);
 
   const canCreate = hasPermission("quotes.create");
-  const { data: products = [], isLoading: loadingProducts } = useAllProducts({ forSaleOnly: true });
+  const { data: products = [], isLoading: loadingProducts } = useAllProducts({ forSaleOnly: true, inBranchOnly: true });
 
   const [customer, setCustomer] = useState("");
   const [customerNit, setCustomerNit] = useState("");
@@ -78,6 +79,8 @@ export default function NewQuotePage() {
     Record<string, { stock: number; reserved: number; available: number }>
   >({});
   const [isSaving, setIsSaving] = useState(false);
+  const { branches, branch } = useTenant();
+  const [targetBranchId, setTargetBranchId] = useState(branch?.id ?? "");
   const [manualPriceTier, setManualPriceTier] = useState(false);
   const [selectedPriceTier, setSelectedPriceTier] = useState<QuotePriceTier>("WHOLESALE");
   const [resolvedPriceTier, setResolvedPriceTier] = useState<QuotePriceTier>("WHOLESALE");
@@ -336,6 +339,7 @@ export default function NewQuotePage() {
     setIsSaving(true);
     try {
       const created = await createQuote({
+        branch_id: targetBranchId || undefined,
         customer: customer.trim() || undefined,
         customer_nit: customerNit.trim() || undefined,
         is_final_consumer: isFinalConsumer,
@@ -423,6 +427,26 @@ export default function NewQuotePage() {
               <Label htmlFor="notes">Notas</Label>
               <Textarea id="notes" value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} />
             </div>
+            {branches.length > 1 && (
+              <div className="space-y-2">
+                <Label htmlFor="quote-branch">Sucursal</Label>
+                <Select value={targetBranchId} onValueChange={setTargetBranchId}>
+                  <SelectTrigger id="quote-branch">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {branches.map((b) => (
+                      <SelectItem key={b.id} value={b.id}>
+                        {b.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  El catálogo y el stock que ves son los de {branch?.name ?? "la sucursal activa"}.
+                </p>
+              </div>
+            )}
             <div className="rounded-md border p-3 space-y-3">
               <div className="flex items-center gap-2">
                 <Checkbox
