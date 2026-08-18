@@ -113,6 +113,13 @@ export const TransfersManagement = () => {
     const invalidate = () => {
         void queryClient.invalidateQueries({ queryKey: ['transfers'] })
         void queryClient.invalidateQueries({ queryKey: ['products'] })
+        // Recibir/cancelar mueve stock: sin esto Inventario, Análisis y
+        // Reportes siguen mostrando el saldo anterior hasta recargar.
+        void queryClient.invalidateQueries({ queryKey: ['warehouses'] })
+        void queryClient.invalidateQueries({ queryKey: ['stock-by-location'] })
+        void queryClient.invalidateQueries({ queryKey: ['stock-replenishment'] })
+        void queryClient.invalidateQueries({ queryKey: ['stock-moves'] })
+        void queryClient.invalidateQueries({ queryKey: ['analytics'] })
     }
 
     const createMutation = useMutation({
@@ -261,6 +268,12 @@ export const TransfersManagement = () => {
                                     {shrinkage > 0 && (
                                         <p className='text-xs text-destructive'>
                                             Faltante de tránsito: {shrinkage} unidad(es). Resuélvelo con un conteo de inventario.
+                                        </p>
+                                    )}
+                                    {t.status === 'RECIBIDA' && t.received_at && (
+                                        <p className='text-xs text-muted-foreground'>
+                                            Recibido {new Date(t.received_at).toLocaleString('es-GT', { dateStyle: 'short', timeStyle: 'short' })}
+                                            {t.receivedBy?.name ? ` por ${t.receivedBy.name}` : ''}
                                         </p>
                                     )}
                                     {t.status === 'EN_TRANSITO' && (
